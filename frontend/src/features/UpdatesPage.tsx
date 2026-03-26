@@ -136,8 +136,12 @@ export function UpdatesPage() {
               <div key={entry.id} className="list-row">
                 <div className="list-row-main">
                   <div className="list-row-header">
-                    <h3 className="list-row-title line-clamp-1">{entry.title}</h3>
+                    <h3 className="list-row-title line-clamp-1">
+                      {entry.version_tag ? `${entry.version_tag} · ` : ''}
+                      {entry.title}
+                    </h3>
                     <div className="list-row-meta">
+                      {entry.version_tag ? <Badge tone="success">{entry.version_tag}</Badge> : null}
                       <Badge tone={toneForProductUpdateType(entry.change_type)}>
                         {formatEnumLabel(entry.change_type)}
                       </Badge>

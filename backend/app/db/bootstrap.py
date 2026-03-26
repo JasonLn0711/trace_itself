@@ -1,10 +1,9 @@
-from datetime import datetime
-
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.enums import ProductUpdateType, UserRole
+from app.core.product_update_catalog import PRODUCT_UPDATE_CATALOG
+from app.core.enums import UserRole
 from app.models.product_update import ProductUpdate
 from app.models.user import User
 from app.services.security import hash_password, normalize_username
@@ -87,6 +86,8 @@ def apply_schema_upgrades(connection) -> None:
             """
             CREATE TABLE IF NOT EXISTS product_updates (
                 id SERIAL PRIMARY KEY,
+                entry_key VARCHAR(120) NULL,
+                version_tag VARCHAR(24) NULL,
                 title VARCHAR(160) NOT NULL,
                 summary TEXT NOT NULL,
                 details TEXT NULL,
@@ -101,6 +102,8 @@ def apply_schema_upgrades(connection) -> None:
             """
         )
     )
+    connection.execute(text("ALTER TABLE product_updates ADD COLUMN IF NOT EXISTS entry_key VARCHAR(120)"))
+    connection.execute(text("ALTER TABLE product_updates ADD COLUMN IF NOT EXISTS version_tag VARCHAR(24)"))
 
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_user_id ON asr_transcripts (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_created_at ON asr_transcripts (created_at)"))
@@ -113,7 +116,17 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_area ON product_updates (area)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_change_type ON product_updates (change_type)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_changed_at ON product_updates (changed_at)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_version_tag ON product_updates (version_tag)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_author_user_id ON product_updates (author_user_id)"))
+    connection.execute(
+        text(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_product_updates_entry_key
+            ON product_updates (entry_key)
+            WHERE entry_key IS NOT NULL
+            """
+        )
+    )
     connection.execute(
         text("CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_logs_user_log_date ON daily_logs (user_id, log_date)")
     )
@@ -230,43 +243,32 @@ def ensure_initial_admin(db: Session) -> User:
     return admin
 
 
-def ensure_default_product_updates(db: Session, admin_id: int) -> None:
-    existing_update = db.query(ProductUpdate).order_by(ProductUpdate.id.asc()).first()
-    if existing_update:
-        return
+def sync_product_updates_catalog(db: Session, admin_id: int) -> None:
+    items = list(db.scalars(select(ProductUpdate).order_by(ProductUpdate.id.asc())).all())
+    existing_by_key = {item.entry_key: item for item in items if item.entry_key}
+    legacy_by_title = {item.title: item for item in items if not item.entry_key}
 
-    entries = [
-        ProductUpdate(
-            title="Next.js app runtime",
-            summary="The frontend now runs on Next.js App Router with the same private session flow.",
-            details="We replaced the old SPA shell with Next.js routes, protected layouts, and a same-origin API proxy so the product is easier to evolve without changing the deployment model.",
-            area="frontend",
-            change_type=ProductUpdateType.BUILD,
-            changed_at=datetime.fromisoformat("2026-03-26T00:00:00+00:00"),
-            is_pinned=True,
-            author_user_id=admin_id,
-        ),
-        ProductUpdate(
-            title="Shared account system",
-            summary="Multiple users can sign in with isolated data and admin-managed access.",
-            details="This added user management, account roles, password resets, and temporary lockouts after repeated failed login attempts.",
-            area="users",
-            change_type=ProductUpdateType.SECURITY,
-            changed_at=datetime.fromisoformat("2026-03-26T00:00:00+00:00"),
-            author_user_id=admin_id,
-        ),
-        ProductUpdate(
-            title="Progress dashboard refresh",
-            summary="The dashboard now uses clearer dark-mode visuals, progress bars, and tighter task focus.",
-            details="We simplified page copy, reduced visual noise, and kept the main questions visible: what is active, what is overdue, and what to do next.",
-            area="dashboard",
-            change_type=ProductUpdateType.UPDATE,
-            changed_at=datetime.fromisoformat("2026-03-26T00:00:00+00:00"),
-            author_user_id=admin_id,
-        ),
-    ]
-    db.add_all(entries)
-    db.commit()
+    dirty = False
+    for entry in PRODUCT_UPDATE_CATALOG:
+        item = existing_by_key.get(entry.entry_key) or legacy_by_title.get(entry.title)
+        if item is None:
+            item = ProductUpdate(entry_key=entry.entry_key)
+            db.add(item)
+
+        item.entry_key = entry.entry_key
+        item.version_tag = entry.version_tag
+        item.title = entry.title
+        item.summary = entry.summary
+        item.details = entry.details
+        item.area = entry.area
+        item.change_type = entry.change_type
+        item.changed_at = entry.changed_at
+        item.is_pinned = entry.is_pinned
+        item.author_user_id = admin_id
+        dirty = True
+
+    if dirty:
+        db.commit()
 
 
 def backfill_existing_data(db: Session, admin_id: int) -> None:

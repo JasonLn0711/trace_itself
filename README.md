@@ -123,6 +123,13 @@ Why this shape:
 
 The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
 
+Notes for the versioned updates log:
+
+- The `Updates` page is read-only for signed-in users.
+- Release entries are source-controlled in [backend/app/core/product_update_catalog.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/core/product_update_catalog.py).
+- When you ship a new page or feature change, add a new catalog entry with the new date and a version label such as `v1.0.55`, then rebuild the backend.
+- On startup, the backend syncs that catalog into the database so the `Updates` page and dashboard stay current.
+
 Notes for ASR:
 
 - The first transcription request downloads the ASR model into the Docker volume `asr_model_cache`.

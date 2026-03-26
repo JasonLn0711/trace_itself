@@ -33,6 +33,7 @@ class ProductUpdateRead(ProductUpdateBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    version_tag: str | None = None
     author_user_id: int | None
     author_display_name: str | None = None
     created_at: datetime

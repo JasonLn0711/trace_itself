@@ -69,6 +69,7 @@ export interface User {
 
 export interface ProductUpdate {
   id: number;
+  version_tag: string | null;
   title: string;
   summary: string;
   details: string | null;

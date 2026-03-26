@@ -9,9 +9,9 @@ from app.db.base import Base
 from app.db.bootstrap import (
     apply_schema_upgrades,
     backfill_existing_data,
-    ensure_default_product_updates,
     ensure_initial_admin,
     finalize_schema_upgrades,
+    sync_product_updates_catalog,
 )
 
 settings = get_settings()
@@ -38,7 +38,7 @@ def init_db() -> None:
             with SessionLocal() as db:
                 admin = ensure_initial_admin(db)
                 backfill_existing_data(db, admin.id)
-                ensure_default_product_updates(db, admin.id)
+                sync_product_updates_catalog(db, admin.id)
             with engine.begin() as connection:
                 finalize_schema_upgrades(connection)
             return

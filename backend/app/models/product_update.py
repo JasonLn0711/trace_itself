@@ -11,6 +11,8 @@ class ProductUpdate(Base):
     __tablename__ = "product_updates"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    entry_key: Mapped[str | None] = mapped_column(String(120), unique=True)
+    version_tag: Mapped[str | None] = mapped_column(String(24), index=True)
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     summary: Mapped[str] = mapped_column(Text(), nullable=False)
     details: Mapped[str | None] = mapped_column(Text())
