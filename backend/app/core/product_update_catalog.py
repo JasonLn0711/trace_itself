@@ -253,4 +253,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="meeting-language-preset-list",
+        version_tag="v1.0.65",
+        title="Meeting language preset list",
+        summary="The audio page now uses a short language picker instead of free text.",
+        details=(
+            "Users can now choose from auto, zh-tw, jp, kr, and en in the transcript and meeting flows, "
+            "while the app maps those choices to ASR-safe language codes behind the scenes."
+        ),
+        area="frontend",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=False,
+    ),
 )

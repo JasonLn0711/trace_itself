@@ -32,6 +32,14 @@ type MeetingTab = 'summary' | 'minutes' | 'actions' | 'transcript';
 type WorkspaceMode = 'transcript' | 'meeting';
 type TranscriptInputMode = 'live' | 'file';
 
+const LANGUAGE_OPTIONS = [
+  { value: '', label: 'auto' },
+  { value: 'zh', label: 'zh-tw' },
+  { value: 'ja', label: 'jp' },
+  { value: 'ko', label: 'kr' },
+  { value: 'en', label: 'en' }
+] as const;
+
 function excerpt(value: string, max = 160) {
   const compact = value.replace(/\s+/g, ' ').trim();
   if (compact.length <= max) {
@@ -45,6 +53,14 @@ function splitActionItems(value: string) {
     .split('\n')
     .map((line) => line.replace(/^-\s*/, '').trim())
     .filter(Boolean);
+}
+
+function languageLabel(value: string | null | undefined) {
+  const normalized = (value || '').trim().toLowerCase();
+  if (!normalized) {
+    return 'auto';
+  }
+  return LANGUAGE_OPTIONS.find((option) => option.value === normalized)?.label ?? normalized;
 }
 
 export function MeetingsPage() {
@@ -478,7 +494,13 @@ export function MeetingsPage() {
                 </label>
                 <label className="field">
                   <span>Language</span>
-                  <input value={language} onChange={(event) => setLanguage(event.target.value)} placeholder="auto, en, zh" />
+                  <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.label} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
               {asrProviders.length > 1 ? (
@@ -538,7 +560,13 @@ export function MeetingsPage() {
                 </label>
                 <label className="field">
                   <span>Language</span>
-                  <input value={language} onChange={(event) => setLanguage(event.target.value)} placeholder="auto, en, zh" />
+                  <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+                    {LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.label} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               </div>
               {asrProviders.length > 1 ? (
@@ -603,7 +631,7 @@ export function MeetingsPage() {
                           <Badge tone={selectedTranscriptId === entry.id ? 'info' : 'neutral'}>
                             {selectedTranscriptId === entry.id ? 'Open' : 'Saved'}
                           </Badge>
-                          <Badge tone="neutral">{entry.language || 'auto'}</Badge>
+                          <Badge tone="neutral">{languageLabel(entry.language)}</Badge>
                           <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
                         </div>
                       </div>
@@ -641,7 +669,7 @@ export function MeetingsPage() {
                         <Badge tone={selectedMeetingId === entry.id ? 'info' : 'neutral'}>
                           {selectedMeetingId === entry.id ? 'Open' : 'Saved'}
                         </Badge>
-                        <Badge tone="neutral">{entry.language || 'auto'}</Badge>
+                        <Badge tone="neutral">{languageLabel(entry.language)}</Badge>
                         <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
                       </div>
                     </div>
@@ -697,7 +725,7 @@ export function MeetingsPage() {
           ) : selectedTranscript ? (
             <div className="transcript-surface">
               <div className="detail-row">
-                <Badge tone="neutral">{selectedTranscript.language || 'auto'}</Badge>
+                <Badge tone="neutral">{languageLabel(selectedTranscript.language)}</Badge>
                 <Badge tone="neutral">{formatDuration(selectedTranscript.duration_seconds)}</Badge>
                 <Badge tone="neutral">{formatBytes(selectedTranscript.file_size_bytes)}</Badge>
                 <Badge tone="info">{selectedTranscript.model_name}</Badge>
@@ -716,7 +744,7 @@ export function MeetingsPage() {
         ) : selectedMeeting ? (
           <div className="transcript-surface">
             <div className="detail-row">
-              <Badge tone="neutral">{selectedMeeting.language || 'auto'}</Badge>
+              <Badge tone="neutral">{languageLabel(selectedMeeting.language)}</Badge>
               <Badge tone="neutral">{formatDuration(selectedMeeting.duration_seconds)}</Badge>
               <Badge tone="neutral">{formatBytes(selectedMeeting.file_size_bytes)}</Badge>
               <Badge tone="info">{selectedMeeting.asr_model_name}</Badge>
