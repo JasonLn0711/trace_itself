@@ -29,6 +29,8 @@ services:
       - db
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - asr_model_cache:/root/.cache/huggingface
     networks:
       - internal
 
@@ -49,6 +51,7 @@ services:
 
 volumes:
   postgres_data:
+  asr_model_cache:
 
 networks:
   internal:

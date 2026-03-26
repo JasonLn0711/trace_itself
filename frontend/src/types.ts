@@ -82,6 +82,32 @@ export interface ProductUpdate {
   updated_at: string;
 }
 
+export interface AsrTranscriptSummary {
+  id: number;
+  title: string;
+  original_filename: string;
+  language: string | null;
+  duration_seconds: number | null;
+  file_size_bytes: number;
+  model_name: string;
+  excerpt: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AsrTranscript {
+  id: number;
+  title: string;
+  original_filename: string;
+  language: string | null;
+  duration_seconds: number | null;
+  file_size_bytes: number;
+  model_name: string;
+  transcript_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardSummary {
   active_projects: Project[];
   today_tasks: Task[];

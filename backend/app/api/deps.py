@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.daily_log import DailyLog
+from app.models.asr_transcript import AsrTranscript
 from app.models.milestone import Milestone
 from app.models.project import Project
 from app.models.task import Task
@@ -79,3 +80,14 @@ def get_daily_log_or_404(
     if not daily_log:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Daily log not found.")
     return daily_log
+
+
+def get_asr_transcript_or_404(
+    transcript_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AsrTranscript:
+    transcript = db.scalar(select(AsrTranscript).where(AsrTranscript.id == transcript_id, AsrTranscript.user_id == current_user.id))
+    if not transcript:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transcript not found.")
+    return transcript

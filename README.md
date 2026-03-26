@@ -2,12 +2,18 @@
 
 `trace_itself` is a private, self-hosted execution dashboard for long-horizon learning and project management. It stays intentionally narrow, but it now supports multiple private user accounts with isolated data.
 
+It now has two main user-facing functions:
+
+- Progress tracking for projects, milestones, tasks, and daily logs
+- Private ASR for turning uploaded audio into saved transcripts per user
+
 ## MVP scope
 
 - Multi-user account login with per-user private data
 - Admin-managed user accounts and password resets
 - Temporary account lockout after repeated failed login attempts
 - Projects, milestones, tasks, and daily logs
+- Private ASR uploads with per-user transcript history
 - Shared product updates log for fixes, builds, and release notes
 - Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
 - FastAPI backend with PostgreSQL
@@ -20,6 +26,7 @@
 - Frontend: Next.js + React
 - Backend: FastAPI + SQLAlchemy
 - Database: PostgreSQL 16
+- ASR engine: local Whisper inference with `faster-whisper`
 - Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
 - Deployment: Docker Compose with a Next.js standalone frontend container
 - Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
@@ -28,6 +35,7 @@ Why this shape:
 
 - Next.js gives us file-based routing, a cleaner production runtime, and an easier path to future server-side optimization without changing the product model.
 - FastAPI + SQLAlchemy gives us typed APIs and a clean data layer without extra framework weight.
+- Local ASR keeps transcripts private to the lab machine instead of shipping audio to a third-party service.
 - Postgres stays on the internal Docker network and is never published.
 - The frontend and backend bind to `127.0.0.1` on the host so the default posture is private-first.
 
@@ -79,6 +87,12 @@ Why this shape:
    - `INITIAL_ADMIN_USERNAME`
    - `INITIAL_ADMIN_PASSWORD`
 
+   Optional ASR tuning:
+
+   - `ASR_MODEL_NAME=small`
+   - `ASR_DEVICE=cpu`
+   - `ASR_COMPUTE_TYPE=int8`
+
 3. Start the stack:
 
    ```bash
@@ -98,6 +112,12 @@ Why this shape:
 6. If you need more accounts, sign in as the admin user and open the `Users` page.
 
 The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
+
+Notes for ASR:
+
+- The first transcription request downloads the ASR model into the Docker volume `asr_model_cache`.
+- Uploaded audio is processed on the server and only the transcript is stored in Postgres.
+- Supported upload formats include common file types such as `wav`, `mp3`, `m4a`, `ogg`, `flac`, and `webm`.
 
 ## Local development
 
@@ -142,6 +162,8 @@ Use these commands when you change code:
   ```bash
   docker compose up --build -d backend
   ```
+
+  Use this after ASR model/config changes too.
 
 - Frontend and backend together, or you are not sure:
 

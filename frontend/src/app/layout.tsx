@@ -5,7 +5,7 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'trace_itself',
-  description: 'Private self-hosted progress dashboard'
+  description: 'Private self-hosted progress dashboard and ASR workspace'
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

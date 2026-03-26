@@ -1,4 +1,6 @@
 import type {
+  AsrTranscript,
+  AsrTranscriptSummary,
   DailyLog,
   DashboardSummary,
   Milestone,
@@ -42,6 +44,35 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       ...(headers ?? {})
     },
     body: body === undefined ? undefined : JSON.stringify(body)
+  });
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const isJson = contentType.includes('application/json');
+  const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
+
+  if (!response.ok) {
+    if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
+      window.location.assign('/login');
+    }
+    throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
+  }
+
+  return payload as T;
+}
+
+async function requestForm<T>(
+  path: string,
+  formData: FormData,
+  options: Omit<RequestOptions, 'body'> = {}
+): Promise<T> {
+  const { headers, handleUnauthorized = true, ...init } = options;
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    ...init,
+    headers: {
+      ...(headers ?? {})
+    },
+    body: formData
   });
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -133,6 +164,33 @@ export const authApi = {
   me() {
     return request<UserSession>('/auth/me', {
       handleUnauthorized: false
+    });
+  }
+};
+
+export const asrApi = {
+  list(query?: { limit?: number }) {
+    return request<AsrTranscriptSummary[]>(withQuery('/asr/transcripts', query));
+  },
+  get(id: number) {
+    return request<AsrTranscript>(`/asr/transcripts/${id}`);
+  },
+  transcribe(input: { file: File; title?: string; language?: string }) {
+    const formData = new FormData();
+    formData.append('file', input.file);
+    if (input.title?.trim()) {
+      formData.append('title', input.title.trim());
+    }
+    if (input.language?.trim()) {
+      formData.append('language', input.language.trim());
+    }
+    return requestForm<AsrTranscript>('/asr/transcripts', formData, {
+      method: 'POST'
+    });
+  },
+  remove(id: number) {
+    return request<void>(`/asr/transcripts/${id}`, {
+      method: 'DELETE'
     });
   }
 };

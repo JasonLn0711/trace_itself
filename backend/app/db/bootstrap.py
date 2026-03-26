@@ -37,6 +37,25 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(
         text(
             """
+            CREATE TABLE IF NOT EXISTS asr_transcripts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                title VARCHAR(200) NOT NULL,
+                original_filename VARCHAR(255) NOT NULL,
+                language VARCHAR(32) NULL,
+                duration_seconds DOUBLE PRECISION NULL,
+                file_size_bytes BIGINT NOT NULL,
+                model_name VARCHAR(120) NOT NULL,
+                transcript_text TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
             CREATE TABLE IF NOT EXISTS product_updates (
                 id SERIAL PRIMARY KEY,
                 title VARCHAR(160) NOT NULL,
@@ -54,6 +73,8 @@ def apply_schema_upgrades(connection) -> None:
         )
     )
 
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_user_id ON asr_transcripts (user_id)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_created_at ON asr_transcripts (created_at)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_projects_user_id ON projects (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_milestones_user_id ON milestones (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_tasks_user_id ON tasks (user_id)"))
