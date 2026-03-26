@@ -210,4 +210,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="idle-session-timeout",
+        version_tag="v1.0.62",
+        title="Idle session timeout",
+        summary="Accounts now sign out after 5 minutes of inactivity.",
+        details=(
+            "The frontend now tracks page activity, keeps the session alive while uploads or recordings are actively "
+            "running, and returns the user to login with a short timeout message after 5 idle minutes."
+        ),
+        area="security",
+        change_type=ProductUpdateType.SECURITY,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

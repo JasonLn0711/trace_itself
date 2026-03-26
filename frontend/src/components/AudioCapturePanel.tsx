@@ -1,8 +1,9 @@
 'use client';
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button, Notice } from './Primitives';
 import { formatBytes, formatDuration } from '../lib/media';
+import { useAuth } from '../state/AuthContext';
 
 type RecordingPreset = {
   mimeType: string;
@@ -56,6 +57,8 @@ export function AudioCapturePanel({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<number | null>(null);
+  const { setSessionHold } = useAuth();
+  const sessionHoldKey = useId();
 
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -89,6 +92,13 @@ export function AudioCapturePanel({
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
+
+  useEffect(() => {
+    setSessionHold(`audio-capture:${sessionHoldKey}`, isRecording);
+    return () => {
+      setSessionHold(`audio-capture:${sessionHoldKey}`, false);
+    };
+  }, [isRecording, sessionHoldKey, setSessionHold]);
 
   function resetClock() {
     if (timerRef.current !== null) {

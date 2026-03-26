@@ -24,6 +24,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const nextPath = safeRedirectPath(searchParams?.get('next') ?? null);
+  const logoutReason = searchParams?.get('reason') ?? '';
 
   useEffect(() => {
     if (authenticated && !loading) {
@@ -111,6 +112,7 @@ export function LoginPage() {
             </Field>
           </div>
 
+          {logoutReason === 'idle' && !error ? <Notice title="Session timed out" description="Sign in again." /> : null}
           {error ? <Notice title="Sign-in failed" description={error} tone="danger" /> : null}
 
           <Button type="submit" disabled={submitting || !username.trim() || !password}>

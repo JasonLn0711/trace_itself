@@ -41,31 +41,62 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
 };
 
 const API_BASE = '/api';
+const apiActivityListeners = new Set<(pendingCount: number) => void>();
+let pendingApiRequests = 0;
+
+function notifyApiActivityListeners() {
+  for (const listener of apiActivityListeners) {
+    listener(pendingApiRequests);
+  }
+}
+
+function beginApiActivity() {
+  pendingApiRequests += 1;
+  notifyApiActivityListeners();
+}
+
+function endApiActivity() {
+  pendingApiRequests = Math.max(0, pendingApiRequests - 1);
+  notifyApiActivityListeners();
+}
+
+export function subscribeApiActivity(listener: (pendingCount: number) => void) {
+  apiActivityListeners.add(listener);
+  listener(pendingApiRequests);
+  return () => {
+    apiActivityListeners.delete(listener);
+  };
+}
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, headers, handleUnauthorized = true, ...init } = options;
-  const response = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(headers ?? {})
-    },
-    body: body === undefined ? undefined : JSON.stringify(body)
-  });
+  beginApiActivity();
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(headers ?? {})
+      },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const isJson = contentType.includes('application/json');
-  const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
+    const contentType = response.headers.get('content-type') ?? '';
+    const isJson = contentType.includes('application/json');
+    const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
 
-  if (!response.ok) {
-    if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
-      window.location.assign('/login');
+    if (!response.ok) {
+      if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
+        window.location.assign('/login');
+      }
+      throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
     }
-    throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
-  }
 
-  return payload as T;
+    return payload as T;
+  } finally {
+    endApiActivity();
+  }
 }
 
 async function requestForm<T>(
@@ -74,27 +105,32 @@ async function requestForm<T>(
   options: Omit<RequestOptions, 'body'> = {}
 ): Promise<T> {
   const { headers, handleUnauthorized = true, ...init } = options;
-  const response = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    ...init,
-    headers: {
-      ...(headers ?? {})
-    },
-    body: formData
-  });
+  beginApiActivity();
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      ...init,
+      headers: {
+        ...(headers ?? {})
+      },
+      body: formData
+    });
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const isJson = contentType.includes('application/json');
-  const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
+    const contentType = response.headers.get('content-type') ?? '';
+    const isJson = contentType.includes('application/json');
+    const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
 
-  if (!response.ok) {
-    if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
-      window.location.assign('/login');
+    if (!response.ok) {
+      if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
+        window.location.assign('/login');
+      }
+      throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
     }
-    throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
-  }
 
-  return payload as T;
+    return payload as T;
+  } finally {
+    endApiActivity();
+  }
 }
 
 async function requestBinary<T>(
@@ -104,28 +140,33 @@ async function requestBinary<T>(
 ): Promise<T> {
   const { headers, handleUnauthorized = true, ...init } = options;
   const binaryBody = body instanceof Uint8Array ? body.slice().buffer : body;
-  const response = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    ...init,
-    headers: {
-      'Content-Type': 'application/octet-stream',
-      ...(headers ?? {})
-    },
-    body: binaryBody
-  });
+  beginApiActivity();
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      ...init,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        ...(headers ?? {})
+      },
+      body: binaryBody
+    });
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const isJson = contentType.includes('application/json');
-  const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
+    const contentType = response.headers.get('content-type') ?? '';
+    const isJson = contentType.includes('application/json');
+    const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
 
-  if (!response.ok) {
-    if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
-      window.location.assign('/login');
+    if (!response.ok) {
+      if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
+        window.location.assign('/login');
+      }
+      throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
     }
-    throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
-  }
 
-  return payload as T;
+    return payload as T;
+  } finally {
+    endApiActivity();
+  }
 }
 
 function normalizeErrorMessage(payload: unknown): string | undefined {

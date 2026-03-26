@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Notice, ProgressBar } from './Primitives';
 import { asrApi, extractApiErrorMessage } from '../lib/api';
 import { formatDuration } from '../lib/media';
 import type { AsrTranscript, LiveAsrSessionSnapshot } from '../types';
+import { useAuth } from '../state/AuthContext';
 
 type RecordingPreset = {
   mimeType: string;
@@ -87,6 +88,8 @@ export function LiveAsrPanel({
   const [snapshot, setSnapshot] = useState<LiveAsrSessionSnapshot | null>(null);
   const [localError, setLocalError] = useState('');
   const [pendingSave, setPendingSave] = useState(false);
+  const { setSessionHold } = useAuth();
+  const sessionHoldKey = useId();
 
   const pipelineRef = useRef<PipelineRefs | null>(null);
   const chunkQueueRef = useRef<Uint8Array[]>([]);
@@ -112,6 +115,14 @@ export function LiveAsrPanel({
       void teardownPipeline();
     };
   }, []);
+
+  useEffect(() => {
+    const active = state !== 'idle';
+    setSessionHold(`live-asr:${sessionHoldKey}`, active);
+    return () => {
+      setSessionHold(`live-asr:${sessionHoldKey}`, false);
+    };
+  }, [sessionHoldKey, setSessionHold, state]);
 
   const liveLabel =
     state === 'connecting'
