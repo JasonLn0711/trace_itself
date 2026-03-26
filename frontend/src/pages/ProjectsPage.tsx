@@ -1,8 +1,21 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, EmptyState, Field, SectionHeader } from '../components/Primitives';
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  EmptyState,
+  Field,
+  MetricPill,
+  Notice,
+  PageIntro,
+  SectionHeader,
+  SegmentedControl
+} from '../components/Primitives';
 import { extractApiErrorMessage, projectsApi } from '../lib/api';
 import { formatDate } from '../lib/dates';
+import { formatEnumLabel, toneForPriority, toneForProjectStatus } from '../lib/presentation';
 import type { Project } from '../types';
 
 type ProjectFormState = {
@@ -34,6 +47,8 @@ function projectToForm(project: Project): ProjectFormState {
   };
 }
 
+type ViewFilter = 'active' | 'planned' | 'paused' | 'completed' | 'all';
+
 export function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<ProjectFormState>(defaultProjectForm());
@@ -41,6 +56,10 @@ export function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [search, setSearch] = useState('');
+  const [viewFilter, setViewFilter] = useState<ViewFilter>('active');
+  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
   async function loadProjects() {
     const items = await projectsApi.list();
@@ -49,11 +68,16 @@ export function ProjectsPage() {
 
   useEffect(() => {
     let alive = true;
+
     async function load() {
       try {
         const items = await projectsApi.list();
         if (alive) {
           setProjects(items);
+        }
+      } catch (err) {
+        if (alive) {
+          setError(extractApiErrorMessage(err));
         }
       } finally {
         if (alive) {
@@ -61,21 +85,58 @@ export function ProjectsPage() {
         }
       }
     }
+
     void load();
     return () => {
       alive = false;
     };
   }, []);
 
-  const activeProjects = useMemo(
-    () => projects.filter((project) => project.status !== 'completed' && project.status !== 'archived'),
-    [projects]
-  );
+  const activeCount = projects.filter((project) => project.status === 'active').length;
+  const plannedCount = projects.filter((project) => project.status === 'planned').length;
+  const pausedCount = projects.filter((project) => project.status === 'paused').length;
+  const completedCount = projects.filter((project) => project.status === 'completed').length;
+  const noTargetCount = projects.filter((project) => !project.target_date && project.status !== 'completed' && project.status !== 'archived').length;
+
+  const visibleProjects = useMemo(() => {
+    let items = [...projects].sort((left, right) => {
+      const leftTarget = left.target_date ?? '9999-12-31';
+      const rightTarget = right.target_date ?? '9999-12-31';
+      if (leftTarget !== rightTarget) {
+        return leftTarget.localeCompare(rightTarget);
+      }
+      return left.name.localeCompare(right.name);
+    });
+
+    if (viewFilter !== 'all') {
+      items = items.filter((project) => {
+        if (viewFilter === 'active') {
+          return project.status === 'active';
+        }
+        return project.status === viewFilter;
+      });
+    }
+
+    if (deferredSearch) {
+      items = items.filter((project) => [project.name, project.description ?? ''].join(' ').toLowerCase().includes(deferredSearch));
+    }
+
+    return items;
+  }, [deferredSearch, projects, viewFilter]);
+
+  const filterOptions = [
+    { value: 'active', label: 'Active', count: activeCount },
+    { value: 'planned', label: 'Planned', count: plannedCount },
+    { value: 'paused', label: 'Paused', count: pausedCount },
+    { value: 'completed', label: 'Completed', count: completedCount },
+    { value: 'all', label: 'All', count: projects.length }
+  ] satisfies Array<{ value: ViewFilter; label: string; count: number }>;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError('');
+    setNotice('');
 
     const payload = {
       ...form,
@@ -87,8 +148,10 @@ export function ProjectsPage() {
     try {
       if (editingId) {
         await projectsApi.update(editingId, payload);
+        setNotice('Project updated.');
       } else {
         await projectsApi.create(payload);
+        setNotice('Project created.');
       }
       await loadProjects();
       setForm(defaultProjectForm());
@@ -103,20 +166,26 @@ export function ProjectsPage() {
   function editProject(project: Project) {
     setEditingId(project.id);
     setForm(projectToForm(project));
+    setError('');
+    setNotice('');
   }
 
-  async function removeProject(id: number) {
-    const confirmed = window.confirm('Delete this project and its nested items?');
+  async function removeProject(project: Project) {
+    const confirmed = window.confirm(`Delete project "${project.name}" and its milestones/tasks?`);
     if (!confirmed) {
       return;
     }
+
+    setError('');
+    setNotice('');
     try {
-      await projectsApi.remove(id);
-      if (editingId === id) {
+      await projectsApi.remove(project.id);
+      if (editingId === project.id) {
         setEditingId(null);
         setForm(defaultProjectForm());
       }
       await loadProjects();
+      setNotice('Project deleted.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     }
@@ -135,43 +204,70 @@ export function ProjectsPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>Projects</h1>
-          <p className="muted">Track long-horizon work, one project at a time.</p>
-        </div>
-      </div>
+      <PageIntro
+        eyebrow="Portfolio view"
+        title="Projects"
+        description="Use projects as the stable frame for long-horizon work. If the list is clear here, the rest of the system gets easier to trust."
+        actions={
+          <>
+            <Link className="btn btn-primary" to="/tasks">Open task queue</Link>
+            <Link className="btn btn-ghost" to="/">Back to dashboard</Link>
+          </>
+        }
+        aside={
+          <div className="metric-strip">
+            <MetricPill label="Active" value={activeCount} tone="info" />
+            <MetricPill label="Planned" value={plannedCount} tone="neutral" />
+            <MetricPill label="Paused" value={pausedCount} tone={pausedCount ? 'warning' : 'neutral'} />
+            <MetricPill label="Missing target date" value={noTargetCount} tone={noTargetCount ? 'warning' : 'success'} />
+          </div>
+        }
+      />
+
+      {noTargetCount > 0 ? (
+        <Callout
+          title="Some active work has no target date"
+          description="Target dates are optional, but they reduce ambiguity and make the dashboard easier to prioritize."
+          tone="warning"
+        />
+      ) : null}
+
+      {error ? <Notice title="Could not update projects" description={error} tone="danger" /> : null}
+      {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title={editingId ? 'Edit project' : 'Create project'} description="Use one project per learning track or initiative." />
+          <SectionHeader
+            title={editingId ? 'Edit project' : 'Add project'}
+            description="One project per learning track, initiative, or sustained goal."
+          />
           <form className="form-grid" onSubmit={handleSubmit}>
-            <Field label="Name">
-              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+            <Field label="Name" hint="Use a stable title you will recognize later.">
+              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Example: FastAPI fundamentals" required />
             </Field>
-            <Field label="Description">
+            <Field label="Description" hint="What is the point of this track or initiative?">
               <textarea
                 value={form.description}
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
-                placeholder="What is this project about?"
+                placeholder="Why it matters, what success looks like, or the current focus."
               />
             </Field>
             <div className="form-grid cols-2">
               <Field label="Priority">
                 <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
-                  <option value="low">low</option>
-                  <option value="medium">medium</option>
-                  <option value="high">high</option>
-                  <option value="critical">critical</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
                 </select>
               </Field>
               <Field label="Status">
                 <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
-                  <option value="planned">planned</option>
-                  <option value="active">active</option>
-                  <option value="paused">paused</option>
-                  <option value="completed">completed</option>
-                  <option value="archived">archived</option>
+                  <option value="planned">Planned</option>
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="completed">Completed</option>
+                  <option value="archived">Archived</option>
                 </select>
               </Field>
             </div>
@@ -183,9 +279,6 @@ export function ProjectsPage() {
                 <input type="date" value={form.target_date} onChange={(event) => setForm({ ...form, target_date: event.target.value })} />
               </Field>
             </div>
-
-            {error ? <EmptyState title="Could not save project" description={error} /> : null}
-
             <div className="helper-row">
               <Button type="submit" disabled={saving}>
                 {saving ? 'Saving...' : editingId ? 'Update project' : 'Create project'}
@@ -207,65 +300,80 @@ export function ProjectsPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Project overview" description="A quick browse of every track you are managing." />
-          <div className="list-grid">
-            {projects.length ? (
-              projects.map((project) => (
-                <div key={project.id} className="entity">
+          <SectionHeader title="Project list" description="Filter the list until the next steering decision is obvious." />
+          <div className="toolbar">
+            <SegmentedControl label="Project status filter" value={viewFilter} onChange={(value) => setViewFilter(value as ViewFilter)} options={filterOptions} />
+            <div className="toolbar-row">
+              <Field label="Search">
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search project title or description" />
+              </Field>
+            </div>
+          </div>
+
+          <div className="divider" />
+
+          <div className="cluster-grid">
+            {visibleProjects.length ? (
+              visibleProjects.map((project) => (
+                <div key={project.id} className="surface-soft">
                   <div className="entity-top">
-                    <div>
+                    <div className="entity-copy">
                       <h3 className="entity-title">{project.name}</h3>
                       <p className="muted">{project.description || 'No description yet.'}</p>
                     </div>
-                    <Badge tone={project.status === 'completed' ? 'success' : project.status === 'paused' ? 'warning' : 'info'}>
-                      {project.status}
-                    </Badge>
+                    <Badge tone={toneForProjectStatus(project.status)}>{formatEnumLabel(project.status)}</Badge>
                   </div>
                   <div className="entity-meta">
-                    <Badge tone="neutral">Priority {project.priority}</Badge>
-                    <Badge tone="neutral">Target {formatDate(project.target_date)}</Badge>
+                    <Badge tone={toneForPriority(project.priority)}>{formatEnumLabel(project.priority)}</Badge>
+                    <Badge tone="neutral">Start {formatDate(project.start_date)}</Badge>
+                    <Badge tone={project.target_date ? 'info' : 'warning'}>
+                      Target {formatDate(project.target_date)}
+                    </Badge>
                   </div>
-                  <div className="entity-actions">
-                    <Link className="btn btn-secondary" to={`/projects/${project.id}`}>
+                  <div className="quick-actions">
+                    <Link className="btn btn-primary" to={`/projects/${project.id}`}>
                       Open
                     </Link>
-                    <Button variant="ghost" onClick={() => editProject(project)}>
+                    <Button variant="secondary" onClick={() => editProject(project)}>
                       Edit
                     </Button>
-                    <Button variant="danger" onClick={() => void removeProject(project.id)}>
+                    <Button variant="danger" onClick={() => void removeProject(project)}>
                       Delete
                     </Button>
                   </div>
                 </div>
               ))
             ) : (
-              <EmptyState
-                title="No projects yet"
-                description="Create the first track to start organizing milestones and tasks."
-              />
+              <EmptyState title="No projects in this view" description="Clear the filter or create a new project." />
             )}
           </div>
         </Card>
       </div>
 
       <Card className="section-card">
-        <SectionHeader title="Active projects" description="These are the projects still in motion." />
+        <SectionHeader title="Active tracks" description="A quick browse of the work that still needs steering." />
         <div className="grid cards">
-          {activeProjects.map((project) => (
-            <Link key={project.id} className="card entity" to={`/projects/${project.id}`}>
-              <div className="entity-top">
-                <div>
-                  <h3 className="entity-title">{project.name}</h3>
-                  <p className="muted">{project.description || 'No description yet.'}</p>
-                </div>
-                <Badge tone="info">{project.status}</Badge>
-              </div>
-              <div className="entity-meta">
-                <Badge tone="neutral">Priority {project.priority}</Badge>
-                <Badge tone="neutral">{formatDate(project.target_date)}</Badge>
-              </div>
-            </Link>
-          ))}
+          {projects.filter((project) => project.status === 'active').length ? (
+            projects
+              .filter((project) => project.status === 'active')
+              .map((project) => (
+                <Link key={project.id} className="card entity" to={`/projects/${project.id}`}>
+                  <div className="entity-top">
+                    <div className="entity-copy">
+                      <h3 className="entity-title">{project.name}</h3>
+                      <p className="muted">{project.description || 'No description yet.'}</p>
+                    </div>
+                    <Badge tone="info">Active</Badge>
+                  </div>
+                  <div className="entity-meta">
+                    <Badge tone={toneForPriority(project.priority)}>{formatEnumLabel(project.priority)}</Badge>
+                    <Badge tone={project.target_date ? 'info' : 'warning'}>{formatDate(project.target_date)}</Badge>
+                  </div>
+                </Link>
+              ))
+          ) : (
+            <EmptyState title="No active projects" description="Move a planned project to active when you are ready to work it." />
+          )}
         </div>
       </Card>
     </div>

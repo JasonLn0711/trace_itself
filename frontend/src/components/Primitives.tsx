@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { formatDate } from '../lib/dates';
+import type { Tone } from '../lib/presentation';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <section className={`card ${className}`.trim()}>{children}</section>;
@@ -55,6 +56,32 @@ export function SectionHeader({
   );
 }
 
+export function PageIntro({
+  eyebrow,
+  title,
+  description,
+  actions,
+  aside
+}: {
+  eyebrow?: string;
+  title: string;
+  description: string;
+  actions?: ReactNode;
+  aside?: ReactNode;
+}) {
+  return (
+    <section className="page-intro card">
+      <div className="page-intro-copy">
+        {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
+        <h1>{title}</h1>
+        <p className="muted">{description}</p>
+        {actions ? <div className="hero-actions">{actions}</div> : null}
+      </div>
+      {aside ? <div className="page-intro-aside">{aside}</div> : null}
+    </section>
+  );
+}
+
 export function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <Card className="stat-card">
@@ -62,6 +89,45 @@ export function StatCard({ label, value, hint }: { label: string; value: string 
       <div className="stat-value">{value}</div>
       {hint ? <div className="muted small">{hint}</div> : null}
     </Card>
+  );
+}
+
+export function MetricPill({
+  label,
+  value,
+  tone = 'neutral'
+}: {
+  label: string;
+  value: string | number;
+  tone?: Tone;
+}) {
+  return (
+    <div className={`metric-pill metric-pill-${tone}`}>
+      <span className="metric-pill-label">{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+export function Callout({
+  title,
+  description,
+  tone = 'info',
+  action
+}: {
+  title: string;
+  description: string;
+  tone?: Tone;
+  action?: ReactNode;
+}) {
+  return (
+    <div className={`callout callout-${tone}`}>
+      <div className="callout-copy">
+        <strong>{title}</strong>
+        <p>{description}</p>
+      </div>
+      {action ? <div className="callout-action">{action}</div> : null}
+    </div>
   );
 }
 
@@ -170,6 +236,23 @@ export function EmptyState({
   );
 }
 
+export function Notice({
+  title,
+  description,
+  tone = 'info'
+}: {
+  title: string;
+  description?: string;
+  tone?: Tone;
+}) {
+  return (
+    <div className={`notice notice-${tone}`} role="status">
+      <strong>{title}</strong>
+      {description ? <p>{description}</p> : null}
+    </div>
+  );
+}
+
 export function Field({
   label,
   children,
@@ -185,6 +268,34 @@ export function Field({
       {children}
       {hint ? <span className="muted small">{hint}</span> : null}
     </label>
+  );
+}
+
+export function SegmentedControl({
+  label,
+  value,
+  onChange,
+  options
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string; count?: number }>;
+}) {
+  return (
+    <div className="segmented-control" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          className={`segment ${value === option.value ? 'active' : ''}`.trim()}
+          type="button"
+          onClick={() => onChange(option.value)}
+        >
+          <span>{option.label}</span>
+          {option.count !== undefined ? <strong>{option.count}</strong> : null}
+        </button>
+      ))}
+    </div>
   );
 }
 

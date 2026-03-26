@@ -1,8 +1,29 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Button, Card, EmptyState, Field, SectionHeader } from '../components/Primitives';
+import {
+  Badge,
+  Button,
+  Callout,
+  Card,
+  EmptyState,
+  Field,
+  MetricPill,
+  Notice,
+  PageIntro,
+  SectionHeader,
+  SegmentedControl
+} from '../components/Primitives';
 import { extractApiErrorMessage, milestonesApi, projectsApi, tasksApi } from '../lib/api';
 import { formatDate, relativeDueLabel } from '../lib/dates';
+import {
+  formatEnumLabel,
+  getDueState,
+  shortDueLabel,
+  sortTasksForAttention,
+  toneForDueState,
+  toneForPriority,
+  toneForTaskStatus
+} from '../lib/presentation';
 import type { Milestone, Project, Task } from '../types';
 
 type TaskFormState = {
@@ -17,9 +38,9 @@ type TaskFormState = {
   actual_hours: string;
 };
 
-function emptyTaskForm(): TaskFormState {
+function emptyTaskForm(defaultProjectId = ''): TaskFormState {
   return {
-    project_id: '',
+    project_id: defaultProjectId,
     milestone_id: '',
     title: '',
     description: '',
@@ -45,6 +66,22 @@ function taskToForm(task: Task): TaskFormState {
   };
 }
 
+function taskToPayload(task: Task, status = task.status) {
+  return {
+    project_id: task.project_id,
+    milestone_id: task.milestone_id,
+    title: task.title,
+    description: task.description,
+    due_date: task.due_date,
+    priority: task.priority,
+    status,
+    estimated_hours: task.estimated_hours,
+    actual_hours: task.actual_hours
+  };
+}
+
+type QueueFilter = 'attention' | 'in_progress' | 'blocked' | 'done' | 'all';
+
 export function TasksPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -53,8 +90,13 @@ export function TasksPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actingTaskId, setActingTaskId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [projectFilter, setProjectFilter] = useState('');
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('attention');
+  const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
   async function loadData() {
     const [projectItems, milestoneItems, taskItems] = await Promise.all([
@@ -69,6 +111,7 @@ export function TasksPage() {
 
   useEffect(() => {
     let alive = true;
+
     async function load() {
       try {
         const [projectItems, milestoneItems, taskItems] = await Promise.all([
@@ -80,9 +123,12 @@ export function TasksPage() {
           setProjects(projectItems);
           setMilestones(milestoneItems);
           setTasks(taskItems);
-          if (projectItems[0]) {
-            setForm((current) => ({ ...current, project_id: current.project_id || String(projectItems[0].id) }));
-          }
+          const defaultProjectId = projectItems[0] ? String(projectItems[0].id) : '';
+          setForm((current) => (current.project_id ? current : emptyTaskForm(defaultProjectId)));
+        }
+      } catch (err) {
+        if (alive) {
+          setError(extractApiErrorMessage(err));
         }
       } finally {
         if (alive) {
@@ -90,18 +136,25 @@ export function TasksPage() {
         }
       }
     }
+
     void load();
     return () => {
       alive = false;
     };
   }, []);
 
-  const visibleTasks = useMemo(() => {
-    if (!projectFilter) {
-      return tasks;
+  useEffect(() => {
+    if (editingId) {
+      return;
     }
-    return tasks.filter((task) => String(task.project_id) === projectFilter);
-  }, [tasks, projectFilter]);
+    const defaultProjectId = projectFilter || (projects[0] ? String(projects[0].id) : '');
+    setForm((current) => {
+      if (current.project_id === defaultProjectId) {
+        return current;
+      }
+      return { ...current, project_id: defaultProjectId, milestone_id: '' };
+    });
+  }, [editingId, projectFilter, projects]);
 
   const milestoneOptions = useMemo(() => {
     if (!form.project_id) {
@@ -110,10 +163,69 @@ export function TasksPage() {
     return milestones.filter((milestone) => String(milestone.project_id) === form.project_id);
   }, [milestones, form.project_id]);
 
+  const visibleTasks = useMemo(() => {
+    let items = sortTasksForAttention(tasks);
+
+    if (projectFilter) {
+      items = items.filter((task) => String(task.project_id) === projectFilter);
+    }
+
+    if (deferredSearch) {
+      items = items.filter((task) => {
+        const milestoneName = task.milestone_id
+          ? milestones.find((item) => item.id === task.milestone_id)?.title ?? ''
+          : '';
+        const projectName = projects.find((item) => item.id === task.project_id)?.name ?? '';
+        return [task.title, task.description ?? '', milestoneName, projectName]
+          .join(' ')
+          .toLowerCase()
+          .includes(deferredSearch);
+      });
+    }
+
+    switch (queueFilter) {
+      case 'attention':
+        items = items.filter((task) => {
+          const dueState = getDueState(task.due_date);
+          return task.status !== 'done' && (task.status === 'blocked' || dueState === 'overdue' || dueState === 'today' || dueState === 'soon');
+        });
+        break;
+      case 'in_progress':
+        items = items.filter((task) => task.status === 'in_progress');
+        break;
+      case 'blocked':
+        items = items.filter((task) => task.status === 'blocked');
+        break;
+      case 'done':
+        items = items.filter((task) => task.status === 'done');
+        break;
+      case 'all':
+      default:
+        break;
+    }
+
+    return items;
+  }, [deferredSearch, milestones, projectFilter, projects, queueFilter, tasks]);
+
+  const overdueCount = tasks.filter((task) => getDueState(task.due_date) === 'overdue' && task.status !== 'done').length;
+  const inProgressCount = tasks.filter((task) => task.status === 'in_progress').length;
+  const blockedCount = tasks.filter((task) => task.status === 'blocked').length;
+  const doneCount = tasks.filter((task) => task.status === 'done').length;
+
+  const queueOptions = [
+    { value: 'attention', label: 'Needs attention', count: tasks.filter((task) => task.status !== 'done' && (task.status === 'blocked' || ['overdue', 'today', 'soon'].includes(getDueState(task.due_date)))).length },
+    { value: 'in_progress', label: 'In progress', count: inProgressCount },
+    { value: 'blocked', label: 'Blocked', count: blockedCount },
+    { value: 'done', label: 'Done', count: doneCount },
+    { value: 'all', label: 'All', count: tasks.length }
+  ] satisfies Array<{ value: QueueFilter; label: string; count: number }>;
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError('');
+    setNotice('');
+
     const payload = {
       project_id: Number(form.project_id),
       milestone_id: form.milestone_id ? Number(form.milestone_id) : null,
@@ -129,11 +241,14 @@ export function TasksPage() {
     try {
       if (editingId) {
         await tasksApi.update(editingId, payload);
+        setNotice('Task updated.');
       } else {
         await tasksApi.create(payload);
+        setNotice('Task created.');
       }
       await loadData();
-      setForm(emptyTaskForm());
+      const defaultProjectId = projectFilter || String(payload.project_id);
+      setForm(emptyTaskForm(defaultProjectId));
       setEditingId(null);
     } catch (err) {
       setError(extractApiErrorMessage(err));
@@ -145,17 +260,42 @@ export function TasksPage() {
   function editTask(task: Task) {
     setEditingId(task.id);
     setForm(taskToForm(task));
+    setNotice('');
+    setError('');
   }
 
-  async function removeTask(id: number) {
-    if (!window.confirm('Delete this task?')) {
+  async function removeTask(task: Task) {
+    if (!window.confirm(`Delete task "${task.title}"?`)) {
       return;
     }
+
+    setError('');
+    setNotice('');
     try {
-      await tasksApi.remove(id);
+      await tasksApi.remove(task.id);
+      if (editingId === task.id) {
+        setEditingId(null);
+        setForm(emptyTaskForm(projectFilter || (projects[0] ? String(projects[0].id) : '')));
+      }
       await loadData();
+      setNotice('Task deleted.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
+    }
+  }
+
+  async function changeTaskStatus(task: Task, status: string) {
+    setActingTaskId(task.id);
+    setError('');
+    setNotice('');
+    try {
+      await tasksApi.update(task.id, taskToPayload(task, status));
+      await loadData();
+      setNotice(`Task moved to ${formatEnumLabel(status)}.`);
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    } finally {
+      setActingTaskId(null);
     }
   }
 
@@ -170,26 +310,155 @@ export function TasksPage() {
     );
   }
 
+  const formDisabled = projects.length === 0;
+
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>Tasks</h1>
-          <p className="muted">Everything that still needs to happen.</p>
-        </div>
-        <Link className="btn btn-ghost" to="/projects">
-          Organize by project
-        </Link>
-      </div>
+      <PageIntro
+        eyebrow="Execution queue"
+        title="Tasks"
+        description="Keep this list concrete and current. The less interpretation it requires, the easier it is to start working."
+        actions={
+          <>
+            <Link className="btn btn-primary" to="/projects">Review by project</Link>
+            <Link className="btn btn-ghost" to="/daily-logs">Write daily log</Link>
+          </>
+        }
+        aside={
+          <div className="metric-strip">
+            <MetricPill label="Overdue" value={overdueCount} tone={overdueCount ? 'danger' : 'success'} />
+            <MetricPill label="In progress" value={inProgressCount} tone="info" />
+            <MetricPill label="Blocked" value={blockedCount} tone={blockedCount ? 'warning' : 'neutral'} />
+            <MetricPill label="Done" value={doneCount} tone="success" />
+          </div>
+        }
+      />
+
+      {overdueCount > 0 ? (
+        <Callout
+          title="Start with the overdue and blocked items"
+          description="These tasks create the most drag across the rest of the system. Clear, reschedule, or break them down before adding more."
+          tone="danger"
+          action={<button className="btn btn-danger" type="button" onClick={() => setQueueFilter('attention')}>Focus the queue</button>}
+        />
+      ) : null}
+
+      {error ? <Notice title="Could not update tasks" description={error} tone="danger" /> : null}
+      {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title={editingId ? 'Edit task' : 'Create task'} description="Use tasks to capture concrete next actions." />
-          <form className="form-grid" onSubmit={handleSubmit}>
-            <div className="form-grid cols-2">
-              <Field label="Project">
-                <select value={form.project_id} onChange={(event) => setForm({ ...form, project_id: event.target.value, milestone_id: '' })} required>
-                  <option value="">Select a project</option>
+          <SectionHeader
+            title={editingId ? 'Edit task' : 'Add task'}
+            description="Make the next action specific enough that future-you can start without thinking."
+          />
+          {formDisabled ? (
+            <EmptyState
+              title="Create a project first"
+              description="Tasks need a project so the dashboard can show where the work belongs."
+              action={<Link className="btn btn-primary" to="/projects">Create project</Link>}
+            />
+          ) : (
+            <form className="form-grid" onSubmit={handleSubmit}>
+              <div className="form-grid cols-2">
+                <Field label="Project" hint="Use one project per track or initiative.">
+                  <select value={form.project_id} onChange={(event) => setForm({ ...form, project_id: event.target.value, milestone_id: '' })} required>
+                    <option value="">Select a project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Milestone" hint="Optional, but useful when a task unlocks a checkpoint.">
+                  <select value={form.milestone_id} onChange={(event) => setForm({ ...form, milestone_id: event.target.value })}>
+                    <option value="">None</option>
+                    {milestoneOptions.map((milestone) => (
+                      <option key={milestone.id} value={milestone.id}>
+                        {milestone.title}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              <Field label="Title" hint="Describe the smallest useful next action.">
+                <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Example: Draft milestone checklist" required />
+              </Field>
+
+              <Field label="Description" hint="Optional context for future-you.">
+                <textarea
+                  value={form.description}
+                  onChange={(event) => setForm({ ...form, description: event.target.value })}
+                  placeholder="What done looks like, key notes, or links to remember."
+                />
+              </Field>
+
+              <div className="form-grid cols-2">
+                <Field label="Due date">
+                  <input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
+                </Field>
+                <Field label="Status">
+                  <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+                    <option value="todo">To do</option>
+                    <option value="in_progress">In progress</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="done">Done</option>
+                  </select>
+                </Field>
+              </div>
+
+              <div className="form-grid cols-2">
+                <Field label="Priority">
+                  <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </Field>
+                <Field label="Estimated hours" hint="Rough sizing helps you plan your day honestly.">
+                  <input type="number" min="0" step="0.25" value={form.estimated_hours} onChange={(event) => setForm({ ...form, estimated_hours: event.target.value })} />
+                </Field>
+              </div>
+
+              <Field label="Actual hours">
+                <input type="number" min="0" step="0.25" value={form.actual_hours} onChange={(event) => setForm({ ...form, actual_hours: event.target.value })} />
+              </Field>
+
+              <div className="helper-row">
+                <Button type="submit" disabled={saving}>
+                  {saving ? 'Saving...' : editingId ? 'Update task' : 'Create task'}
+                </Button>
+                {editingId ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setEditingId(null);
+                      setForm(emptyTaskForm(projectFilter || (projects[0] ? String(projects[0].id) : '')));
+                    }}
+                  >
+                    Cancel edit
+                  </Button>
+                ) : null}
+              </div>
+            </form>
+          )}
+        </Card>
+
+        <Card className="section-card">
+          <SectionHeader title="Task queue" description="Filter the list until only the work that matters right now is left." />
+
+          <div className="toolbar">
+            <SegmentedControl label="Task queue filter" value={queueFilter} onChange={(value) => setQueueFilter(value as QueueFilter)} options={queueOptions} />
+            <div className="toolbar-row">
+              <Field label="Search">
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, notes, milestone, project" />
+              </Field>
+              <Field label="Project filter">
+                <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
+                  <option value="">All projects</option>
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
@@ -197,119 +466,67 @@ export function TasksPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Milestone">
-                <select value={form.milestone_id} onChange={(event) => setForm({ ...form, milestone_id: event.target.value })}>
-                  <option value="">None</option>
-                  {milestoneOptions.map((milestone) => (
-                    <option key={milestone.id} value={milestone.id}>
-                      {milestone.title}
-                    </option>
-                  ))}
-                </select>
-              </Field>
             </div>
-            <Field label="Title">
-              <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
-            </Field>
-            <Field label="Description">
-              <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-            </Field>
-            <div className="form-grid cols-2">
-              <Field label="Due date">
-                <input type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
-              </Field>
-              <Field label="Status">
-                <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
-                  <option value="todo">todo</option>
-                  <option value="in_progress">in_progress</option>
-                  <option value="blocked">blocked</option>
-                  <option value="done">done</option>
-                </select>
-              </Field>
-            </div>
-            <div className="form-grid cols-2">
-              <Field label="Priority">
-                <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
-                  <option value="low">low</option>
-                  <option value="medium">medium</option>
-                  <option value="high">high</option>
-                  <option value="critical">critical</option>
-                </select>
-              </Field>
-              <Field label="Estimated hours">
-                <input type="number" min="0" step="0.25" value={form.estimated_hours} onChange={(event) => setForm({ ...form, estimated_hours: event.target.value })} />
-              </Field>
-            </div>
-            <Field label="Actual hours">
-              <input type="number" min="0" step="0.25" value={form.actual_hours} onChange={(event) => setForm({ ...form, actual_hours: event.target.value })} />
-            </Field>
-            {error ? <EmptyState title="Could not save task" description={error} /> : null}
-            <div className="helper-row">
-              <Button type="submit" disabled={saving}>
-                {saving ? 'Saving...' : editingId ? 'Update task' : 'Create task'}
-              </Button>
-              {editingId ? (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setEditingId(null);
-                    setForm(emptyTaskForm());
-                  }}
-                >
-                  Cancel
-                </Button>
-              ) : null}
-            </div>
-          </form>
-        </Card>
-
-        <Card className="section-card">
-          <SectionHeader title="Task list" description="Use the filter to focus on one project." />
-          <div className="form-grid cols-2">
-            <Field label="Project filter">
-              <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
-                <option value="">All projects</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Hint">
-              <input readOnly value="Overdue tasks appear in the dashboard" />
-            </Field>
           </div>
 
           <div className="divider" />
 
-          <div className="list-grid">
+          <div className="cluster-grid">
             {visibleTasks.length ? (
               visibleTasks.map((task) => {
                 const project = projects.find((item) => item.id === task.project_id);
+                const milestone = task.milestone_id ? milestones.find((item) => item.id === task.milestone_id) : null;
                 return (
-                  <div key={task.id} className="entity">
+                  <div key={task.id} className="surface-soft">
                     <div className="entity-top">
-                      <div>
+                      <div className="entity-copy">
                         <h3 className="entity-title">{task.title}</h3>
-                        <p className="muted">{task.description || 'No description yet.'}</p>
+                        <p className="muted">{task.description || 'No supporting note yet.'}</p>
                       </div>
-                      <Badge tone={task.status === 'done' ? 'success' : task.status === 'blocked' ? 'danger' : 'info'}>
-                        {task.status}
-                      </Badge>
+                      <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
                     </div>
+
                     <div className="entity-meta">
                       <Badge tone="neutral">{project?.name ?? `Project ${task.project_id}`}</Badge>
-                      <Badge tone={relativeDueLabel(task.due_date).startsWith('Overdue') ? 'danger' : 'neutral'}>
-                        {relativeDueLabel(task.due_date)}
-                      </Badge>
-                      <Badge tone="neutral">Due {formatDate(task.due_date)}</Badge>
+                      {milestone ? <Badge tone="neutral">{milestone.title}</Badge> : null}
+                      <Badge tone={toneForPriority(task.priority)}>{formatEnumLabel(task.priority)}</Badge>
+                      <Badge tone={toneForDueState(task.due_date)}>{shortDueLabel(task.due_date)}</Badge>
                     </div>
-                    <div className="entity-actions">
+
+                    <div className="detail-grid">
+                      <div className="detail-row">
+                        <span className="muted small">Due</span>
+                        <strong>{formatDate(task.due_date)}</strong>
+                        <span className="muted small">{relativeDueLabel(task.due_date)}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="muted small">Estimate</span>
+                        <strong>{task.estimated_hours ?? 0}h</strong>
+                        <span className="muted small">Actual</span>
+                        <strong>{task.actual_hours ?? 0}h</strong>
+                      </div>
+                    </div>
+
+                    <div className="quick-actions">
+                      {task.status !== 'in_progress' ? (
+                        <Button variant="secondary" disabled={actingTaskId === task.id} onClick={() => void changeTaskStatus(task, 'in_progress')}>
+                          Start
+                        </Button>
+                      ) : null}
+                      {task.status !== 'done' ? (
+                        <Button disabled={actingTaskId === task.id} onClick={() => void changeTaskStatus(task, 'done')}>
+                          Mark done
+                        </Button>
+                      ) : null}
+                      {task.status !== 'blocked' ? (
+                        <Button variant="ghost" disabled={actingTaskId === task.id} onClick={() => void changeTaskStatus(task, 'blocked')}>
+                          Blocked
+                        </Button>
+                      ) : null}
                       <Button variant="secondary" onClick={() => editTask(task)}>
                         Edit
                       </Button>
-                      <Button variant="danger" onClick={() => void removeTask(task.id)}>
+                      <Button variant="danger" onClick={() => void removeTask(task)}>
                         Delete
                       </Button>
                     </div>
@@ -317,7 +534,10 @@ export function TasksPage() {
                 );
               })
             ) : (
-              <EmptyState title="No tasks found" description="Create a task or clear the filter." />
+              <EmptyState
+                title="No tasks match this view"
+                description="Clear a filter, search for something else, or add a fresh task."
+              />
             )}
           </div>
         </Card>

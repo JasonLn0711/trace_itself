@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext';
-import { Badge, Button, Card, EmptyState, Field } from '../components/Primitives';
+import { Badge, Button, Callout, Card, EmptyState, Field } from '../components/Primitives';
 import { extractApiErrorMessage } from '../lib/api';
 
 export function LoginPage() {
@@ -60,11 +60,15 @@ export function LoginPage() {
           <p className="muted">
             Sign in to review projects, milestones, daily logs, and the work that needs attention today.
           </p>
-          <p className="muted small">Repeated failed sign-ins may temporarily lock an account.</p>
         </div>
         {user ? <Badge tone="info">Last session: {user.display_name}</Badge> : null}
 
         <form className="stack" onSubmit={handleSubmit}>
+          <Callout
+            title="Private access only"
+            description="Sign in with an account created by the server admin. Repeated failed sign-ins may temporarily lock the account."
+            tone="info"
+          />
           <Field label="Username" hint="Use your account username.">
             <input
               type="text"
