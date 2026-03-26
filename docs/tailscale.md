@@ -51,6 +51,12 @@ docker compose up --build -d
 docker compose ps
 ```
 
+If you plan to use ASR, remember:
+
+- the first transcription request downloads the local Whisper model
+- that first ASR run can take noticeably longer than later runs
+- the model cache is stored in the Docker volume `asr_model_cache`
+
 Basic local checks on the server:
 
 ```bash

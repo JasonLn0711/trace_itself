@@ -149,7 +149,8 @@ export function DashboardPage() {
         actions={
           <>
             <Link className="btn btn-primary" href="/tasks">Tasks</Link>
-            <Link className="btn btn-secondary" href="/daily-logs">Log</Link>
+            <Link className="btn btn-secondary" href="/asr">ASR</Link>
+            <Link className="btn btn-ghost" href="/daily-logs">Log</Link>
             <Link className="btn btn-ghost" href="/projects">Projects</Link>
           </>
         }

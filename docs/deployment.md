@@ -40,6 +40,13 @@ Use these security settings:
 - For local-only testing on the lab machine: `SESSION_COOKIE_SECURE=false`
 - For real remote access over Tailscale HTTPS: `SESSION_COOKIE_SECURE=true`
 
+Optional ASR tuning:
+
+- `ASR_MODEL_NAME=small` for a balanced default
+- `ASR_DEVICE=cpu` for normal lab-machine use
+- `ASR_COMPUTE_TYPE=int8` to reduce CPU memory usage
+- `ASR_MAX_UPLOAD_MB=25` to cap upload size
+
 After first login, use the `Users` page to create more accounts, reset passwords, or unlock accounts that hit the failed-login threshold.
 
 ## Start the app
@@ -55,6 +62,12 @@ Local checks on the server:
 curl http://127.0.0.1:8000/healthz
 curl http://127.0.0.1:3000/
 ```
+
+ASR notes:
+
+- The first transcription request downloads the Whisper model into the Docker volume `asr_model_cache`.
+- That first ASR run can take longer than normal, depending on your network and chosen model.
+- After the model is cached, later transcriptions are much faster.
 
 ## Private remote access with Tailscale Serve
 
