@@ -2,6 +2,8 @@
 
 `trace_itself` is a private, self-hosted execution dashboard for long-horizon learning and project management. It stays intentionally narrow, but it now supports multiple private user accounts with isolated data.
 
+Maintained by Jason Chia-Sheng Lin, PhD student at Institute of Biophotonics, NYCU. Feel free to contact me.
+
 It now has two main user-facing functions:
 
 - Progress tracking for projects, milestones, tasks, and daily logs
