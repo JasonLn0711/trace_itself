@@ -94,6 +94,32 @@ def convert_audio_to_wav(source_path: Path) -> Path:
     return output_path
 
 
+def probe_audio_duration_seconds(source_path: Path) -> float:
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(source_path),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Audio metadata could not be read.")
+
+    raw_value = (result.stdout or "").strip()
+    try:
+        duration = float(raw_value)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Audio duration could not be read.") from exc
+
+    if duration <= 0:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Audio duration is invalid.")
+    return duration
+
+
 def delete_audio_file(path: Path | None) -> None:
     if path is not None:
         path.unlink(missing_ok=True)

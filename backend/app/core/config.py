@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     session_cookie_name: str = "trace_itself_session"
     session_cookie_secure: bool = False
     credentials_secret_key: str | None = None
+    default_llm_runs_per_24h: int = 3
+    default_max_audio_seconds_per_request: int = 5 * 60 * 60
     backend_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     db_connect_max_attempts: int = 30
     db_connect_retry_seconds: int = 2
@@ -26,9 +28,9 @@ class Settings(BaseSettings):
     asr_cpu_threads: int = 4
     asr_chunk_length_seconds: int = 30
     asr_upload_dir: str = "/data/asr"
-    asr_max_upload_mb: int = 25
+    asr_max_upload_mb: int = 512
     meeting_upload_dir: str = "/data/meetings"
-    meeting_max_upload_mb: int = 120
+    meeting_max_upload_mb: int = 512
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.1-flash-lite-preview"
 

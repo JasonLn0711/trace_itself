@@ -125,4 +125,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-26T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="cost-policy-guardrails",
+        version_tag="v1.0.56",
+        title="API budget guardrails",
+        summary="Admins can now cap text AI runs and max audio length to protect the wallet.",
+        details=(
+            "The Control page now includes a policy tab, meetings respect a rolling 24-hour LLM budget, "
+            "and ASR or meeting uploads are rejected when a file exceeds the configured audio cap."
+        ),
+        area="admin",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

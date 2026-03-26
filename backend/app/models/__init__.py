@@ -1,4 +1,5 @@
 from app.models.access_group import AccessGroup
+from app.models.ai_usage_event import AIUsageEvent
 from app.models.asr_transcript import AsrTranscript
 from app.models.ai_provider import AIProvider
 from app.models.daily_log import DailyLog
@@ -8,9 +9,11 @@ from app.models.product_update import ProductUpdate
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
+from app.models.usage_policy import UsagePolicy
 
 __all__ = [
     "AccessGroup",
+    "AIUsageEvent",
     "AIProvider",
     "User",
     "Project",
@@ -20,4 +23,5 @@ __all__ = [
     "ProductUpdate",
     "AsrTranscript",
     "MeetingRecord",
+    "UsagePolicy",
 ]

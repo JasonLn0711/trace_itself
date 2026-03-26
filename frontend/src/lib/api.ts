@@ -17,7 +17,10 @@ import type {
   UserCreateInput,
   UserPasswordResetInput,
   UserSession,
-  UserUpdateInput
+  UserUpdateInput,
+  UsagePolicy,
+  UsagePolicyInput,
+  UsagePolicySnapshot
 } from '../types';
 
 export class ApiError extends Error {
@@ -324,6 +327,18 @@ export const aiProvidersApi = {
   remove(id: number) {
     return request<void>(`/ai-providers/${id}`, {
       method: 'DELETE'
+    });
+  }
+};
+
+export const usagePolicyApi = {
+  get() {
+    return request<UsagePolicySnapshot>('/usage-policy');
+  },
+  update(body: UsagePolicyInput) {
+    return request<UsagePolicy>('/usage-policy', {
+      method: 'PUT',
+      body
     });
   }
 };

@@ -13,7 +13,9 @@ from app.models.asr_transcript import AsrTranscript
 from app.models.user import User
 from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary
 from app.services.asr import AsrServiceError, service as asr_service
-from app.services.audio_storage import delete_audio_file, save_upload_file
+from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
+from app.services.usage_policy import ensure_audio_duration_allowed, get_or_create_usage_policy, record_usage_event
+from app.core.enums import UsageEventKind
 
 router = APIRouter(prefix="/asr", tags=["asr"], dependencies=[Depends(require_asr_access)])
 settings = get_settings()
@@ -105,6 +107,13 @@ async def transcribe_audio(
         max_bytes=settings.asr_max_upload_bytes,
         prefix=f"asr-{current_user.id}",
     )
+    try:
+        policy = get_or_create_usage_policy(db)
+        probed_duration_seconds = probe_audio_duration_seconds(stored_audio.storage_path)
+        ensure_audio_duration_allowed(probed_duration_seconds, policy)
+    except HTTPException:
+        delete_audio_file(stored_audio.storage_path)
+        raise
 
     normalized_language = (language or "").strip().lower() or None
     if normalized_language == "auto":
@@ -127,12 +136,20 @@ async def transcribe_audio(
         audio_storage_path=stored_audio.relative_storage_path,
         audio_mime_type=stored_audio.mime_type,
         language=result.language,
-        duration_seconds=result.duration_seconds,
+        duration_seconds=result.duration_seconds or probed_duration_seconds,
         file_size_bytes=stored_audio.file_size_bytes,
         model_name=result.model_name,
         transcript_text=result.text,
     )
     db.add(transcript)
+    record_usage_event(
+        db,
+        user_id=current_user.id,
+        provider_id=provider.id,
+        kind=UsageEventKind.ASR_AUDIO,
+        source="asr_transcript",
+        duration_seconds=result.duration_seconds or probed_duration_seconds,
+    )
     db.commit()
     db.refresh(transcript)
     return to_read(transcript)

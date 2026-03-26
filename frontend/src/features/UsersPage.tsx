@@ -13,11 +13,12 @@ import {
   SectionHeader,
   SegmentedControl
 } from '../components/Primitives';
-import { accessGroupsApi, aiProvidersApi, extractApiErrorMessage, usersApi } from '../lib/api';
+import { accessGroupsApi, aiProvidersApi, extractApiErrorMessage, usagePolicyApi, usersApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
-import type { AccessGroup, AIProvider, AIProviderDriver, AIProviderKind, User } from '../types';
+import { formatDuration } from '../lib/media';
+import type { AccessGroup, AIProvider, AIProviderDriver, AIProviderKind, UsagePolicySnapshot, User } from '../types';
 
-type AdminTab = 'users' | 'groups' | 'providers';
+type AdminTab = 'users' | 'groups' | 'providers' | 'policy';
 
 type UserFormState = {
   username: string;
@@ -53,6 +54,11 @@ type AIProviderFormState = {
   description: string;
   is_active: boolean;
   api_key: string;
+};
+
+type PolicyFormState = {
+  llm_runs_per_24h: string;
+  max_audio_hours_per_request: string;
 };
 
 const emptyUserForm = (): UserFormState => ({
@@ -134,31 +140,46 @@ function capabilitySummary(group: AccessGroup) {
   return items.length ? items.join(' · ') : 'No feature access';
 }
 
+function policyToForm(snapshot: UsagePolicySnapshot): PolicyFormState {
+  return {
+    llm_runs_per_24h: String(snapshot.policy.llm_runs_per_24h),
+    max_audio_hours_per_request: String(snapshot.policy.max_audio_seconds_per_request / 3600),
+  };
+}
+
 export function UsersPage() {
   const [tab, setTab] = useState<AdminTab>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<AccessGroup[]>([]);
   const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [policySnapshot, setPolicySnapshot] = useState<UsagePolicySnapshot | null>(null);
   const [createUserForm, setCreateUserForm] = useState<UserFormState>(emptyUserForm());
   const [editUserForms, setEditUserForms] = useState<Record<number, UserEditState>>({});
   const [createGroupForm, setCreateGroupForm] = useState<AccessGroupFormState>(emptyAccessGroupForm());
   const [editGroupForms, setEditGroupForms] = useState<Record<number, AccessGroupFormState>>({});
   const [createProviderForm, setCreateProviderForm] = useState<AIProviderFormState>(emptyAIProviderForm());
   const [editProviderForms, setEditProviderForms] = useState<Record<number, AIProviderFormState>>({});
+  const [policyForm, setPolicyForm] = useState<PolicyFormState>({
+    llm_runs_per_24h: '3',
+    max_audio_hours_per_request: '5',
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
   async function loadAll() {
-    const [nextUsers, nextGroups, nextProviders] = await Promise.all([
+    const [nextUsers, nextGroups, nextProviders, nextPolicy] = await Promise.all([
       usersApi.list(),
       accessGroupsApi.list(),
-      aiProvidersApi.list({ include_inactive: true })
+      aiProvidersApi.list({ include_inactive: true }),
+      usagePolicyApi.get()
     ]);
     setUsers(nextUsers);
     setGroups(nextGroups);
     setProviders(nextProviders);
+    setPolicySnapshot(nextPolicy);
+    setPolicyForm(policyToForm(nextPolicy));
     setEditUserForms(Object.fromEntries(nextUsers.map((user) => [user.id, userToEdit(user)])));
     setEditGroupForms(Object.fromEntries(nextGroups.map((group) => [group.id, accessGroupToEdit(group)])));
     setEditProviderForms(Object.fromEntries(nextProviders.map((provider) => [provider.id, providerToEdit(provider)])));
@@ -173,10 +194,11 @@ export function UsersPage() {
 
     async function load() {
       try {
-        const [nextUsers, nextGroups, nextProviders] = await Promise.all([
+        const [nextUsers, nextGroups, nextProviders, nextPolicy] = await Promise.all([
           usersApi.list(),
           accessGroupsApi.list(),
-          aiProvidersApi.list({ include_inactive: true })
+          aiProvidersApi.list({ include_inactive: true }),
+          usagePolicyApi.get()
         ]);
         if (!alive) {
           return;
@@ -184,6 +206,8 @@ export function UsersPage() {
         setUsers(nextUsers);
         setGroups(nextGroups);
         setProviders(nextProviders);
+        setPolicySnapshot(nextPolicy);
+        setPolicyForm(policyToForm(nextPolicy));
         setEditUserForms(Object.fromEntries(nextUsers.map((user) => [user.id, userToEdit(user)])));
         setEditGroupForms(Object.fromEntries(nextGroups.map((group) => [group.id, accessGroupToEdit(group)])));
         setEditProviderForms(Object.fromEntries(nextProviders.map((provider) => [provider.id, providerToEdit(provider)])));
@@ -371,6 +395,27 @@ export function UsersPage() {
     }
   }
 
+  async function handleSavePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await usagePolicyApi.update({
+        llm_runs_per_24h: Math.max(1, Math.round(Number(policyForm.llm_runs_per_24h) || 0)),
+        max_audio_seconds_per_request: Math.max(60, Math.round((Number(policyForm.max_audio_hours_per_request) || 0) * 3600)),
+      });
+      const nextPolicy = await usagePolicyApi.get();
+      setPolicySnapshot(nextPolicy);
+      setPolicyForm(policyToForm(nextPolicy));
+      setNotice('Policy saved.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="page">
@@ -386,7 +431,7 @@ export function UsersPage() {
     <div className="page">
       <PageIntro
         title="Control"
-        description="Users, groups, providers."
+        description="Users, groups, providers, policy."
         aside={
           <div className="metric-strip">
             <MetricPill label="Users" value={users.length} tone="info" />
@@ -394,6 +439,8 @@ export function UsersPage() {
             <MetricPill label="Groups" value={groups.length} tone="neutral" />
             <MetricPill label="ASR" value={asrEnabledProviders} tone="success" />
             <MetricPill label="LLM" value={llmEnabledProviders} tone="info" />
+            <MetricPill label="Text/24h" value={policySnapshot?.policy.llm_runs_per_24h ?? 'n/a'} tone="warning" />
+            <MetricPill label="Audio cap" value={formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)} tone="neutral" />
           </div>
         }
       />
@@ -408,7 +455,8 @@ export function UsersPage() {
         options={[
           { value: 'users', label: 'Users', count: users.length },
           { value: 'groups', label: 'Groups', count: groups.length },
-          { value: 'providers', label: 'Providers', count: providers.length }
+          { value: 'providers', label: 'Providers', count: providers.length },
+          { value: 'policy', label: 'Policy' }
         ]}
       />
 
@@ -786,6 +834,68 @@ export function UsersPage() {
               ) : (
                 <EmptyState title="No providers yet" description="Create the first AI provider." />
               )}
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === 'policy' ? (
+        <div className="grid two">
+          <Card className="section-card">
+            <SectionHeader title="Cost policy" description="Applies to all users." />
+            <form className="form-grid" onSubmit={handleSavePolicy}>
+              <div className="form-grid cols-2">
+                <Field label="Text runs / 24h">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={policyForm.llm_runs_per_24h}
+                    onChange={(event) => setPolicyForm({ ...policyForm, llm_runs_per_24h: event.target.value })}
+                  />
+                </Field>
+                <Field label="Max audio / file (hours)">
+                  <input
+                    type="number"
+                    min="0.25"
+                    step="0.25"
+                    value={policyForm.max_audio_hours_per_request}
+                    onChange={(event) => setPolicyForm({ ...policyForm, max_audio_hours_per_request: event.target.value })}
+                  />
+                </Field>
+              </div>
+              <div className="list-row-copy">Meetings spend one text run. ASR and Meetings both follow the audio cap.</div>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving...' : 'Save policy'}
+              </Button>
+            </form>
+          </Card>
+
+          <Card className="section-card">
+            <SectionHeader title="Current window" />
+            <div className="metric-strip">
+              <MetricPill
+                label="Text left"
+                value={
+                  policySnapshot
+                    ? `${policySnapshot.usage.llm_runs_remaining}/${policySnapshot.policy.llm_runs_per_24h}`
+                    : 'n/a'
+                }
+                tone="warning"
+              />
+              <MetricPill label="Text used" value={policySnapshot?.usage.llm_runs_last_24h ?? 'n/a'} tone="info" />
+              <MetricPill label="Audio 24h" value={formatDuration(policySnapshot?.usage.audio_seconds_last_24h ?? null)} tone="success" />
+              <MetricPill label="Audio cap" value={formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)} tone="neutral" />
+            </div>
+            <div className="list-table">
+              <div className="list-row">
+                <div className="list-row-main">
+                  <div className="list-row-header">
+                    <h3 className="list-row-title">Budget behavior</h3>
+                  </div>
+                  <div className="list-row-copy">Rolling 24-hour text window. Per-file audio cap for uploads and recordings.</div>
+                </div>
+              </div>
             </div>
           </Card>
         </div>

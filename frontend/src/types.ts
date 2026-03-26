@@ -202,6 +202,31 @@ export interface AIProviderInput {
   api_key?: string | null;
 }
 
+export interface UsagePolicy {
+  id: number;
+  llm_runs_per_24h: number;
+  max_audio_seconds_per_request: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UsageSummary {
+  llm_runs_last_24h: number;
+  llm_runs_remaining: number;
+  audio_seconds_last_24h: number;
+  window_hours: number;
+}
+
+export interface UsagePolicySnapshot {
+  policy: UsagePolicy;
+  usage: UsageSummary;
+}
+
+export interface UsagePolicyInput {
+  llm_runs_per_24h: number;
+  max_audio_seconds_per_request: number;
+}
+
 export interface DashboardSummary {
   active_projects: Project[];
   today_tasks: Task[];

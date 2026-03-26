@@ -8,6 +8,7 @@ from app.models.access_group import AccessGroup
 from app.models.ai_provider import AIProvider
 from app.models.product_update import ProductUpdate
 from app.models.user import User
+from app.models.usage_policy import UsagePolicy
 from app.services.secrets import encrypt_secret, make_secret_hint
 from app.services.security import hash_password, normalize_username
 
@@ -361,6 +362,22 @@ def ensure_default_ai_providers(db: Session) -> None:
 
     if created:
         db.commit()
+
+
+def ensure_usage_policy(db: Session) -> UsagePolicy:
+    policy = db.scalar(select(UsagePolicy).order_by(UsagePolicy.id.asc()).limit(1))
+    if policy is not None:
+        return policy
+
+    policy = UsagePolicy(
+        id=1,
+        llm_runs_per_24h=settings.default_llm_runs_per_24h,
+        max_audio_seconds_per_request=settings.default_max_audio_seconds_per_request,
+    )
+    db.add(policy)
+    db.commit()
+    db.refresh(policy)
+    return policy
 
 
 def sync_product_updates_catalog(db: Session, admin_id: int) -> None:

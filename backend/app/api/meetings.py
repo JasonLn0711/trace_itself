@@ -19,8 +19,10 @@ from app.models.meeting_record import MeetingRecord
 from app.models.user import User
 from app.schemas.meeting import MeetingRecordRead, MeetingRecordSummaryRead
 from app.services.asr import AsrServiceError, service as asr_service
-from app.services.audio_storage import delete_audio_file, save_upload_file
+from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
 from app.services.meeting_ai import MeetingAiError, generate_meeting_artifacts
+from app.services.usage_policy import ensure_audio_duration_allowed, ensure_llm_budget_available, get_or_create_usage_policy, record_usage_event
+from app.core.enums import UsageEventKind
 
 router = APIRouter(
     prefix="/meetings",
@@ -102,6 +104,14 @@ def create_meeting(
         max_bytes=settings.meeting_max_upload_bytes,
         prefix=f"meeting-{current_user.id}",
     )
+    try:
+        policy = get_or_create_usage_policy(db)
+        probed_duration_seconds = probe_audio_duration_seconds(stored_audio.storage_path)
+        ensure_audio_duration_allowed(probed_duration_seconds, policy)
+        ensure_llm_budget_available(db, current_user.id, policy)
+    except HTTPException:
+        delete_audio_file(stored_audio.storage_path)
+        raise
     normalized_language = (language or "").strip().lower() or None
     if normalized_language == "auto":
         normalized_language = None
@@ -132,7 +142,7 @@ def create_meeting(
         audio_mime_type=stored_audio.mime_type,
         file_size_bytes=stored_audio.file_size_bytes,
         language=transcript.language,
-        duration_seconds=transcript.duration_seconds,
+        duration_seconds=transcript.duration_seconds or probed_duration_seconds,
         transcript_text=transcript.text,
         minutes_text=artifacts.minutes_text,
         summary_text=artifacts.summary_text,
@@ -141,6 +151,21 @@ def create_meeting(
         llm_model_name=artifacts.model_name,
     )
     db.add(meeting)
+    record_usage_event(
+        db,
+        user_id=current_user.id,
+        provider_id=asr_provider.id,
+        kind=UsageEventKind.ASR_AUDIO,
+        source="meeting_record",
+        duration_seconds=transcript.duration_seconds or probed_duration_seconds,
+    )
+    record_usage_event(
+        db,
+        user_id=current_user.id,
+        provider_id=llm_provider.id,
+        kind=UsageEventKind.LLM_TEXT,
+        source="meeting_record",
+    )
     db.commit()
     db.refresh(meeting)
     return to_read(meeting)

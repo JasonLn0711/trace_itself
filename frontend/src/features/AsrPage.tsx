@@ -12,15 +12,16 @@ import {
   PageIntro,
   SectionHeader
 } from '../components/Primitives';
-import { aiProvidersApi, asrApi, extractApiErrorMessage } from '../lib/api';
+import { aiProvidersApi, asrApi, extractApiErrorMessage, usagePolicyApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import { formatBytes, formatDuration } from '../lib/media';
-import type { AIProvider, AsrTranscript, AsrTranscriptSummary } from '../types';
+import type { AIProvider, AsrTranscript, AsrTranscriptSummary, UsagePolicySnapshot } from '../types';
 
 export function AsrPage() {
   const [entries, setEntries] = useState<AsrTranscriptSummary[]>([]);
   const [selected, setSelected] = useState<AsrTranscript | null>(null);
   const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [policySnapshot, setPolicySnapshot] = useState<UsagePolicySnapshot | null>(null);
   const [providerId, setProviderId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
@@ -55,15 +56,17 @@ export function AsrPage() {
 
     async function load() {
       try {
-        const [items, nextProviders] = await Promise.all([
+        const [items, nextProviders, nextPolicy] = await Promise.all([
           asrApi.list({ limit: 30 }),
-          aiProvidersApi.list({ kind: 'asr' })
+          aiProvidersApi.list({ kind: 'asr' }),
+          usagePolicyApi.get()
         ]);
         if (!alive) {
           return;
         }
         setEntries(items);
         setProviders(nextProviders);
+        setPolicySnapshot(nextPolicy);
         setProviderId((current) => current ?? nextProviders[0]?.id ?? null);
         const firstId = items[0]?.id ?? null;
         setSelectedId(firstId);
@@ -136,6 +139,7 @@ export function AsrPage() {
       setTitle('');
       setLanguage('');
       setFile(null);
+      setPolicySnapshot(await usagePolicyApi.get());
       await loadEntries(created.id);
       setNotice('Transcript ready.');
     } catch (err) {
@@ -204,8 +208,9 @@ export function AsrPage() {
           <div className="metric-strip">
             <MetricPill label="Transcripts" value={entries.length} tone="info" />
             <MetricPill label="Audio" value={`${totalMinutes}m`} tone="success" />
+            <MetricPill label="24h" value={formatDuration(policySnapshot?.usage.audio_seconds_last_24h ?? null)} tone="neutral" />
             <MetricPill label="Languages" value={languageCount} tone="neutral" />
-            <MetricPill label="Model" value={selected?.model_name ?? 'Breeze'} tone="info" />
+            <MetricPill label="Cap" value={formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)} tone="info" />
           </div>
         }
       />
@@ -244,6 +249,11 @@ export function AsrPage() {
                 {providers[0] ? `${providers[0].name} · ${providers[0].model_name}` : 'No ASR provider available.'}
               </div>
             )}
+            {policySnapshot ? (
+              <div className="list-row-copy">
+                Max {formatDuration(policySnapshot.policy.max_audio_seconds_per_request)} per file. Used {formatDuration(policySnapshot.usage.audio_seconds_last_24h)} in the last 24h.
+              </div>
+            ) : null}
             <Button type="submit" disabled={submitting || !file || !providers.length}>
               {submitting ? 'Transcribing...' : 'Transcribe'}
             </Button>

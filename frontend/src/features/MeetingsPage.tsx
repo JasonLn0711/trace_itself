@@ -12,10 +12,10 @@ import {
   PageIntro,
   SectionHeader
 } from '../components/Primitives';
-import { aiProvidersApi, meetingsApi, extractApiErrorMessage } from '../lib/api';
+import { aiProvidersApi, meetingsApi, extractApiErrorMessage, usagePolicyApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import { actionItemCount, formatBytes, formatDuration } from '../lib/media';
-import type { AIProvider, MeetingRecord, MeetingRecordSummary } from '../types';
+import type { AIProvider, MeetingRecord, MeetingRecordSummary, UsagePolicySnapshot } from '../types';
 
 type MeetingTab = 'summary' | 'minutes' | 'actions' | 'transcript';
 
@@ -39,6 +39,7 @@ export function MeetingsPage() {
   const [selected, setSelected] = useState<MeetingRecord | null>(null);
   const [asrProviders, setAsrProviders] = useState<AIProvider[]>([]);
   const [llmProviders, setLlmProviders] = useState<AIProvider[]>([]);
+  const [policySnapshot, setPolicySnapshot] = useState<UsagePolicySnapshot | null>(null);
   const [asrProviderId, setAsrProviderId] = useState<number | null>(null);
   const [llmProviderId, setLlmProviderId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -75,10 +76,11 @@ export function MeetingsPage() {
 
     async function load() {
       try {
-        const [items, nextAsrProviders, nextLlmProviders] = await Promise.all([
+        const [items, nextAsrProviders, nextLlmProviders, nextPolicy] = await Promise.all([
           meetingsApi.list({ limit: 30 }),
           aiProvidersApi.list({ kind: 'asr' }),
-          aiProvidersApi.list({ kind: 'llm' })
+          aiProvidersApi.list({ kind: 'llm' }),
+          usagePolicyApi.get()
         ]);
         if (!alive) {
           return;
@@ -86,6 +88,7 @@ export function MeetingsPage() {
         setEntries(items);
         setAsrProviders(nextAsrProviders);
         setLlmProviders(nextLlmProviders);
+        setPolicySnapshot(nextPolicy);
         setAsrProviderId((current) => current ?? nextAsrProviders[0]?.id ?? null);
         setLlmProviderId((current) => current ?? nextLlmProviders[0]?.id ?? null);
         const firstId = items[0]?.id ?? null;
@@ -167,6 +170,7 @@ export function MeetingsPage() {
       setLanguage('');
       setFile(null);
       setActiveTab('summary');
+      setPolicySnapshot(await usagePolicyApi.get());
       await loadEntries(created.id);
       setNotice('Meeting saved.');
     } catch (err) {
@@ -270,8 +274,17 @@ export function MeetingsPage() {
           <div className="metric-strip">
             <MetricPill label="Meetings" value={entries.length} tone="info" />
             <MetricPill label="Audio" value={`${totalMinutes}m`} tone="success" />
+            <MetricPill
+              label="Text left"
+              value={
+                policySnapshot
+                  ? `${policySnapshot.usage.llm_runs_remaining}/${policySnapshot.policy.llm_runs_per_24h}`
+                  : 'n/a'
+              }
+              tone="warning"
+            />
             <MetricPill label="To-do" value={totalActionItems} tone="warning" />
-            <MetricPill label="LLM" value={selected?.llm_model_name ?? 'Gemini'} tone="neutral" />
+            <MetricPill label="Cap" value={formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)} tone="neutral" />
           </div>
         }
       />
@@ -326,7 +339,21 @@ export function MeetingsPage() {
                 {llmProviders[0] ? `${llmProviders[0].name} · ${llmProviders[0].model_name}` : 'No LLM provider available.'}
               </div>
             )}
-            <Button type="submit" disabled={submitting || !file || !asrProviders.length || !llmProviders.length}>
+            {policySnapshot ? (
+              <div className="list-row-copy">
+                {policySnapshot.usage.llm_runs_remaining} of {policySnapshot.policy.llm_runs_per_24h} text runs left in the last 24h. Max {formatDuration(policySnapshot.policy.max_audio_seconds_per_request)} per file.
+              </div>
+            ) : null}
+            <Button
+              type="submit"
+              disabled={
+                submitting ||
+                !file ||
+                !asrProviders.length ||
+                !llmProviders.length ||
+                (policySnapshot?.usage.llm_runs_remaining ?? 1) <= 0
+              }
+            >
               {submitting ? 'Processing...' : 'Save meeting'}
             </Button>
           </form>

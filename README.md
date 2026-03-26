@@ -90,6 +90,8 @@ Why this shape:
    - `POSTGRES_PASSWORD`
    - `SECRET_KEY`
    - `CREDENTIALS_SECRET_KEY`
+   - `DEFAULT_LLM_RUNS_PER_24H`
+   - `DEFAULT_MAX_AUDIO_SECONDS_PER_REQUEST`
    - `INITIAL_ADMIN_USERNAME`
    - `INITIAL_ADMIN_PASSWORD`
 
@@ -130,6 +132,7 @@ Why this shape:
    - assign users to feature access groups
    - store ASR or LLM provider settings and API keys
    - choose which providers stay active in the app
+   - tune the wallet guardrails for text runs and max audio length
 
 The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
 
@@ -147,6 +150,7 @@ Notes for ASR:
 - Supported upload formats include common file types such as `wav`, `mp3`, `m4a`, `ogg`, `flac`, and `webm`.
 - In-browser recordings use speech-optimized compressed audio so meeting capture stays storage-friendly.
 - Users only see ASR providers that match their feature permissions.
+- Audio jobs follow the admin policy limit for max duration per file. The default is 5 hours.
 
 Notes for meeting records:
 
@@ -154,6 +158,7 @@ Notes for meeting records:
 - Meeting-note generation requires `GEMINI_API_KEY`.
 - If you change ASR or Gemini settings, rebuild the backend container.
 - The meeting page lets users choose from active providers they are allowed to use.
+- LLM text runs follow the admin policy limit. The default is 3 runs per 24 hours per user.
 
 Notes for the control plane:
 
@@ -161,6 +166,7 @@ Notes for the control plane:
 - A user can only see and use pages that match their group's capabilities.
 - Provider secrets are stored encrypted in the database.
 - The `Control` page is admin-only.
+- The `Policy` tab lets you cap text AI runs per 24 hours and max audio duration per file for all users.
 
 ## Local development
 

@@ -31,6 +31,8 @@ Then change these values:
 - `POSTGRES_PASSWORD` to a strong database password
 - `SECRET_KEY` to a long random secret
 - `CREDENTIALS_SECRET_KEY` to a second long random secret for encrypting stored provider API keys
+- `DEFAULT_LLM_RUNS_PER_24H` if you want a different default text budget
+- `DEFAULT_MAX_AUDIO_SECONDS_PER_REQUEST` if you want a different default audio cap
 - `INITIAL_ADMIN_USERNAME` to the first admin login name
 - `INITIAL_ADMIN_PASSWORD` to the first admin password
 - `AUTH_MAX_FAILED_ATTEMPTS` if you want a different lockout threshold
@@ -47,8 +49,8 @@ Optional ASR tuning:
 - `ASR_MODEL_NAME=MediaTek-Research/Breeze-ASR-25` for the default local ASR model
 - `ASR_DEVICE=cpu` for normal lab-machine use
 - `ASR_COMPUTE_TYPE=float32` for the default Breeze CPU path
-- `ASR_MAX_UPLOAD_MB=25` to cap upload size
-- `MEETING_MAX_UPLOAD_MB=120` for longer meeting audio
+- `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
+- `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
 
 After first login, use the `Control` page to:
@@ -58,6 +60,7 @@ After first login, use the `Control` page to:
 - reset passwords or unlock locked users
 - store ASR and LLM provider settings
 - enable or disable providers for the user-facing selectors
+- set the shared text/audio budget policy
 
 ## Start the app
 
@@ -81,6 +84,7 @@ ASR notes:
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
 - Provider API secrets are stored encrypted in Postgres.
+- The default policy is 3 LLM text runs per user per rolling 24 hours and 5 hours max audio per file.
 
 ## Private remote access with Tailscale Serve
 

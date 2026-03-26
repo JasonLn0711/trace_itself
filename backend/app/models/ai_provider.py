@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import AIProviderDriver, AIProviderKind
 from app.models.base import Base
@@ -34,6 +34,8 @@ class AIProvider(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    usage_events = relationship("AIUsageEvent", back_populates="provider")
 
     @property
     def has_api_key(self) -> bool:

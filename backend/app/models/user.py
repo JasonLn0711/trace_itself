@@ -39,6 +39,7 @@ class User(Base):
     daily_logs = relationship("DailyLog", back_populates="user")
     asr_transcripts = relationship("AsrTranscript", back_populates="user", cascade="all, delete-orphan")
     meeting_records = relationship("MeetingRecord", back_populates="user", cascade="all, delete-orphan")
+    usage_events = relationship("AIUsageEvent", back_populates="user", cascade="all, delete-orphan")
     product_updates = relationship("ProductUpdate", back_populates="author")
 
     @property

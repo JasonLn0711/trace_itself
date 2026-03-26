@@ -50,6 +50,11 @@ class AIProviderDriver(StrEnum):
     GEMINI = "gemini"
 
 
+class UsageEventKind(StrEnum):
+    ASR_AUDIO = "asr_audio"
+    LLM_TEXT = "llm_text"
+
+
 class ProductUpdateType(StrEnum):
     BUILD = "build"
     FIX = "fix"
