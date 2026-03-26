@@ -1108,6 +1108,17 @@ a.card.entity {
   margin-top: 4px;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
 .cluster-grid {
   display: grid;
   gap: 10px;
@@ -1263,6 +1274,93 @@ a.card.entity {
 .transcript-surface {
   display: grid;
   gap: 12px;
+}
+
+.audio-capture {
+  display: grid;
+  gap: 10px;
+}
+
+.audio-capture-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.capture-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.capture-pill.live {
+  color: var(--danger);
+  border-color: rgba(255, 142, 142, 0.22);
+  background: rgba(255, 142, 142, 0.1);
+}
+
+.capture-pill.ready {
+  color: var(--success);
+  border-color: rgba(119, 217, 163, 0.22);
+  background: rgba(119, 217, 163, 0.1);
+}
+
+.audio-capture-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.audio-capture-copy {
+  min-width: 0;
+}
+
+.audio-player {
+  width: 100%;
+  min-height: 42px;
+}
+
+.meeting-body {
+  max-height: 360px;
+}
+
+.note-surface {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.todo-list {
+  display: grid;
+  gap: 10px;
+}
+
+.todo-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.todo-bullet {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(88, 208, 190, 0.12);
 }
 
 .transcript-body {

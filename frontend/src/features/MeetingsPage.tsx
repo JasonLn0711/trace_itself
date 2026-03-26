@@ -12,36 +12,54 @@ import {
   PageIntro,
   SectionHeader
 } from '../components/Primitives';
-import { asrApi, extractApiErrorMessage } from '../lib/api';
+import { meetingsApi, extractApiErrorMessage } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
-import { formatBytes, formatDuration } from '../lib/media';
-import type { AsrTranscript, AsrTranscriptSummary } from '../types';
+import { actionItemCount, formatBytes, formatDuration } from '../lib/media';
+import type { MeetingRecord, MeetingRecordSummary } from '../types';
 
-export function AsrPage() {
-  const [entries, setEntries] = useState<AsrTranscriptSummary[]>([]);
-  const [selected, setSelected] = useState<AsrTranscript | null>(null);
+type MeetingTab = 'summary' | 'minutes' | 'actions' | 'transcript';
+
+function excerpt(value: string, max = 160) {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (compact.length <= max) {
+    return compact;
+  }
+  return `${compact.slice(0, max - 1).trimEnd()}…`;
+}
+
+function splitActionItems(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.replace(/^-\s*/, '').trim())
+    .filter(Boolean);
+}
+
+export function MeetingsPage() {
+  const [entries, setEntries] = useState<MeetingRecordSummary[]>([]);
+  const [selected, setSelected] = useState<MeetingRecord | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [language, setLanguage] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [activeTab, setActiveTab] = useState<MeetingTab>('summary');
   const [loading, setLoading] = useState(true);
-  const [loadingTranscript, setLoadingTranscript] = useState(false);
+  const [loadingEntry, setLoadingEntry] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
   async function loadEntries(targetId?: number | null) {
-    const items = await asrApi.list({ limit: 30 });
+    const items = await meetingsApi.list({ limit: 30 });
     setEntries(items);
     const nextSelectedId = targetId ?? items[0]?.id ?? null;
     setSelectedId(nextSelectedId);
     if (nextSelectedId) {
-      setLoadingTranscript(true);
+      setLoadingEntry(true);
       try {
-        setSelected(await asrApi.get(nextSelectedId));
+        setSelected(await meetingsApi.get(nextSelectedId));
       } finally {
-        setLoadingTranscript(false);
+        setLoadingEntry(false);
       }
     } else {
       setSelected(null);
@@ -53,7 +71,7 @@ export function AsrPage() {
 
     async function load() {
       try {
-        const items = await asrApi.list({ limit: 30 });
+        const items = await meetingsApi.list({ limit: 30 });
         if (!alive) {
           return;
         }
@@ -61,15 +79,15 @@ export function AsrPage() {
         const firstId = items[0]?.id ?? null;
         setSelectedId(firstId);
         if (firstId) {
-          setLoadingTranscript(true);
+          setLoadingEntry(true);
           try {
-            const transcript = await asrApi.get(firstId);
+            const meeting = await meetingsApi.get(firstId);
             if (alive) {
-              setSelected(transcript);
+              setSelected(meeting);
             }
           } finally {
             if (alive) {
-              setLoadingTranscript(false);
+              setLoadingEntry(false);
             }
           }
         }
@@ -94,21 +112,22 @@ export function AsrPage() {
     () => Math.round(entries.reduce((sum, item) => sum + (item.duration_seconds ?? 0), 0) / 60),
     [entries]
   );
-  const languageCount = useMemo(
-    () => new Set(entries.map((item) => item.language).filter(Boolean)).size,
+  const totalActionItems = useMemo(
+    () => entries.reduce((sum, item) => sum + actionItemCount(item.action_items_text), 0),
     [entries]
   );
 
   async function handleSelect(id: number) {
     setSelectedId(id);
-    setLoadingTranscript(true);
+    setLoadingEntry(true);
     setError('');
     try {
-      setSelected(await asrApi.get(id));
+      setSelected(await meetingsApi.get(id));
+      setActiveTab('summary');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     } finally {
-      setLoadingTranscript(false);
+      setLoadingEntry(false);
     }
   }
 
@@ -123,14 +142,15 @@ export function AsrPage() {
     setError('');
     setNotice('');
     try {
-      const created = await asrApi.transcribe({ file, title, language });
+      const created = await meetingsApi.create({ file, title, language });
       setSelected(created);
       setSelectedId(created.id);
       setTitle('');
       setLanguage('');
       setFile(null);
+      setActiveTab('summary');
       await loadEntries(created.id);
-      setNotice('Transcript ready.');
+      setNotice('Meeting saved.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     } finally {
@@ -139,7 +159,7 @@ export function AsrPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!window.confirm('Delete this transcript?')) {
+    if (!window.confirm('Delete this meeting record?')) {
       return;
     }
 
@@ -147,9 +167,9 @@ export function AsrPage() {
     setError('');
     setNotice('');
     try {
-      await asrApi.remove(id);
+      await meetingsApi.remove(id);
       await loadEntries(selectedId === id ? null : selectedId);
-      setNotice('Transcript deleted.');
+      setNotice('Meeting deleted.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     } finally {
@@ -157,12 +177,47 @@ export function AsrPage() {
     }
   }
 
-  async function copyTranscript() {
-    if (!selected?.transcript_text || typeof navigator === 'undefined' || !navigator.clipboard) {
+  async function copyActiveTab() {
+    if (!selected || typeof navigator === 'undefined' || !navigator.clipboard) {
       return;
     }
-    await navigator.clipboard.writeText(selected.transcript_text);
-    setNotice('Transcript copied.');
+
+    const value =
+      activeTab === 'summary'
+        ? selected.summary_text
+        : activeTab === 'minutes'
+          ? selected.minutes_text
+          : activeTab === 'actions'
+            ? selected.action_items_text
+            : selected.transcript_text;
+
+    await navigator.clipboard.writeText(value);
+    setNotice('Copied.');
+  }
+
+  function renderActiveTab(meeting: MeetingRecord) {
+    if (activeTab === 'summary') {
+      return <div className="note-surface">{meeting.summary_text}</div>;
+    }
+    if (activeTab === 'minutes') {
+      return <pre className="transcript-body meeting-body">{meeting.minutes_text}</pre>;
+    }
+    if (activeTab === 'actions') {
+      const items = splitActionItems(meeting.action_items_text);
+      return items.length ? (
+        <div className="todo-list">
+          {items.map((item, index) => (
+            <div key={`${item}-${index}`} className="todo-item">
+              <span className="todo-bullet" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No action items" description="This meeting did not produce explicit tasks." />
+      );
+    }
+    return <pre className="transcript-body meeting-body">{meeting.transcript_text}</pre>;
   }
 
   if (loading) {
@@ -170,7 +225,7 @@ export function AsrPage() {
       <div className="page">
         <Card className="section-card">
           <div className="spinner" />
-          <p className="muted">Loading ASR...</p>
+          <p className="muted">Loading meetings...</p>
         </Card>
       </div>
     );
@@ -179,15 +234,15 @@ export function AsrPage() {
   return (
     <div className="page">
       <PageIntro
-        title="ASR"
-        description="Record or upload. Save text."
+        title="Meetings"
+        description="Record. Save notes."
         actions={
           <>
             <button className="btn btn-primary" type="button" onClick={() => void loadEntries(selectedId)}>
               Refresh
             </button>
-            {selected?.transcript_text ? (
-              <button className="btn btn-ghost" type="button" onClick={() => void copyTranscript()}>
+            {selected ? (
+              <button className="btn btn-ghost" type="button" onClick={() => void copyActiveTab()}>
                 Copy
               </button>
             ) : null}
@@ -195,22 +250,22 @@ export function AsrPage() {
         }
         aside={
           <div className="metric-strip">
-            <MetricPill label="Transcripts" value={entries.length} tone="info" />
+            <MetricPill label="Meetings" value={entries.length} tone="info" />
             <MetricPill label="Audio" value={`${totalMinutes}m`} tone="success" />
-            <MetricPill label="Languages" value={languageCount} tone="neutral" />
-            <MetricPill label="Model" value={selected?.model_name ?? 'Breeze'} tone="info" />
+            <MetricPill label="To-do" value={totalActionItems} tone="warning" />
+            <MetricPill label="LLM" value={selected?.llm_model_name ?? 'Gemini'} tone="neutral" />
           </div>
         }
       />
 
-      {error ? <Notice title="ASR error" description={error} tone="danger" /> : null}
+      {error ? <Notice title="Meeting error" description={error} tone="danger" /> : null}
       {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title="New transcript" />
+          <SectionHeader title="New meeting" />
           <form className="form-grid" onSubmit={handleSubmit}>
-            <AudioCapturePanel file={file} onChange={setFile} filenameBase="asr" disabled={submitting} />
+            <AudioCapturePanel file={file} onChange={setFile} filenameBase="meeting" disabled={submitting} />
             <div className="form-grid cols-2">
               <label className="field">
                 <span>Title</span>
@@ -221,9 +276,9 @@ export function AsrPage() {
                 <input value={language} onChange={(event) => setLanguage(event.target.value)} placeholder="auto, en, zh" />
               </label>
             </div>
-            <div className="list-row-copy">Breeze ASR 25 runs on your server.</div>
+            <div className="list-row-copy">Breeze on-server. Gemini notes.</div>
             <Button type="submit" disabled={submitting || !file}>
-              {submitting ? 'Transcribing...' : 'Transcribe'}
+              {submitting ? 'Processing...' : 'Save meeting'}
             </Button>
           </form>
         </Card>
@@ -243,9 +298,9 @@ export function AsrPage() {
                         <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
                       </div>
                     </div>
-                    <div className="list-row-copy line-clamp-1">{entry.excerpt || 'No transcript text.'}</div>
+                    <div className="list-row-copy line-clamp-2">{excerpt(entry.summary_text)}</div>
                     <div className="list-row-copy line-clamp-1">
-                      {entry.original_filename} · {formatBytes(entry.file_size_bytes)} · {formatDateTime(entry.created_at)}
+                      {formatBytes(entry.file_size_bytes)} · {actionItemCount(entry.action_items_text)} tasks · {formatDateTime(entry.created_at)}
                     </div>
                   </div>
                   <div className="list-row-side">
@@ -261,7 +316,7 @@ export function AsrPage() {
                 </div>
               ))
             ) : (
-              <EmptyState title="No transcripts yet" description="Record or upload the first one." />
+              <EmptyState title="No meetings yet" description="Record one to save the first note set." />
             )}
           </div>
         </Card>
@@ -269,10 +324,10 @@ export function AsrPage() {
 
       <Card className="section-card">
         <SectionHeader
-          title={selected ? selected.title : 'Transcript'}
-          description={selected ? `${selected.original_filename} · ${formatDateTime(selected.created_at)}` : undefined}
+          title={selected ? selected.title : 'Meeting'}
+          description={selected ? `${selected.audio_filename} · ${formatDateTime(selected.created_at)}` : undefined}
         />
-        {loadingTranscript ? (
+        {loadingEntry ? (
           <div className="spinner" />
         ) : selected ? (
           <div className="transcript-surface">
@@ -280,16 +335,29 @@ export function AsrPage() {
               <Badge tone="neutral">{selected.language || 'auto'}</Badge>
               <Badge tone="neutral">{formatDuration(selected.duration_seconds)}</Badge>
               <Badge tone="neutral">{formatBytes(selected.file_size_bytes)}</Badge>
-              <Badge tone="info">{selected.model_name}</Badge>
-              <a className="btn btn-ghost" href={asrApi.audioUrl(selected.id)}>
+              <Badge tone="info">{selected.asr_model_name}</Badge>
+              <Badge tone="warning">{selected.llm_model_name}</Badge>
+              <a className="btn btn-ghost" href={meetingsApi.audioUrl(selected.id)}>
                 Audio
               </a>
             </div>
-            <audio className="audio-player" controls preload="none" src={asrApi.audioUrl(selected.id)} />
-            <pre className="transcript-body">{selected.transcript_text}</pre>
+            <audio className="audio-player" controls preload="none" src={meetingsApi.audioUrl(selected.id)} />
+            <div className="segmented-control">
+              {(['summary', 'minutes', 'actions', 'transcript'] as MeetingTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  className={`segment ${activeTab === tab ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab === 'actions' ? 'To-do' : tab[0].toUpperCase() + tab.slice(1)}
+                </button>
+              ))}
+            </div>
+            {renderActiveTab(selected)}
           </div>
         ) : (
-          <EmptyState title="No transcript selected" description="Pick a transcript from history." />
+          <EmptyState title="No meeting selected" description="Pick a saved meeting." />
         )}
       </Card>
     </div>

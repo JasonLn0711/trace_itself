@@ -34,6 +34,8 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS user_id INTEGER"))
     connection.execute(text("ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS user_id INTEGER"))
     connection.execute(text("ALTER TABLE daily_logs DROP CONSTRAINT IF EXISTS daily_logs_log_date_key"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_storage_path VARCHAR(255)"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_mime_type VARCHAR(120)"))
     connection.execute(
         text(
             """
@@ -42,11 +44,38 @@ def apply_schema_upgrades(connection) -> None:
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 title VARCHAR(200) NOT NULL,
                 original_filename VARCHAR(255) NOT NULL,
+                audio_storage_path VARCHAR(255) NULL,
+                audio_mime_type VARCHAR(120) NULL,
                 language VARCHAR(32) NULL,
                 duration_seconds DOUBLE PRECISION NULL,
                 file_size_bytes BIGINT NOT NULL,
                 model_name VARCHAR(120) NOT NULL,
                 transcript_text TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS meeting_records (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                title VARCHAR(200) NOT NULL,
+                audio_filename VARCHAR(255) NOT NULL,
+                audio_storage_path VARCHAR(255) NOT NULL,
+                audio_mime_type VARCHAR(120) NULL,
+                file_size_bytes BIGINT NOT NULL,
+                language VARCHAR(32) NULL,
+                duration_seconds DOUBLE PRECISION NULL,
+                transcript_text TEXT NOT NULL,
+                minutes_text TEXT NOT NULL,
+                summary_text TEXT NOT NULL,
+                action_items_text TEXT NOT NULL,
+                asr_model_name VARCHAR(120) NOT NULL,
+                llm_model_name VARCHAR(120) NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )
@@ -75,6 +104,8 @@ def apply_schema_upgrades(connection) -> None:
 
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_user_id ON asr_transcripts (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_created_at ON asr_transcripts (created_at)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_meeting_records_user_id ON meeting_records (user_id)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_meeting_records_created_at ON meeting_records (created_at)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_projects_user_id ON projects (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_milestones_user_id ON milestones (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_tasks_user_id ON tasks (user_id)"))

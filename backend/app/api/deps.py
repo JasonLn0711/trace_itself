@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.daily_log import DailyLog
 from app.models.asr_transcript import AsrTranscript
 from app.models.milestone import Milestone
+from app.models.meeting_record import MeetingRecord
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
@@ -91,3 +92,14 @@ def get_asr_transcript_or_404(
     if not transcript:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transcript not found.")
     return transcript
+
+
+def get_meeting_record_or_404(
+    meeting_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MeetingRecord:
+    meeting = db.scalar(select(MeetingRecord).where(MeetingRecord.id == meeting_id, MeetingRecord.user_id == current_user.id))
+    if not meeting:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting record not found.")
+    return meeting

@@ -1,7 +1,7 @@
 from pathlib import Path
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,10 +12,10 @@ from app.models.asr_transcript import AsrTranscript
 from app.models.user import User
 from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary
 from app.services.asr import AsrServiceError, service as asr_service
+from app.services.audio_storage import delete_audio_file, save_upload_file
 
 router = APIRouter(prefix="/asr", tags=["asr"])
 settings = get_settings()
-ALLOWED_EXTENSIONS = {".aac", ".flac", ".m4a", ".mp3", ".mp4", ".ogg", ".wav", ".webm"}
 
 
 def build_excerpt(value: str, max_length: int = 180) -> str:
@@ -30,6 +30,7 @@ def to_summary(transcript: AsrTranscript) -> AsrTranscriptSummary:
         id=transcript.id,
         title=transcript.title,
         original_filename=transcript.original_filename,
+        audio_mime_type=transcript.audio_mime_type,
         language=transcript.language,
         duration_seconds=transcript.duration_seconds,
         file_size_bytes=transcript.file_size_bytes,
@@ -50,6 +51,16 @@ def normalize_title(raw_title: str | None, original_filename: str) -> str:
         return candidate[:200]
     stem = Path(original_filename).stem.replace("_", " ").replace("-", " ").strip()
     return (stem or "Transcript")[:200]
+
+
+@router.get("/transcripts/{transcript_id}/audio")
+def download_audio(transcript: AsrTranscript = Depends(get_asr_transcript_or_404)) -> FileResponse:
+    if not transcript.audio_storage_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found.")
+    path = Path(settings.asr_upload_dir) / transcript.audio_storage_path
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found.")
+    return FileResponse(path, media_type=transcript.audio_mime_type, filename=transcript.original_filename)
 
 
 @router.get("/transcripts", response_model=list[AsrTranscriptSummary])
@@ -80,46 +91,32 @@ async def transcribe_audio(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AsrTranscriptRead:
-    original_filename = file.filename or "audio"
-    suffix = Path(original_filename).suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported audio format.")
-
-    payload = await file.read()
-    await file.close()
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty audio file.")
-
-    max_bytes = settings.asr_max_upload_mb * 1024 * 1024
-    if len(payload) > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Audio file exceeds the {settings.asr_max_upload_mb} MB limit.",
-        )
-
-    target_dir = Path(settings.asr_upload_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target_path = target_dir / f"{uuid4().hex}{suffix}"
-    target_path.write_bytes(payload)
+    stored_audio = save_upload_file(
+        file,
+        storage_root=Path(settings.asr_upload_dir),
+        max_bytes=settings.asr_max_upload_bytes,
+        prefix=f"asr-{current_user.id}",
+    )
 
     normalized_language = (language or "").strip().lower() or None
     if normalized_language == "auto":
         normalized_language = None
 
     try:
-        result = asr_service.transcribe_file(target_path, language=normalized_language)
+        result = asr_service.transcribe_file(stored_audio.storage_path, language=normalized_language)
     except AsrServiceError as exc:
+        delete_audio_file(stored_audio.storage_path)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-    finally:
-        target_path.unlink(missing_ok=True)
 
     transcript = AsrTranscript(
         user_id=current_user.id,
-        title=normalize_title(title, original_filename),
-        original_filename=original_filename[:255],
+        title=normalize_title(title, stored_audio.original_filename),
+        original_filename=stored_audio.original_filename,
+        audio_storage_path=stored_audio.relative_storage_path,
+        audio_mime_type=stored_audio.mime_type,
         language=result.language,
         duration_seconds=result.duration_seconds,
-        file_size_bytes=len(payload),
+        file_size_bytes=stored_audio.file_size_bytes,
         model_name=result.model_name,
         transcript_text=result.text,
     )
@@ -131,5 +128,7 @@ async def transcribe_audio(
 
 @router.delete("/transcripts/{transcript_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_transcript(transcript: AsrTranscript = Depends(get_asr_transcript_or_404), db: Session = Depends(get_db)) -> None:
+    path = Path(settings.asr_upload_dir) / transcript.audio_storage_path if transcript.audio_storage_path else None
     db.delete(transcript)
     db.commit()
+    delete_audio_file(path)

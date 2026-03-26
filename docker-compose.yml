@@ -31,6 +31,7 @@ services:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - asr_model_cache:/root/.cache/huggingface
+      - app_data:/data
     networks:
       - internal
 
@@ -52,6 +53,7 @@ services:
 volumes:
   postgres_data:
   asr_model_cache:
+  app_data:
 
 networks:
   internal:

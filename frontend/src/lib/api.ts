@@ -3,6 +3,8 @@ import type {
   AsrTranscriptSummary,
   DailyLog,
   DashboardSummary,
+  MeetingRecord,
+  MeetingRecordSummary,
   Milestone,
   ProductUpdate,
   ProductUpdateCreateInput,
@@ -175,6 +177,9 @@ export const asrApi = {
   get(id: number) {
     return request<AsrTranscript>(`/asr/transcripts/${id}`);
   },
+  audioUrl(id: number) {
+    return `${API_BASE}/asr/transcripts/${id}/audio`;
+  },
   transcribe(input: { file: File; title?: string; language?: string }) {
     const formData = new FormData();
     formData.append('file', input.file);
@@ -190,6 +195,36 @@ export const asrApi = {
   },
   remove(id: number) {
     return request<void>(`/asr/transcripts/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
+export const meetingsApi = {
+  list(query?: { limit?: number }) {
+    return request<MeetingRecordSummary[]>(withQuery('/meetings', query));
+  },
+  get(id: number) {
+    return request<MeetingRecord>(`/meetings/${id}`);
+  },
+  audioUrl(id: number) {
+    return `${API_BASE}/meetings/${id}/audio`;
+  },
+  create(input: { file: File; title?: string; language?: string }) {
+    const formData = new FormData();
+    formData.append('file', input.file);
+    if (input.title?.trim()) {
+      formData.append('title', input.title.trim());
+    }
+    if (input.language?.trim()) {
+      formData.append('language', input.language.trim());
+    }
+    return requestForm<MeetingRecord>('/meetings', formData, {
+      method: 'POST'
+    });
+  },
+  remove(id: number) {
+    return request<void>(`/meetings/${id}`, {
       method: 'DELETE'
     });
   }

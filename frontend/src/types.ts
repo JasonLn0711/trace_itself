@@ -86,6 +86,7 @@ export interface AsrTranscriptSummary {
   id: number;
   title: string;
   original_filename: string;
+  audio_mime_type: string | null;
   language: string | null;
   duration_seconds: number | null;
   file_size_bytes: number;
@@ -99,11 +100,46 @@ export interface AsrTranscript {
   id: number;
   title: string;
   original_filename: string;
+  audio_mime_type: string | null;
   language: string | null;
   duration_seconds: number | null;
   file_size_bytes: number;
   model_name: string;
   transcript_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingRecordSummary {
+  id: number;
+  title: string;
+  audio_filename: string;
+  audio_mime_type: string | null;
+  file_size_bytes: number;
+  language: string | null;
+  duration_seconds: number | null;
+  summary_text: string;
+  action_items_text: string;
+  asr_model_name: string;
+  llm_model_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingRecord {
+  id: number;
+  title: string;
+  audio_filename: string;
+  audio_mime_type: string | null;
+  file_size_bytes: number;
+  language: string | null;
+  duration_seconds: number | null;
+  transcript_text: string;
+  minutes_text: string;
+  summary_text: string;
+  action_items_text: string;
+  asr_model_name: string;
+  llm_model_name: string;
   created_at: string;
   updated_at: string;
 }

@@ -5,7 +5,7 @@
 It now has two main user-facing functions:
 
 - Progress tracking for projects, milestones, tasks, and daily logs
-- Private ASR for turning uploaded audio into saved transcripts per user
+- Private audio workflows: ASR transcripts and meeting notes per user
 
 ## MVP scope
 
@@ -13,7 +13,8 @@ It now has two main user-facing functions:
 - Admin-managed user accounts and password resets
 - Temporary account lockout after repeated failed login attempts
 - Projects, milestones, tasks, and daily logs
-- Private ASR uploads with per-user transcript history
+- Private ASR with saved audio and per-user transcript history
+- Meeting records with transcript, minutes, summary, and action items
 - Shared product updates log for fixes, builds, and release notes
 - Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
 - FastAPI backend with PostgreSQL
@@ -26,7 +27,8 @@ It now has two main user-facing functions:
 - Frontend: Next.js + React
 - Backend: FastAPI + SQLAlchemy
 - Database: PostgreSQL 16
-- ASR engine: local Whisper inference with `faster-whisper`
+- ASR engine: local Breeze ASR 25 via Hugging Face Transformers
+- Meeting summarizer: Gemini 3.1 Flash-Lite API
 - Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
 - Deployment: Docker Compose with a Next.js standalone frontend container
 - Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
@@ -35,7 +37,8 @@ Why this shape:
 
 - Next.js gives us file-based routing, a cleaner production runtime, and an easier path to future server-side optimization without changing the product model.
 - FastAPI + SQLAlchemy gives us typed APIs and a clean data layer without extra framework weight.
-- Local ASR keeps transcripts private to the lab machine instead of shipping audio to a third-party service.
+- Local ASR keeps transcription on the lab machine instead of shipping audio to a third-party ASR service.
+- Meeting summaries build on the saved transcript, so the raw workflow stays private-first and only the transcript text is sent to Gemini when you enable that feature.
 - Postgres stays on the internal Docker network and is never published.
 - The frontend and backend bind to `127.0.0.1` on the host so the default posture is private-first.
 
@@ -89,9 +92,16 @@ Why this shape:
 
    Optional ASR tuning:
 
-   - `ASR_MODEL_NAME=small`
+   - `ASR_MODEL_NAME=MediaTek-Research/Breeze-ASR-25`
    - `ASR_DEVICE=cpu`
-   - `ASR_COMPUTE_TYPE=int8`
+   - `ASR_COMPUTE_TYPE=float32`
+   - `ASR_MAX_UPLOAD_MB=25`
+
+   Optional meeting-note setup:
+
+   - `GEMINI_API_KEY=...`
+   - `GEMINI_MODEL=gemini-3.1-flash-lite-preview`
+   - `MEETING_MAX_UPLOAD_MB=120`
 
 3. Start the stack:
 
@@ -116,8 +126,15 @@ The backend auto-creates the MVP tables on startup and bootstraps the initial ad
 Notes for ASR:
 
 - The first transcription request downloads the ASR model into the Docker volume `asr_model_cache`.
-- Uploaded audio is processed on the server and only the transcript is stored in Postgres.
+- Uploaded or recorded audio is stored in the Docker volume `app_data`, and transcript/meeting metadata is stored in Postgres.
 - Supported upload formats include common file types such as `wav`, `mp3`, `m4a`, `ogg`, `flac`, and `webm`.
+- In-browser recordings use speech-optimized compressed audio so meeting capture stays storage-friendly.
+
+Notes for meeting records:
+
+- The `Meetings` page runs Breeze ASR locally first, then asks Gemini for minutes, a short summary, and action items.
+- Meeting-note generation requires `GEMINI_API_KEY`.
+- If you change ASR or Gemini settings, rebuild the backend container.
 
 ## Local development
 
@@ -163,7 +180,7 @@ Use these commands when you change code:
   docker compose up --build -d backend
   ```
 
-  Use this after ASR model/config changes too.
+  Use this after ASR model/config changes, Breeze upgrades, or Gemini env changes too.
 
 - Frontend and backend together, or you are not sure:
 

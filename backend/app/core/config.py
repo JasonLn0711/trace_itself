@@ -19,12 +19,17 @@ class Settings(BaseSettings):
     backend_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     db_connect_max_attempts: int = 30
     db_connect_retry_seconds: int = 2
-    asr_model_name: str = "small"
+    asr_model_name: str = "MediaTek-Research/Breeze-ASR-25"
     asr_device: str = "cpu"
-    asr_compute_type: str = "int8"
+    asr_compute_type: str = "float32"
     asr_cpu_threads: int = 4
-    asr_upload_dir: str = "/tmp/trace_itself_asr"
+    asr_chunk_length_seconds: int = 30
+    asr_upload_dir: str = "/data/asr"
     asr_max_upload_mb: int = 25
+    meeting_upload_dir: str = "/data/meetings"
+    meeting_max_upload_mb: int = 120
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-3.1-flash-lite-preview"
 
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), case_sensitive=False, extra="ignore")
 
@@ -37,6 +42,14 @@ class Settings(BaseSettings):
     @property
     def bootstrap_admin_password(self) -> str:
         return self.initial_admin_password or self.app_password
+
+    @property
+    def asr_max_upload_bytes(self) -> int:
+        return self.asr_max_upload_mb * 1024 * 1024
+
+    @property
+    def meeting_max_upload_bytes(self) -> int:
+        return self.meeting_max_upload_mb * 1024 * 1024
 
 
 @lru_cache

@@ -3,33 +3,39 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
-class AsrTranscriptSummary(BaseModel):
+class MeetingRecordSummaryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     title: str
-    original_filename: str
+    audio_filename: str
     audio_mime_type: str | None
+    file_size_bytes: int
     language: str | None
     duration_seconds: float | None
-    file_size_bytes: int
-    model_name: str
-    excerpt: str
+    summary_text: str
+    action_items_text: str
+    asr_model_name: str
+    llm_model_name: str
     created_at: datetime
     updated_at: datetime
 
 
-class AsrTranscriptRead(BaseModel):
+class MeetingRecordRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     title: str
-    original_filename: str
+    audio_filename: str
     audio_mime_type: str | None
+    file_size_bytes: int
     language: str | None
     duration_seconds: float | None
-    file_size_bytes: int
-    model_name: str
     transcript_text: str
+    minutes_text: str
+    summary_text: str
+    action_items_text: str
+    asr_model_name: str
+    llm_model_name: str
     created_at: datetime
     updated_at: datetime

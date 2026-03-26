@@ -9,6 +9,7 @@ import { useAuth } from '../state/AuthContext';
 const navItems = [
   { to: '/', label: 'Home' },
   { to: '/asr', label: 'ASR' },
+  { to: '/meetings', label: 'Meetings' },
   { to: '/updates', label: 'Updates' },
   { to: '/projects', label: 'Projects' },
   { to: '/tasks', label: 'Tasks' },

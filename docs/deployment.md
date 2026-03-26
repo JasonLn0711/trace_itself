@@ -34,6 +34,7 @@ Then change these values:
 - `INITIAL_ADMIN_PASSWORD` to the first admin password
 - `AUTH_MAX_FAILED_ATTEMPTS` if you want a different lockout threshold
 - `AUTH_LOCKOUT_MINUTES` if you want a different lockout duration
+- `GEMINI_API_KEY` if you want meeting summaries, minutes, and action items
 
 Use these security settings:
 
@@ -42,10 +43,12 @@ Use these security settings:
 
 Optional ASR tuning:
 
-- `ASR_MODEL_NAME=small` for a balanced default
+- `ASR_MODEL_NAME=MediaTek-Research/Breeze-ASR-25` for the default local ASR model
 - `ASR_DEVICE=cpu` for normal lab-machine use
-- `ASR_COMPUTE_TYPE=int8` to reduce CPU memory usage
+- `ASR_COMPUTE_TYPE=float32` for the default Breeze CPU path
 - `ASR_MAX_UPLOAD_MB=25` to cap upload size
+- `MEETING_MAX_UPLOAD_MB=120` for longer meeting audio
+- `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
 
 After first login, use the `Users` page to create more accounts, reset passwords, or unlock accounts that hit the failed-login threshold.
 
@@ -65,9 +68,11 @@ curl http://127.0.0.1:3000/
 
 ASR notes:
 
-- The first transcription request downloads the Whisper model into the Docker volume `asr_model_cache`.
+- The first transcription request downloads the Breeze ASR model into the Docker volume `asr_model_cache`.
 - That first ASR run can take longer than normal, depending on your network and chosen model.
 - After the model is cached, later transcriptions are much faster.
+- Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
+- Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
 
 ## Private remote access with Tailscale Serve
 
@@ -134,6 +139,13 @@ Backend only:
 ```bash
 docker compose up --build -d backend
 ```
+
+Use this after:
+
+- FastAPI code changes
+- ASR model or upload setting changes
+- Gemini API key or model changes
+- schema upgrade SQL changes
 
 Frontend and backend together:
 
