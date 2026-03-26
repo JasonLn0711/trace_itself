@@ -1,14 +1,15 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../state/AuthContext';
-import { Badge, Button, Callout, Card, EmptyState, Field } from '../components/Primitives';
+import { Button, Card, Field, Notice } from '../components/Primitives';
 import { extractApiErrorMessage } from '../lib/api';
 
 export function LoginPage() {
-  const { authenticated, loading, login, user } = useAuth();
+  const { authenticated, loading, login } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -50,51 +51,63 @@ export function LoginPage() {
 
   return (
     <div className="login-shell">
-      <Card className="login-card hero-banner">
-        <div className="hero-chip">
-          <Badge tone="info">Account-based</Badge>
-          Private self-hosted progress dashboard
+      <Card className="login-card login-surface">
+        <div className="login-brand-stack">
+          <div className="login-brand-mark">T</div>
+          <div className="login-copy">
+            <div className="login-eyebrow">Private access</div>
+            <h1 className="login-title">trace_itself</h1>
+            <p className="muted">Sign in to continue.</p>
+          </div>
         </div>
-        <div>
-          <h1 className="login-title">trace_itself</h1>
-          <p className="muted">
-            Sign in to review projects, milestones, daily logs, and the work that needs attention today.
-          </p>
-        </div>
-        {user ? <Badge tone="info">Last session: {user.display_name}</Badge> : null}
 
-        <form className="stack" onSubmit={handleSubmit}>
-          <Callout
-            title="Private access only"
-            description="Sign in with an account created by the server admin. Repeated failed sign-ins may temporarily lock the account."
-            tone="info"
-          />
-          <Field label="Username" hint="Use your account username.">
+        <form className="stack login-form" onSubmit={handleSubmit}>
+          <Field label="Username">
             <input
               type="text"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="username"
-              placeholder="your-username"
+              autoFocus
+              className="login-input"
+              placeholder="Username"
+              enterKeyHint="next"
               required
             />
           </Field>
-          <Field label="Access password" hint="Use the password configured on your lab server.">
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-              placeholder="Enter password"
-              required
-            />
+          <Field label="Password">
+            <div className="password-field">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                className="login-input password-input"
+                placeholder="Password"
+                enterKeyHint="go"
+                required
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </Field>
 
-          {error ? <EmptyState title="Login failed" description={error} /> : null}
+          {error ? <Notice title="Could not sign in" description={error} tone="danger" /> : null}
 
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting || !username.trim() || !password}>
             {submitting ? 'Signing in...' : 'Sign in'}
           </Button>
+
+          <div className="login-meta">
+            <span>Use the account your admin created.</span>
+            <span>Failed attempts may lock the account briefly.</span>
+          </div>
         </form>
       </Card>
     </div>
