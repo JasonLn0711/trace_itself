@@ -2,7 +2,6 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   Badge,
   Button,
-  Callout,
   Card,
   EmptyState,
   Field,
@@ -168,7 +167,7 @@ export function DailyLogsPage() {
       <PageIntro
         eyebrow="Daily reflection"
         title="Daily Logs"
-        description="Keep entries short, honest, and easy to scan later. The right log reduces rework tomorrow."
+        description="One note per day."
         actions={
           <>
             <button className="btn btn-primary" type="button" onClick={() => setForm(emptyLogForm(todayIso()))}>
@@ -196,50 +195,39 @@ export function DailyLogsPage() {
         }
       />
 
-      {!todayLog ? (
-        <Callout
-          title="Capture today before you stop"
-          description="A short end-of-day note makes the next session easier to restart and keeps progress grounded in reality."
-          tone="warning"
-        />
-      ) : null}
-
       {error ? <Notice title="Could not update daily logs" description={error} tone="danger" /> : null}
       {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader
-            title={editingId ? 'Edit log' : 'Add log'}
-            description="Write the shortest useful note that future-you would thank you for."
-          />
+          <SectionHeader title={editingId ? 'Edit log' : 'Add log'} />
           <form className="form-grid" onSubmit={handleSubmit}>
             <Field label="Date">
               <input type="date" value={form.log_date} onChange={(event) => setForm({ ...form, log_date: event.target.value })} required />
             </Field>
-            <Field label="Summary" hint="What did you intend, and what actually moved?">
+            <Field label="Summary">
               <textarea
                 value={form.summary}
                 onChange={(event) => setForm({ ...form, summary: event.target.value })}
-                placeholder="Planned to review API auth flow, ended up implementing account lockout and testing remote access."
+                placeholder="What moved today?"
                 required
               />
             </Field>
-            <Field label="Blockers" hint="Only write what future-you needs to remember or unblock.">
+            <Field label="Blockers">
               <textarea
                 value={form.blockers}
                 onChange={(event) => setForm({ ...form, blockers: event.target.value })}
-                placeholder="Waiting on docs, need to confirm deployment ports, unclear on next milestone definition."
+                placeholder="What got in the way?"
               />
             </Field>
-            <Field label="Next step" hint="Describe the next action so tomorrow starts fast.">
+            <Field label="Next step">
               <textarea
                 value={form.next_step}
                 onChange={(event) => setForm({ ...form, next_step: event.target.value })}
-                placeholder="Create two milestone tasks and verify the Tailscale private-only setup."
+                placeholder="What comes next?"
               />
             </Field>
-            <Field label="Total focus hours" hint="A rough honest number is more useful than a perfect one.">
+            <Field label="Total focus hours">
               <input type="number" min="0" step="0.25" value={form.total_focus_hours} onChange={(event) => setForm({ ...form, total_focus_hours: event.target.value })} />
             </Field>
             <div className="helper-row">
@@ -262,7 +250,7 @@ export function DailyLogsPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Recent logs" description="Review recent movement without reading everything in full." />
+          <SectionHeader title="Recent logs" />
           <div className="cluster-grid">
             {recentLogs.length ? (
               recentLogs.map((log) => (
@@ -270,7 +258,7 @@ export function DailyLogsPage() {
                   <div className="entity-top">
                     <div className="entity-copy">
                       <h3 className="entity-title">{formatDate(log.log_date)}</h3>
-                      <p className="muted">{log.summary || 'No summary yet.'}</p>
+                      <p className="muted">{log.summary || 'No summary.'}</p>
                     </div>
                     <Button variant="secondary" onClick={() => editLog(log)}>
                       Edit
@@ -280,11 +268,11 @@ export function DailyLogsPage() {
                   <div className="detail-grid">
                     <div>
                       <div className="muted small">Blockers</div>
-                      <div>{log.blockers || 'No blockers recorded.'}</div>
+                      <div>{log.blockers || 'None'}</div>
                     </div>
                     <div>
                       <div className="muted small">Next step</div>
-                      <div>{log.next_step || 'No next step recorded.'}</div>
+                      <div>{log.next_step || 'Not set'}</div>
                     </div>
                     <div className="detail-row">
                       <Badge tone="neutral">{(log.total_focus_hours ?? 0).toFixed(1)}h focus</Badge>
@@ -303,7 +291,7 @@ export function DailyLogsPage() {
                 </div>
               ))
             ) : (
-              <EmptyState title="No logs yet" description="Start with today so the record stays useful and trustworthy." />
+              <EmptyState title="No logs yet" description="Add one for today." />
             )}
           </div>
         </Card>

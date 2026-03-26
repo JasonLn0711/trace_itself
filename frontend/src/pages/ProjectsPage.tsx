@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Badge,
   Button,
-  Callout,
   Card,
   EmptyState,
   Field,
@@ -205,9 +204,9 @@ export function ProjectsPage() {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Portfolio view"
+        eyebrow="Projects"
         title="Projects"
-        description="Use projects as the stable frame for long-horizon work. If the list is clear here, the rest of the system gets easier to trust."
+        description="Long-horizon tracks."
         actions={
           <>
             <Link className="btn btn-primary" to="/tasks">Open task queue</Link>
@@ -224,32 +223,21 @@ export function ProjectsPage() {
         }
       />
 
-      {noTargetCount > 0 ? (
-        <Callout
-          title="Some active work has no target date"
-          description="Target dates are optional, but they reduce ambiguity and make the dashboard easier to prioritize."
-          tone="warning"
-        />
-      ) : null}
-
       {error ? <Notice title="Could not update projects" description={error} tone="danger" /> : null}
       {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader
-            title={editingId ? 'Edit project' : 'Add project'}
-            description="One project per learning track, initiative, or sustained goal."
-          />
+          <SectionHeader title={editingId ? 'Edit project' : 'Add project'} />
           <form className="form-grid" onSubmit={handleSubmit}>
-            <Field label="Name" hint="Use a stable title you will recognize later.">
+            <Field label="Name">
               <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Example: FastAPI fundamentals" required />
             </Field>
-            <Field label="Description" hint="What is the point of this track or initiative?">
+            <Field label="Description">
               <textarea
                 value={form.description}
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
-                placeholder="Why it matters, what success looks like, or the current focus."
+                placeholder="What this project is for."
               />
             </Field>
             <div className="form-grid cols-2">
@@ -300,12 +288,12 @@ export function ProjectsPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Project list" description="Filter the list until the next steering decision is obvious." />
+          <SectionHeader title="Project list" />
           <div className="toolbar">
             <SegmentedControl label="Project status filter" value={viewFilter} onChange={(value) => setViewFilter(value as ViewFilter)} options={filterOptions} />
             <div className="toolbar-row">
               <Field label="Search">
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search project title or description" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects" />
               </Field>
             </div>
           </div>
@@ -319,7 +307,7 @@ export function ProjectsPage() {
                   <div className="entity-top">
                     <div className="entity-copy">
                       <h3 className="entity-title">{project.name}</h3>
-                      <p className="muted">{project.description || 'No description yet.'}</p>
+                      <p className="muted">{project.description || 'No description.'}</p>
                     </div>
                     <Badge tone={toneForProjectStatus(project.status)}>{formatEnumLabel(project.status)}</Badge>
                   </div>
@@ -344,14 +332,14 @@ export function ProjectsPage() {
                 </div>
               ))
             ) : (
-              <EmptyState title="No projects in this view" description="Clear the filter or create a new project." />
+              <EmptyState title="No projects here" description="Change the filter or add one." />
             )}
           </div>
         </Card>
       </div>
 
       <Card className="section-card">
-        <SectionHeader title="Active tracks" description="A quick browse of the work that still needs steering." />
+        <SectionHeader title="Active tracks" />
         <div className="grid cards">
           {projects.filter((project) => project.status === 'active').length ? (
             projects
@@ -361,7 +349,7 @@ export function ProjectsPage() {
                   <div className="entity-top">
                     <div className="entity-copy">
                       <h3 className="entity-title">{project.name}</h3>
-                      <p className="muted">{project.description || 'No description yet.'}</p>
+                      <p className="muted">{project.description || 'No description.'}</p>
                     </div>
                     <Badge tone="info">Active</Badge>
                   </div>
@@ -372,7 +360,7 @@ export function ProjectsPage() {
                 </Link>
               ))
           ) : (
-            <EmptyState title="No active projects" description="Move a planned project to active when you are ready to work it." />
+            <EmptyState title="No active projects" description="Move one to active when ready." />
           )}
         </div>
       </Card>

@@ -25,7 +25,7 @@ export function LoginPage() {
         <Card className="login-card">
           <div className="spinner" />
           <h1 className="login-title">trace_itself</h1>
-          <p className="muted">Verifying your secure session.</p>
+          <p className="muted">Checking session.</p>
         </Card>
       </div>
     );
@@ -102,10 +102,10 @@ export function LoginPage() {
           {error ? <Notice title="Sign-in failed" description={error} tone="danger" /> : null}
 
           <Button type="submit" disabled={submitting || !username.trim() || !password}>
-            {submitting ? 'Signing in...' : 'Continue'}
+            {submitting ? 'Signing in...' : 'Sign in'}
           </Button>
 
-          <div className="login-note">Private access</div>
+          <div className="login-note">Private</div>
         </form>
       </Card>
     </div>

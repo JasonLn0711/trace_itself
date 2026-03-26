@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   Badge,
   Button,
-  Callout,
   Card,
   EmptyState,
   Field,
@@ -317,7 +316,7 @@ export function TasksPage() {
       <PageIntro
         eyebrow="Execution queue"
         title="Tasks"
-        description="Keep this list concrete and current. The less interpretation it requires, the easier it is to start working."
+        description="What to do next."
         actions={
           <>
             <Link className="btn btn-primary" to="/projects">Review by project</Link>
@@ -334,34 +333,22 @@ export function TasksPage() {
         }
       />
 
-      {overdueCount > 0 ? (
-        <Callout
-          title="Start with the overdue and blocked items"
-          description="These tasks create the most drag across the rest of the system. Clear, reschedule, or break them down before adding more."
-          tone="danger"
-          action={<button className="btn btn-danger" type="button" onClick={() => setQueueFilter('attention')}>Focus the queue</button>}
-        />
-      ) : null}
-
       {error ? <Notice title="Could not update tasks" description={error} tone="danger" /> : null}
       {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader
-            title={editingId ? 'Edit task' : 'Add task'}
-            description="Make the next action specific enough that future-you can start without thinking."
-          />
+          <SectionHeader title={editingId ? 'Edit task' : 'Add task'} />
           {formDisabled ? (
             <EmptyState
               title="Create a project first"
-              description="Tasks need a project so the dashboard can show where the work belongs."
+              description="Tasks need a project."
               action={<Link className="btn btn-primary" to="/projects">Create project</Link>}
             />
           ) : (
             <form className="form-grid" onSubmit={handleSubmit}>
               <div className="form-grid cols-2">
-                <Field label="Project" hint="Use one project per track or initiative.">
+                <Field label="Project">
                   <select value={form.project_id} onChange={(event) => setForm({ ...form, project_id: event.target.value, milestone_id: '' })} required>
                     <option value="">Select a project</option>
                     {projects.map((project) => (
@@ -371,7 +358,7 @@ export function TasksPage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Milestone" hint="Optional, but useful when a task unlocks a checkpoint.">
+                <Field label="Milestone">
                   <select value={form.milestone_id} onChange={(event) => setForm({ ...form, milestone_id: event.target.value })}>
                     <option value="">None</option>
                     {milestoneOptions.map((milestone) => (
@@ -383,15 +370,15 @@ export function TasksPage() {
                 </Field>
               </div>
 
-              <Field label="Title" hint="Describe the smallest useful next action.">
+              <Field label="Title">
                 <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Example: Draft milestone checklist" required />
               </Field>
 
-              <Field label="Description" hint="Optional context for future-you.">
+              <Field label="Description">
                 <textarea
                   value={form.description}
                   onChange={(event) => setForm({ ...form, description: event.target.value })}
-                  placeholder="What done looks like, key notes, or links to remember."
+                  placeholder="Optional note."
                 />
               </Field>
 
@@ -418,7 +405,7 @@ export function TasksPage() {
                     <option value="critical">Critical</option>
                   </select>
                 </Field>
-                <Field label="Estimated hours" hint="Rough sizing helps you plan your day honestly.">
+                <Field label="Estimated hours">
                   <input type="number" min="0" step="0.25" value={form.estimated_hours} onChange={(event) => setForm({ ...form, estimated_hours: event.target.value })} />
                 </Field>
               </div>
@@ -448,13 +435,13 @@ export function TasksPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Task queue" description="Filter the list until only the work that matters right now is left." />
+          <SectionHeader title="Task queue" />
 
           <div className="toolbar">
             <SegmentedControl label="Task queue filter" value={queueFilter} onChange={(value) => setQueueFilter(value as QueueFilter)} options={queueOptions} />
             <div className="toolbar-row">
               <Field label="Search">
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, notes, milestone, project" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks" />
               </Field>
               <Field label="Project filter">
                 <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
@@ -481,7 +468,7 @@ export function TasksPage() {
                     <div className="entity-top">
                       <div className="entity-copy">
                         <h3 className="entity-title">{task.title}</h3>
-                        <p className="muted">{task.description || 'No supporting note yet.'}</p>
+                        <p className="muted">{task.description || 'No note.'}</p>
                       </div>
                       <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
                     </div>
@@ -536,7 +523,7 @@ export function TasksPage() {
             ) : (
               <EmptyState
                 title="No tasks match this view"
-                description="Clear a filter, search for something else, or add a fresh task."
+                description="Clear a filter or add one."
               />
             )}
           </div>

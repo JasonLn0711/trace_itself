@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom';
 import {
   Badge,
   Button,
-  Callout,
   Card,
   EmptyState,
   Field,
@@ -403,9 +402,9 @@ export function ProjectDetailPage() {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Project workspace"
+        eyebrow="Project"
         title={project.name}
-        description={project.description || 'No project description yet. Add a brief statement of purpose so the work stays grounded.'}
+        description={project.description || undefined}
         actions={
           <>
             <Link className="btn btn-primary" to="/projects">Back to projects</Link>
@@ -422,20 +421,12 @@ export function ProjectDetailPage() {
         }
       />
 
-      {overdueCount > 0 || blockedCount > 0 ? (
-        <Callout
-          title="This project needs a quick triage pass"
-          description={`${overdueCount} overdue task${overdueCount === 1 ? '' : 's'} and ${blockedCount} blocked item${blockedCount === 1 ? '' : 's'} are slowing the project down.`}
-          tone={overdueCount > 0 ? 'danger' : 'warning'}
-        />
-      ) : null}
-
       {error ? <Notice title="Could not update this project" description={error} tone="danger" /> : null}
       {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid three">
         <Card className="section-card">
-          <SectionHeader title="Project progress" description="Completion across all tasks." />
+          <SectionHeader title="Project progress" />
           <ProgressBar
             label="Done work"
             value={projectCompletion}
@@ -445,12 +436,12 @@ export function ProjectDetailPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Task mix" description="How work is distributed right now." />
+          <SectionHeader title="Task mix" />
           <MiniBarChart values={taskStatusBreakdown.map((item) => item.count)} labels={taskStatusBreakdown.map((item) => item.status.slice(0, 3).toUpperCase())} />
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Milestone momentum" description="Milestones make the next checkpoint visible." />
+          <SectionHeader title="Milestones" />
           <div className="stack">
             {orderedMilestones.slice(0, 3).length ? (
               orderedMilestones.slice(0, 3).map((milestone) => (
@@ -463,14 +454,14 @@ export function ProjectDetailPage() {
                 />
               ))
             ) : (
-              <EmptyState title="No milestones yet" description="Add milestones to make progress easier to steer." />
+              <EmptyState title="No milestones yet" description="Add one to mark progress." />
             )}
           </div>
         </Card>
       </div>
 
       <Card className="section-card">
-        <SectionHeader title="Project details" description="Keep the high-level track current." />
+        <SectionHeader title="Project details" />
         <form className="form-grid" onSubmit={handleProjectSubmit}>
           <div className="form-grid cols-2">
             <Field label="Name">
@@ -522,19 +513,16 @@ export function ProjectDetailPage() {
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader
-            title={editingMilestoneId ? 'Edit milestone' : 'Add milestone'}
-            description="Milestones break the project into measurable checkpoints."
-          />
+          <SectionHeader title={editingMilestoneId ? 'Edit milestone' : 'Add milestone'} />
           <form className="form-grid" onSubmit={handleMilestoneSubmit}>
-            <Field label="Title" hint="Name the checkpoint, not the activity.">
+            <Field label="Title">
               <input value={milestoneForm.title} onChange={(event) => setMilestoneForm({ ...milestoneForm, title: event.target.value })} required />
             </Field>
             <Field label="Description">
               <textarea
                 value={milestoneForm.description}
                 onChange={(event) => setMilestoneForm({ ...milestoneForm, description: event.target.value })}
-                placeholder="What changes when this milestone is complete?"
+                placeholder="Optional note."
               />
             </Field>
             <div className="form-grid cols-2">
@@ -549,7 +537,7 @@ export function ProjectDetailPage() {
                 </select>
               </Field>
             </div>
-            <Field label="Progress %" hint="A rough honest estimate is enough.">
+            <Field label="Progress %">
               <input type="number" min="0" max="100" value={milestoneForm.progress} onChange={(event) => setMilestoneForm({ ...milestoneForm, progress: event.target.value })} />
             </Field>
             <div className="helper-row">
@@ -579,7 +567,7 @@ export function ProjectDetailPage() {
                   <div className="entity-top">
                     <div className="entity-copy">
                       <h3 className="entity-title">{milestone.title}</h3>
-                      <p className="muted">{milestone.description || 'No description yet.'}</p>
+                      <p className="muted">{milestone.description || 'No description.'}</p>
                     </div>
                     <Badge tone={toneForMilestoneStatus(milestone.status)}>{formatEnumLabel(milestone.status)}</Badge>
                   </div>
@@ -604,19 +592,16 @@ export function ProjectDetailPage() {
                 </div>
               ))
             ) : (
-              <EmptyState title="No milestones yet" description="Add the first milestone to anchor this project." />
+              <EmptyState title="No milestones yet" description="Add the first one." />
             )}
           </div>
         </Card>
 
         <Card className="section-card">
-          <SectionHeader
-            title={editingTaskId ? 'Edit task' : 'Add task'}
-            description="Tasks are the day-to-day moves that make the project real."
-          />
+          <SectionHeader title={editingTaskId ? 'Edit task' : 'Add task'} />
           <form className="form-grid" onSubmit={handleTaskSubmit}>
             <div className="form-grid cols-2">
-              <Field label="Milestone" hint="Optional, but useful for short-term focus.">
+              <Field label="Milestone">
                 <select value={taskForm.milestone_id} onChange={(event) => setTaskForm({ ...taskForm, milestone_id: event.target.value })}>
                   <option value="">None</option>
                   {milestoneOptions.map((milestone) => (
@@ -624,25 +609,25 @@ export function ProjectDetailPage() {
                       {milestone.title}
                     </option>
                   ))}
-                </select>
-              </Field>
-              <Field label="Status">
+                  </select>
+                </Field>
+                <Field label="Status">
                 <select value={taskForm.status} onChange={(event) => setTaskForm({ ...taskForm, status: event.target.value })}>
                   <option value="todo">To do</option>
                   <option value="in_progress">In progress</option>
                   <option value="blocked">Blocked</option>
                   <option value="done">Done</option>
                 </select>
-              </Field>
-            </div>
-            <Field label="Title" hint="The smallest useful next action.">
+                </Field>
+              </div>
+            <Field label="Title">
               <input value={taskForm.title} onChange={(event) => setTaskForm({ ...taskForm, title: event.target.value })} required />
             </Field>
             <Field label="Description">
               <textarea
                 value={taskForm.description}
                 onChange={(event) => setTaskForm({ ...taskForm, description: event.target.value })}
-                placeholder="Clarify what done looks like or any details future-you will need."
+                placeholder="Optional note."
               />
             </Field>
             <div className="form-grid cols-2">
@@ -695,7 +680,7 @@ export function ProjectDetailPage() {
                     <div className="entity-top">
                       <div className="entity-copy">
                         <h3 className="entity-title">{task.title}</h3>
-                        <p className="muted">{task.description || 'No description yet.'}</p>
+                        <p className="muted">{task.description || 'No note.'}</p>
                       </div>
                       <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
                     </div>
@@ -736,7 +721,7 @@ export function ProjectDetailPage() {
                 );
               })
             ) : (
-              <EmptyState title="No tasks yet" description="Add the first task to move this project forward." />
+              <EmptyState title="No tasks yet" description="Add the first one." />
             )}
           </div>
         </Card>

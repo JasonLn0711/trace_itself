@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Badge, Button, Callout, Card, EmptyState, Field, SectionHeader, StatCard } from '../components/Primitives';
+import { Badge, Button, Card, EmptyState, Field, SectionHeader, StatCard } from '../components/Primitives';
 import { extractApiErrorMessage, usersApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import type { User } from '../types';
@@ -145,32 +145,27 @@ export function UsersPage() {
       <div className="page-header">
         <div>
           <h1>Users</h1>
-          <p className="muted">Admin-only account management for the lab server. Keep roles tight and passwords deliberate.</p>
+          <p className="muted">Admin only.</p>
         </div>
       </div>
 
       <div className="grid stats">
-        <StatCard label="Active users" value={activeUsers} hint="Accounts currently allowed to sign in" />
-        <StatCard label="Admins" value={adminUsers} hint="Keep this number intentionally small" />
-        <StatCard label="Locked" value={lockedUsers} hint="Accounts stopped after repeated failed logins" />
-        <StatCard label="Inactive" value={inactiveUsers} hint="Accounts preserved but unable to sign in" />
+        <StatCard label="Active users" value={activeUsers} />
+        <StatCard label="Admins" value={adminUsers} />
+        <StatCard label="Locked" value={lockedUsers} />
+        <StatCard label="Inactive" value={inactiveUsers} />
       </div>
 
       {error ? <EmptyState title="Could not update users" description={error} /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title="Create user" description="Add another person who can sign into the dashboard." />
+          <SectionHeader title="Create user" />
           <form className="form-grid" onSubmit={handleCreate}>
-            <Callout
-              title="Accounts are created by admins only"
-              description="There is no self-signup. Use a unique username and a strong initial password, then share access over your private network."
-              tone="info"
-            />
-            <Field label="Username" hint="Short, stable, and easy to type.">
+            <Field label="Username">
               <input value={createForm.username} onChange={(event) => setCreateForm({ ...createForm, username: event.target.value })} required />
             </Field>
-            <Field label="Display name" hint="Human-readable name shown in the UI.">
+            <Field label="Display name">
               <input value={createForm.display_name} onChange={(event) => setCreateForm({ ...createForm, display_name: event.target.value })} required />
             </Field>
             <div className="form-grid cols-2">
@@ -187,7 +182,7 @@ export function UsersPage() {
                 </select>
               </Field>
             </div>
-            <Field label="Initial password" hint="Passwords are stored hashed. You can reset them later, but you cannot view them again.">
+            <Field label="Initial password">
               <input type="password" value={createForm.password} onChange={(event) => setCreateForm({ ...createForm, password: event.target.value })} required />
             </Field>
             <Button type="submit" disabled={saving}>
@@ -197,7 +192,7 @@ export function UsersPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Account status" description="Review roles, failed attempts, and lockouts before they cause confusion." />
+          <SectionHeader title="Account status" />
           <div className="list-grid">
             {users.map((user) => {
               const form = editForms[user.id] ?? userToEdit(user);
@@ -218,13 +213,6 @@ export function UsersPage() {
                     </Badge>
                     <Badge tone="neutral">{user.last_login_at ? `last login ${formatDateTime(user.last_login_at)}` : 'never logged in'}</Badge>
                   </div>
-                  {user.role === 'admin' ? (
-                    <Callout
-                      title="Admin account"
-                      description="This user can create accounts, change roles, and reset passwords. Reserve admin for trusted operators only."
-                      tone="warning"
-                    />
-                  ) : null}
                   <div className="form-grid cols-2">
                     <Field label="Display name">
                       <input value={form.display_name} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, display_name: event.target.value } })} />
@@ -243,7 +231,7 @@ export function UsersPage() {
                         <option value="false">inactive</option>
                       </select>
                     </Field>
-                    <Field label="Reset password" hint="Leave blank to keep the current password.">
+                    <Field label="Reset password">
                       <input
                         type="password"
                         value={form.password}
@@ -265,7 +253,7 @@ export function UsersPage() {
                 </div>
               );
             })}
-            {!users.length ? <EmptyState title="No users yet" description="Create the first account to begin." /> : null}
+            {!users.length ? <EmptyState title="No users yet" description="Create the first one." /> : null}
           </div>
         </Card>
       </div>

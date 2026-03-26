@@ -108,25 +108,21 @@ export function DashboardPage() {
   const dailyLogTone = hasTodayLog ? 'success' : 'warning';
   const statusNotice = overdueCount
     ? {
-        title: `${overdueCount} overdue task${overdueCount === 1 ? '' : 's'} need attention`,
-        description: 'Clear, reschedule, or break down the oldest blocked work first.',
+        title: `${overdueCount} overdue task${overdueCount === 1 ? '' : 's'}`,
         tone: 'danger' as const
       }
     : !hasTodayLog
       ? {
-          title: 'Today’s log is still missing',
-          description: 'Capture a short note before the day fades.',
+          title: 'Today log missing',
           tone: 'warning' as const
         }
       : urgentCount
         ? {
-            title: `${urgentCount} task${urgentCount === 1 ? '' : 's'} still active today`,
-            description: 'Keep the queue honest as work moves.',
+            title: `${urgentCount} task${urgentCount === 1 ? '' : 's'} active today`,
             tone: 'info' as const
           }
         : {
-            title: 'Dashboard looks healthy',
-            description: 'No overdue work and today is recorded.',
+            title: 'On track',
             tone: 'success' as const
           };
 
@@ -135,7 +131,7 @@ export function DashboardPage() {
       <div className="page">
         <Card className="section-card">
           <div className="spinner" />
-          <p className="muted">Loading dashboard summary...</p>
+          <p className="muted">Loading dashboard...</p>
         </Card>
       </div>
     );
@@ -146,7 +142,6 @@ export function DashboardPage() {
       <PageIntro
         eyebrow="Today"
         title="Dashboard"
-        description="A fast read on what matters now."
         actions={
           <>
             <Link className="btn btn-primary" to="/tasks">Open tasks</Link>
@@ -165,11 +160,11 @@ export function DashboardPage() {
       />
 
       {error ? <Notice title="Dashboard data is incomplete" description={error} tone="danger" /> : null}
-      {!error ? <Notice title={statusNotice.title} description={statusNotice.description} tone={statusNotice.tone} /> : null}
+      {!error ? <Notice title={statusNotice.title} tone={statusNotice.tone} /> : null}
 
       <div className="grid three">
         <Card className="section-card">
-          <SectionHeader title="Today" description="Keep the daily signal current." />
+          <SectionHeader title="Today" />
           <div className="stack compact-stack">
             <ProgressBar
               label="Tasks due today"
@@ -194,7 +189,7 @@ export function DashboardPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Task mix" description="What the queue looks like." />
+          <SectionHeader title="Task mix" />
           <MiniBarChart values={taskBreakdown.map((item) => item.count)} labels={['To', 'Now', 'Blk', 'Done']} />
           <div className="chart-legend">
             {taskBreakdown.length ? (
@@ -211,7 +206,7 @@ export function DashboardPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Project progress" description="Tracks that still need steering." />
+          <SectionHeader title="Project progress" />
           <div className="stack compact-stack">
             {projectProgressItems.length ? (
               projectProgressItems.map((item) => (
@@ -224,7 +219,7 @@ export function DashboardPage() {
                 />
               ))
             ) : (
-              <EmptyState title="No project progress yet" description="Add tasks to start measuring progress." />
+              <EmptyState title="No project progress yet" description="Add tasks to show progress." />
             )}
           </div>
         </Card>
@@ -234,7 +229,6 @@ export function DashboardPage() {
         <Card className="section-card">
           <SectionHeader
             title="Needs attention"
-            description="The shortest queue worth reading."
             action={<Link className="btn btn-ghost" to="/tasks">Open tasks</Link>}
           />
           <div className="cluster-grid">
@@ -254,13 +248,13 @@ export function DashboardPage() {
                 </div>
               ))
             ) : (
-              <EmptyState title="Nothing urgent" description="No overdue tasks and no unfinished tasks due today." />
+              <EmptyState title="Nothing urgent" description="No overdue or due-today tasks." />
             )}
           </div>
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Upcoming milestones" description="Next checkpoints." />
+          <SectionHeader title="Upcoming milestones" />
           <div className="cluster-grid">
             {attentionMilestones.length ? (
               attentionMilestones.map((milestone) => (
@@ -284,7 +278,7 @@ export function DashboardPage() {
                 </div>
               ))
             ) : (
-              <EmptyState title="No upcoming milestones" description="Add milestones to map the next checkpoint." />
+              <EmptyState title="No upcoming milestones" description="Add a milestone." />
             )}
           </div>
         </Card>
@@ -293,33 +287,32 @@ export function DashboardPage() {
       <Card className="section-card">
         <SectionHeader
           title="Latest log"
-          description="The last note that explains recent movement."
-          action={<Link className="btn btn-ghost" to="/daily-logs">Open logs</Link>}
+          action={<Link className="btn btn-ghost" to="/daily-logs">Logs</Link>}
         />
         {latestLog ? (
           <div className="surface-soft">
             <div className="entity-top">
               <div className="entity-copy">
                 <h3 className="entity-title">{formatDate(latestLog.log_date)}</h3>
-                <p className="muted">{latestLog.summary || 'No summary yet.'}</p>
+                <p className="muted">{latestLog.summary || 'No summary.'}</p>
               </div>
               <Badge tone="neutral">{(latestLog.total_focus_hours ?? 0).toFixed(1)}h focus</Badge>
             </div>
             <div className="detail-grid">
               <div>
                 <div className="muted small">Blockers</div>
-                <div>{latestLog.blockers || 'No blockers recorded.'}</div>
+                <div>{latestLog.blockers || 'None'}</div>
               </div>
               <div>
                 <div className="muted small">Next step</div>
-                <div>{latestLog.next_step || 'No next step recorded.'}</div>
+                <div>{latestLog.next_step || 'Not set'}</div>
               </div>
             </div>
           </div>
         ) : (
           <EmptyState
             title="No daily logs yet"
-            description="A short daily note makes the dashboard easier to trust."
+            description="Add today&apos;s log."
             action={<Link className="btn btn-primary" to="/daily-logs">Create log</Link>}
           />
         )}
