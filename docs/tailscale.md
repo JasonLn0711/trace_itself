@@ -212,6 +212,19 @@ docker compose logs -f backend
 docker compose logs -f frontend
 ```
 
+Update the app after code changes:
+
+```bash
+docker compose up --build -d
+```
+
+Service-specific updates:
+
+```bash
+docker compose up --build -d frontend
+docker compose up --build -d backend
+```
+
 Check Tailscale:
 
 ```bash
@@ -220,12 +233,14 @@ tailscale serve status
 tailscale funnel status
 ```
 
-Restart the app after `.env` changes:
+Restart the app after `.env` or Docker config changes:
 
 ```bash
 docker compose down
 docker compose up --build -d
 ```
+
+Normally you do not need to run `tailscale serve --bg 3000` again after a frontend/backend rebuild. The Serve proxy keeps pointing at `127.0.0.1:3000`.
 
 Stop private web publishing:
 

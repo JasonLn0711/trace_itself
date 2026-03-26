@@ -102,17 +102,101 @@ docker compose logs -f frontend
 docker compose logs -f db
 ```
 
-Restart the stack:
+Important:
+
+- `docker compose logs -f ...` only shows logs
+- it does not rebuild images
+- it does not restart containers
+
+### What to restart when code changes
+
+Frontend only:
 
 ```bash
-docker compose restart
+docker compose up --build -d frontend
 ```
 
-Update after pulling repo changes:
+Backend only:
+
+```bash
+docker compose up --build -d backend
+```
+
+Frontend and backend together:
+
+```bash
+docker compose up --build -d
+```
+
+Restart without rebuilding:
+
+```bash
+docker compose restart frontend backend
+```
+
+Full reset of running containers without deleting data:
+
+```bash
+docker compose down
+docker compose up --build -d
+```
+
+If the browser still shows the old frontend after a frontend deploy, do a hard refresh.
+
+### Database and schema changes
+
+This repo currently creates missing tables on backend startup and runs explicit schema upgrade SQL from [backend/app/db/bootstrap.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/db/bootstrap.py).
+
+That means:
+
+- model changes alone do not guarantee that an existing Postgres schema is fully migrated
+- for schema changes on existing tables, add explicit migration logic first
+- after adding that migration logic, rebuild the backend container
+
+Rebuild backend after safe additive schema work:
+
+```bash
+docker compose up --build -d backend
+```
+
+If you are doing disposable local development and want a fresh database:
+
+```bash
+docker compose down -v
+docker compose up --build -d
+```
+
+Warning: `docker compose down -v` deletes the Postgres volume and all saved data.
+
+Before risky schema work on real data:
+
+```bash
+docker compose exec db sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > trace_itself_backup.sql
+```
+
+### Update after pulling repo changes
 
 ```bash
 git pull
 docker compose up --build -d
+docker compose ps
+```
+
+### Tailscale after app updates
+
+Normally you do not need to re-run `tailscale serve --bg 3000` after rebuilding the app.
+
+Recheck only if:
+
+- Tailscale was restarted
+- Serve was reset
+- the frontend port changed
+
+Verification:
+
+```bash
+tailscale serve status
+tailscale funnel status
 ```
 
 Stop the stack:

@@ -117,6 +117,110 @@ npm run dev
 
 The Vite dev server proxies `/api` to `http://localhost:8000` by default.
 
+## Updating a running Docker stack
+
+`docker compose logs -f frontend` and `docker compose logs -f backend` only show logs. They do not rebuild or restart anything.
+
+Use these commands when you change code:
+
+- Frontend only:
+
+  ```bash
+  docker compose up --build -d frontend
+  ```
+
+  Then refresh the browser. If the old UI still appears, do a hard refresh.
+
+- Backend only:
+
+  ```bash
+  docker compose up --build -d backend
+  ```
+
+- Frontend and backend together, or you are not sure:
+
+  ```bash
+  docker compose up --build -d
+  ```
+
+- Restart containers without rebuilding images:
+
+  ```bash
+  docker compose restart frontend backend
+  ```
+
+- After `.env`, `docker-compose.yml`, Dockerfile, or Nginx config changes:
+
+  ```bash
+  docker compose up --build -d
+  ```
+
+- If the stack looks stuck after network or port changes:
+
+  ```bash
+  docker compose down
+  docker compose up --build -d
+  ```
+
+Quick rule:
+
+- new page/UI feature -> rebuild `frontend`
+- API/backend logic change -> rebuild `backend`
+- both changed -> rebuild both
+- config changed -> rebuild the stack
+
+## Database and schema changes
+
+This repo does not use Alembic yet.
+
+Today, backend startup does two database setup steps:
+
+- creates missing tables from the SQLAlchemy models
+- runs explicit upgrade SQL from [backend/app/db/bootstrap.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/db/bootstrap.py)
+
+Important:
+
+- `create_all()` creates missing tables, but it does not fully migrate existing tables
+- changing a model class alone is not enough for many schema changes
+- for existing data you should treat schema changes carefully
+
+Use this guide:
+
+- If you add backend logic only and the schema does not change:
+
+  ```bash
+  docker compose up --build -d backend
+  ```
+
+- If you add a small schema change and you also added the matching SQL upgrade logic in [backend/app/db/bootstrap.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/db/bootstrap.py):
+
+  ```bash
+  docker compose up --build -d backend
+  ```
+
+- If you change existing columns, constraints, names, or relationships:
+
+  Add a real migration step first. Do not assume `docker compose restart` or `docker compose up --build` will safely update the existing database by itself.
+
+- If this is a disposable local dev database and you want to wipe everything and recreate from scratch:
+
+  ```bash
+  docker compose down -v
+  docker compose up --build -d
+  ```
+
+  Warning: `docker compose down -v` deletes the Postgres volume and all app data.
+
+- Before risky schema work on real data, make a backup:
+
+  ```bash
+  docker compose exec db sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > trace_itself_backup.sql
+  ```
+
+- If you change Postgres env vars after the DB volume already exists, remember:
+
+  the old database data is still in the volume. Docker will not magically rewrite existing Postgres users/passwords inside that volume just because `.env` changed.
+
 ## Deployment
 
 Use the guide in [docs/deployment.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/deployment.md) for the lab-server deployment flow and [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md) for the step-by-step Tailscale setup tutorial.
