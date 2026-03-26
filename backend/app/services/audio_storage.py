@@ -1,3 +1,4 @@
+import mimetypes
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,7 +7,19 @@ from uuid import uuid4
 from fastapi import HTTPException, UploadFile, status
 
 
-ALLOWED_AUDIO_EXTENSIONS = {".aac", ".flac", ".m4a", ".mp3", ".mp4", ".ogg", ".wav", ".webm"}
+ALLOWED_AUDIO_EXTENSIONS = {".aac", ".flac", ".m4a", ".mp3", ".mp4", ".ogg", ".opus", ".wav", ".webm"}
+
+AUDIO_MIME_BY_EXTENSION = {
+    ".aac": "audio/aac",
+    ".flac": "audio/flac",
+    ".m4a": "audio/mp4",
+    ".mp3": "audio/mpeg",
+    ".mp4": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/ogg",
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
+}
 
 
 @dataclass(slots=True)
@@ -23,6 +36,19 @@ def ensure_audio_extension(filename: str) -> str:
     if suffix not in ALLOWED_AUDIO_EXTENSIONS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported audio format.")
     return suffix
+
+
+def resolve_audio_mime_type(filename: str, content_type: str | None) -> str | None:
+    normalized = (content_type or "").strip().lower()
+    if normalized and normalized != "application/octet-stream":
+        return normalized
+
+    suffix = Path(filename).suffix.lower()
+    if suffix in AUDIO_MIME_BY_EXTENSION:
+        return AUDIO_MIME_BY_EXTENSION[suffix]
+
+    guessed, _ = mimetypes.guess_type(filename)
+    return guessed
 
 
 def save_upload_file(
@@ -64,7 +90,7 @@ def save_upload_file(
 
     return StoredAudio(
         original_filename=original_filename,
-        mime_type=upload.content_type,
+        mime_type=resolve_audio_mime_type(original_filename, upload.content_type),
         file_size_bytes=file_size_bytes,
         storage_path=storage_path,
         relative_storage_path=storage_name,

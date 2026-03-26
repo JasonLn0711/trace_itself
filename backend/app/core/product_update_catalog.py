@@ -181,4 +181,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=False,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="asr-upload-hardening",
+        version_tag="v1.0.60",
+        title="ASR upload hardening",
+        summary="Remote ASR uploads now accept a wider set of audio files more safely.",
+        details=(
+            "The backend now recognizes .opus files, falls back to MIME type inference when browsers or proxies send "
+            "generic upload metadata, and keeps the live and saved ASR paths stable for remote clients."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=False,
+    ),
 )
