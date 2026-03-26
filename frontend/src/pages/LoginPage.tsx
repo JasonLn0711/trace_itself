@@ -55,9 +55,8 @@ export function LoginPage() {
         <div className="login-brand-stack">
           <div className="login-brand-mark">T</div>
           <div className="login-copy">
-            <div className="login-eyebrow">Private access</div>
             <h1 className="login-title">trace_itself</h1>
-            <p className="muted">Sign in to continue.</p>
+            <p className="muted">Sign in.</p>
           </div>
         </div>
 
@@ -98,16 +97,13 @@ export function LoginPage() {
             </div>
           </Field>
 
-          {error ? <Notice title="Could not sign in" description={error} tone="danger" /> : null}
+          {error ? <Notice title="Sign-in failed" description={error} tone="danger" /> : null}
 
           <Button type="submit" disabled={submitting || !username.trim() || !password}>
-            {submitting ? 'Signing in...' : 'Sign in'}
+            {submitting ? 'Signing in...' : 'Continue'}
           </Button>
 
-          <div className="login-meta">
-            <span>Use the account your admin created.</span>
-            <span>Failed attempts may lock the account briefly.</span>
-          </div>
+          <div className="login-note">Private lab access</div>
         </form>
       </Card>
     </div>
