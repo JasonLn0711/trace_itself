@@ -1,12 +1,7 @@
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
-import soundfile as sf
 
 from app.core.config import get_settings
-from app.services.audio_storage import convert_audio_to_wav
 
 settings = get_settings()
 
@@ -25,34 +20,19 @@ class AsrTranscriptionResult:
 
 class AsrService:
     def __init__(self) -> None:
-        self._pipelines: dict[str, Any] = {}
+        self._models: dict[str, object] = {}
 
-    def _get_pipeline(self, model_name: str):
-        if model_name not in self._pipelines:
-            import torch
-            from transformers import AutomaticSpeechRecognitionPipeline, WhisperForConditionalGeneration, WhisperProcessor
+    def _get_model(self, model_name: str):
+        if model_name not in self._models:
+            from faster_whisper import WhisperModel
 
-            if settings.asr_cpu_threads > 0:
-                torch.set_num_threads(settings.asr_cpu_threads)
-
-            use_cuda = settings.asr_device == "cuda" and torch.cuda.is_available()
-            torch_dtype = torch.float16 if use_cuda else torch.float32
-
-            processor = WhisperProcessor.from_pretrained(model_name)
-            model = WhisperForConditionalGeneration.from_pretrained(
+            self._models[model_name] = WhisperModel(
                 model_name,
-                torch_dtype=torch_dtype,
-            ).eval()
-            model = model.to("cuda" if use_cuda else "cpu")
-
-            self._pipelines[model_name] = AutomaticSpeechRecognitionPipeline(
-                model=model,
-                tokenizer=processor.tokenizer,
-                feature_extractor=processor.feature_extractor,
-                chunk_length_s=max(0, settings.asr_chunk_length_seconds),
-                device=0 if use_cuda else -1,
+                device=settings.asr_device,
+                compute_type=settings.asr_compute_type,
+                cpu_threads=max(0, settings.asr_cpu_threads),
             )
-        return self._pipelines[model_name]
+        return self._models[model_name]
 
     def transcribe_file(
         self,
@@ -62,32 +42,25 @@ class AsrService:
         model_name: str | None = None,
     ) -> AsrTranscriptionResult:
         resolved_model_name = model_name or settings.asr_model_name
-        wav_path = None
-        wav_dir = None
         try:
-            wav_path = convert_audio_to_wav(file_path)
-            wav_dir = wav_path.parent
-            waveform, sample_rate = sf.read(wav_path, dtype="float32")
-            if getattr(waveform, "ndim", 1) > 1:
-                waveform = waveform.mean(axis=1)
-
-            generate_kwargs: dict[str, str] = {"task": "transcribe"}
-            if language:
-                generate_kwargs["language"] = language
-
-            output = self._get_pipeline(resolved_model_name)(waveform, generate_kwargs=generate_kwargs)
-            text = (output.get("text") or "").strip()
+            model = self._get_model(resolved_model_name)
+            segments, info = model.transcribe(
+                str(file_path),
+                task="transcribe",
+                language=language or None,
+                beam_size=5,
+                vad_filter=True,
+            )
+            segment_items = list(segments)
+            text = " ".join(segment.text.strip() for segment in segment_items if segment.text and segment.text.strip()).strip()
         except Exception as exc:
             raise AsrServiceError("Transcription failed. Check the audio file and ASR settings.") from exc
-        finally:
-            if wav_dir:
-                shutil.rmtree(wav_dir, ignore_errors=True)
 
         if not text:
             raise AsrServiceError("No speech detected in the uploaded file.")
 
-        duration_seconds = len(waveform) / sample_rate if sample_rate else None
-        normalized_language = language.strip().lower() if language else None
+        duration_seconds = getattr(info, "duration", None)
+        normalized_language = (getattr(info, "language", None) or language or "").strip().lower() or None
         return AsrTranscriptionResult(
             text=text,
             language=normalized_language,

@@ -46,7 +46,7 @@ Use these security settings:
 
 Optional ASR tuning:
 
-- `ASR_MODEL_NAME=MediaTek-Research/Breeze-ASR-25` for the default local ASR model
+- `ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25` for the default local ASR model
 - `ASR_DEVICE=cpu` for normal lab-machine use
 - `ASR_COMPUTE_TYPE=float32` for the default Breeze CPU path
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads

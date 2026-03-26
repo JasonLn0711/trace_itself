@@ -139,4 +139,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="faster-whisper-breeze",
+        version_tag="v1.0.57",
+        title="Faster Whisper ASR runtime",
+        summary="The local ASR engine now runs the Breeze ASR 25 CTranslate2 model through faster-whisper.",
+        details=(
+            "We replaced the heavier Transformers runtime with faster-whisper and switched the default local model "
+            "to SoybeanMilk/faster-whisper-Breeze-ASR-25 for a cleaner self-hosted transcription path."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

@@ -28,7 +28,7 @@ It now has two main user-facing functions:
 - Frontend: Next.js + React
 - Backend: FastAPI + SQLAlchemy
 - Database: PostgreSQL 16
-- ASR engine: local Breeze ASR 25 via Hugging Face Transformers
+- ASR engine: local Breeze ASR 25 via faster-whisper
 - Meeting summarizer: Gemini 3.1 Flash-Lite API
 - Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
 - Secrets vault: encrypted provider API key storage in Postgres
@@ -97,16 +97,16 @@ Why this shape:
 
    Optional ASR tuning:
 
-   - `ASR_MODEL_NAME=MediaTek-Research/Breeze-ASR-25`
+   - `ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25`
    - `ASR_DEVICE=cpu`
    - `ASR_COMPUTE_TYPE=float32`
-   - `ASR_MAX_UPLOAD_MB=25`
+   - `ASR_MAX_UPLOAD_MB=512`
 
    Optional meeting-note setup:
 
    - `GEMINI_API_KEY=...`
    - `GEMINI_MODEL=gemini-3.1-flash-lite-preview`
-   - `MEETING_MAX_UPLOAD_MB=120`
+   - `MEETING_MAX_UPLOAD_MB=512`
 
 3. Start the stack:
 

@@ -22,11 +22,10 @@ class Settings(BaseSettings):
     backend_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     db_connect_max_attempts: int = 30
     db_connect_retry_seconds: int = 2
-    asr_model_name: str = "MediaTek-Research/Breeze-ASR-25"
+    asr_model_name: str = "SoybeanMilk/faster-whisper-Breeze-ASR-25"
     asr_device: str = "cpu"
     asr_compute_type: str = "float32"
     asr_cpu_threads: int = 4
-    asr_chunk_length_seconds: int = 30
     asr_upload_dir: str = "/data/asr"
     asr_max_upload_mb: int = 512
     meeting_upload_dir: str = "/data/meetings"

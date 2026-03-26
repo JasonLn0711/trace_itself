@@ -335,11 +335,29 @@ def ensure_default_ai_providers(db: Session) -> None:
                 kind=AIProviderKind.ASR,
                 driver=AIProviderDriver.LOCAL_BREEZE,
                 model_name=settings.asr_model_name,
-                description="Runs Breeze ASR locally on the server.",
+                description="Runs faster-whisper Breeze ASR locally on the server.",
                 is_active=True,
             )
         )
         created = True
+    else:
+        updated = False
+        if local_asr.model_name != settings.asr_model_name:
+            local_asr.model_name = settings.asr_model_name
+            updated = True
+        if local_asr.driver != AIProviderDriver.LOCAL_BREEZE:
+            local_asr.driver = AIProviderDriver.LOCAL_BREEZE
+            updated = True
+        if local_asr.kind != AIProviderKind.ASR:
+            local_asr.kind = AIProviderKind.ASR
+            updated = True
+        expected_description = "Runs faster-whisper Breeze ASR locally on the server."
+        if local_asr.description != expected_description:
+            local_asr.description = expected_description
+            updated = True
+        if updated:
+            db.add(local_asr)
+            created = True
 
     if settings.gemini_api_key:
         gemini = db.scalar(select(AIProvider).where(AIProvider.name == "Gemini Meeting Notes"))

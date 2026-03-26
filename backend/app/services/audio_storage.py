@@ -1,6 +1,4 @@
-import shutil
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
@@ -71,28 +69,6 @@ def save_upload_file(
         storage_path=storage_path,
         relative_storage_path=storage_name,
     )
-
-
-def convert_audio_to_wav(source_path: Path) -> Path:
-    temp_dir = Path(tempfile.mkdtemp(prefix="trace_itself_audio_"))
-    output_path = temp_dir / f"{source_path.stem}.wav"
-    command = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(source_path),
-        "-ac",
-        "1",
-        "-ar",
-        "16000",
-        str(output_path),
-    ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    if result.returncode != 0:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise RuntimeError(result.stderr.strip() or "Audio conversion failed.")
-    return output_path
-
 
 def probe_audio_duration_seconds(source_path: Path) -> float:
     command = [
