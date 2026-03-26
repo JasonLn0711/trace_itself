@@ -3,5 +3,6 @@ from app.models.daily_log import DailyLog
 from app.models.milestone import Milestone
 from app.models.project import Project
 from app.models.task import Task
+from app.models.user import User
 
-__all__ = ["Base", "Project", "Milestone", "Task", "DailyLog"]
+__all__ = ["Base", "User", "Project", "Milestone", "Task", "DailyLog"]

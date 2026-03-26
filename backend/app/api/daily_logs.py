@@ -3,23 +3,37 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_daily_log_or_404, require_auth
+from app.api.deps import get_current_user, get_daily_log_or_404
 from app.db.session import get_db
 from app.models.daily_log import DailyLog
+from app.models.user import User
 from app.schemas.daily_log import DailyLogCreate, DailyLogRead, DailyLogUpdate
 
-router = APIRouter(prefix="/daily-logs", tags=["daily_logs"], dependencies=[Depends(require_auth)])
+router = APIRouter(prefix="/daily-logs", tags=["daily_logs"])
 
 
 @router.get("", response_model=list[DailyLogRead])
-def list_daily_logs(limit: int = Query(default=30, le=365), db: Session = Depends(get_db)) -> list[DailyLog]:
-    stmt = select(DailyLog).order_by(DailyLog.log_date.desc()).limit(limit)
+def list_daily_logs(
+    limit: int = Query(default=30, le=365),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[DailyLog]:
+    stmt = (
+        select(DailyLog)
+        .where(DailyLog.user_id == current_user.id)
+        .order_by(DailyLog.log_date.desc())
+        .limit(limit)
+    )
     return list(db.scalars(stmt).all())
 
 
 @router.post("", response_model=DailyLogRead, status_code=status.HTTP_201_CREATED)
-def create_daily_log(payload: DailyLogCreate, db: Session = Depends(get_db)) -> DailyLog:
-    daily_log = DailyLog(**payload.model_dump())
+def create_daily_log(
+    payload: DailyLogCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> DailyLog:
+    daily_log = DailyLog(user_id=current_user.id, **payload.model_dump())
     db.add(daily_log)
     try:
         db.commit()

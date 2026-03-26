@@ -27,3 +27,8 @@ class TaskStatus(StrEnum):
     IN_PROGRESS = "in_progress"
     BLOCKED = "blocked"
     DONE = "done"
+
+
+class UserRole(StrEnum):
+    ADMIN = "admin"
+    MEMBER = "member"

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.bootstrap import apply_schema_upgrades, backfill_existing_data, ensure_initial_admin, finalize_schema_upgrades
 
 settings = get_settings()
 
@@ -26,7 +27,13 @@ def init_db() -> None:
         try:
             with engine.begin() as connection:
                 connection.execute(text("SELECT 1"))
-            Base.metadata.create_all(bind=engine)
+                Base.metadata.create_all(bind=connection)
+                apply_schema_upgrades(connection)
+            with SessionLocal() as db:
+                admin = ensure_initial_admin(db)
+                backfill_existing_data(db, admin.id)
+            with engine.begin() as connection:
+                finalize_schema_upgrades(connection)
             return
         except OperationalError as exc:
             if attempt == settings.db_connect_max_attempts:

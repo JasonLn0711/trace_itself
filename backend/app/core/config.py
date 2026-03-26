@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     secret_key: str = "change-me-in-production"
     app_password: str = "change-me"
+    initial_admin_username: str = "owner"
+    initial_admin_display_name: str = "Owner"
+    initial_admin_password: str | None = None
+    auth_max_failed_attempts: int = 5
+    auth_lockout_minutes: int = 5
     database_url: str = "postgresql+psycopg://trace_itself:trace_itself@localhost:5432/trace_itself"
     session_cookie_name: str = "trace_itself_session"
     session_cookie_secure: bool = False
@@ -22,6 +27,10 @@ class Settings(BaseSettings):
         if not self.backend_cors_origins:
             return []
         return [origin.strip() for origin in self.backend_cors_origins.split(",") if origin.strip()]
+
+    @property
+    def bootstrap_admin_password(self) -> str:
+        return self.initial_admin_password or self.app_password
 
 
 @lru_cache

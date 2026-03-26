@@ -11,6 +11,7 @@ class Milestone(Base):
     __tablename__ = "milestones"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text())
@@ -29,5 +30,6 @@ class Milestone(Base):
         nullable=False,
     )
 
+    user = relationship("User", back_populates="milestones")
     project = relationship("Project", back_populates="milestones")
     tasks = relationship("Task", back_populates="milestone")
