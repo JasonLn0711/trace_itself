@@ -2,6 +2,9 @@ import type {
   DailyLog,
   DashboardSummary,
   Milestone,
+  ProductUpdate,
+  ProductUpdateCreateInput,
+  ProductUpdateUpdateInput,
   Project,
   Task,
   User,
@@ -165,6 +168,29 @@ export const usersApi = {
   unlock(id: number) {
     return request<User>(`/users/${id}/unlock`, {
       method: 'POST'
+    });
+  }
+};
+
+export const productUpdatesApi = {
+  list(query?: { area?: string; change_type?: string; limit?: number }) {
+    return request<ProductUpdate[]>(withQuery('/product-updates', query));
+  },
+  create(body: ProductUpdateCreateInput) {
+    return request<ProductUpdate>('/product-updates', {
+      method: 'POST',
+      body
+    });
+  },
+  update(id: number, body: ProductUpdateUpdateInput) {
+    return request<ProductUpdate>(`/product-updates/${id}`, {
+      method: 'PUT',
+      body
+    });
+  },
+  remove(id: number) {
+    return request<void>(`/product-updates/${id}`, {
+      method: 'DELETE'
     });
   }
 };

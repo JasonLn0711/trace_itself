@@ -1,4 +1,4 @@
-import type { DailyLog, Milestone, PrimitivePriority, PrimitiveStatus, Task } from '../types';
+import type { DailyLog, Milestone, PrimitivePriority, PrimitiveStatus, ProductUpdateType, Task } from '../types';
 import { daysUntil } from './dates';
 
 export type Tone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
@@ -28,8 +28,22 @@ export function formatEnumLabel(value: string | null | undefined, fallback = 'No
     return fallback;
   }
   return value
-    .replace(/_/g, ' ')
+    .replace(/[_-]/g, ' ')
     .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+export function toneForProductUpdateType(changeType: ProductUpdateType | null | undefined): Tone {
+  switch (changeType) {
+    case 'fix':
+      return 'warning';
+    case 'build':
+      return 'info';
+    case 'security':
+      return 'danger';
+    case 'update':
+    default:
+      return 'success';
+  }
 }
 
 export function toneForPriority(priority: PrimitivePriority | null | undefined): Tone {

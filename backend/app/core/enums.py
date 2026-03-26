@@ -32,3 +32,10 @@ class TaskStatus(StrEnum):
 class UserRole(StrEnum):
     ADMIN = "admin"
     MEMBER = "member"
+
+
+class ProductUpdateType(StrEnum):
+    BUILD = "build"
+    FIX = "fix"
+    UPDATE = "update"
+    SECURITY = "security"

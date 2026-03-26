@@ -1112,6 +1112,56 @@ a.card.entity {
   gap: 14px;
 }
 
+.timeline-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 18px;
+}
+
+.timeline-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(88, 208, 190, 0.48), rgba(148, 163, 184, 0.1));
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(88, 208, 190, 0.12);
+}
+
+.timeline-card {
+  display: grid;
+  gap: 12px;
+}
+
+.timeline-date {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.timeline-details {
+  color: var(--text);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

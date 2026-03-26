@@ -8,6 +8,7 @@
 - Admin-managed user accounts and password resets
 - Temporary account lockout after repeated failed login attempts
 - Projects, milestones, tasks, and daily logs
+- Shared product updates log for fixes, builds, and release notes
 - Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
 - FastAPI backend with PostgreSQL
 - Next.js frontend with App Router

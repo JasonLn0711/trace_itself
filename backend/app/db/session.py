@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 from app.db.base import Base
-from app.db.bootstrap import apply_schema_upgrades, backfill_existing_data, ensure_initial_admin, finalize_schema_upgrades
+from app.db.bootstrap import (
+    apply_schema_upgrades,
+    backfill_existing_data,
+    ensure_default_product_updates,
+    ensure_initial_admin,
+    finalize_schema_upgrades,
+)
 
 settings = get_settings()
 
@@ -32,6 +38,7 @@ def init_db() -> None:
             with SessionLocal() as db:
                 admin = ensure_initial_admin(db)
                 backfill_existing_data(db, admin.id)
+                ensure_default_product_updates(db, admin.id)
             with engine.begin() as connection:
                 finalize_schema_upgrades(connection)
             return

@@ -1,16 +1,18 @@
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.enums import MilestoneStatus, ProjectStatus, TaskStatus
 from app.models.daily_log import DailyLog
 from app.models.milestone import Milestone
+from app.models.product_update import ProductUpdate
 from app.models.project import Project
 from app.models.task import Task
 from app.schemas.dashboard import DashboardSummary
 from app.schemas.daily_log import DailyLogRead
 from app.schemas.milestone import MilestoneRead
+from app.schemas.product_update import ProductUpdateRead
 from app.schemas.project import ProjectRead
 from app.schemas.task import TaskRead
 
@@ -64,6 +66,15 @@ def get_dashboard_summary(db: Session, user_id: int) -> DashboardSummary:
             .where(DailyLog.user_id == user_id)
             .order_by(DailyLog.log_date.desc())
             .limit(7)
+        ).all()
+    )
+
+    recent_product_updates = list(
+        db.scalars(
+            select(ProductUpdate)
+            .options(selectinload(ProductUpdate.author))
+            .order_by(ProductUpdate.is_pinned.desc(), ProductUpdate.changed_at.desc(), ProductUpdate.id.desc())
+            .limit(3)
         ).all()
     )
 
@@ -129,6 +140,7 @@ def get_dashboard_summary(db: Session, user_id: int) -> DashboardSummary:
         overdue_tasks=[TaskRead.model_validate(task) for task in overdue_tasks],
         upcoming_milestones=[MilestoneRead.model_validate(milestone) for milestone in upcoming_milestones],
         recent_daily_logs=[DailyLogRead.model_validate(log) for log in recent_daily_logs],
+        recent_product_updates=[ProductUpdateRead.model_validate(item) for item in recent_product_updates],
         project_progress=project_progress,
         task_status_breakdown=[
             {"status": status_name, "count": count}

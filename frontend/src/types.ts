@@ -1,5 +1,6 @@
 export type PrimitiveStatus = string;
 export type PrimitivePriority = string;
+export type ProductUpdateType = 'build' | 'fix' | 'update' | 'security';
 
 export type UserRole = 'admin' | 'member';
 
@@ -66,12 +67,28 @@ export interface User {
   updated_at: string;
 }
 
+export interface ProductUpdate {
+  id: number;
+  title: string;
+  summary: string;
+  details: string | null;
+  area: string;
+  change_type: ProductUpdateType;
+  changed_at: string;
+  is_pinned: boolean;
+  author_user_id: number | null;
+  author_display_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardSummary {
   active_projects: Project[];
   today_tasks: Task[];
   overdue_tasks: Task[];
   upcoming_milestones: Milestone[];
   recent_daily_logs: DailyLog[];
+  recent_product_updates?: ProductUpdate[];
   project_progress?: ProjectProgressItem[];
   task_status_breakdown?: TaskStatusBreakdownItem[];
   focus_hours_trend?: FocusHoursTrendItem[];
@@ -117,6 +134,26 @@ export interface UserUpdateInput {
 
 export interface UserPasswordResetInput {
   password: string;
+}
+
+export interface ProductUpdateCreateInput {
+  title: string;
+  summary: string;
+  details?: string | null;
+  area: string;
+  change_type: ProductUpdateType;
+  changed_at: string;
+  is_pinned: boolean;
+}
+
+export interface ProductUpdateUpdateInput {
+  title?: string;
+  summary?: string;
+  details?: string | null;
+  area?: string;
+  change_type?: ProductUpdateType;
+  changed_at?: string;
+  is_pinned?: boolean;
 }
 
 export interface ApiErrorPayload {

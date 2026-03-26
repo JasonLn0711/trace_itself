@@ -24,6 +24,7 @@ import {
   summarizeFocus,
   toneForDueState,
   toneForMilestoneStatus,
+  toneForProductUpdateType,
   toneForTaskStatus
 } from '../lib/presentation';
 import type { DashboardSummary } from '../types';
@@ -34,6 +35,7 @@ const emptySummary: DashboardSummary = {
   overdue_tasks: [],
   upcoming_milestones: [],
   recent_daily_logs: [],
+  recent_product_updates: [],
   project_progress: [],
   task_status_breakdown: [],
   focus_hours_trend: []
@@ -74,6 +76,7 @@ export function DashboardPage() {
   const projectProgress = summary.project_progress ?? [];
   const taskBreakdown = summary.task_status_breakdown ?? [];
   const focusTrend = summary.focus_hours_trend ?? [];
+  const recentProductUpdates = summary.recent_product_updates ?? [];
   const recentLogs = useMemo(
     () => [...summary.recent_daily_logs].sort((left, right) => right.log_date.localeCompare(left.log_date)),
     [summary.recent_daily_logs]
@@ -286,39 +289,70 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      <Card className="section-card">
-        <SectionHeader
-          title="Latest log"
-          action={<Link className="btn btn-ghost" href="/daily-logs">Logs</Link>}
-        />
-        {latestLog ? (
-          <div className="surface-soft">
-            <div className="entity-top">
-              <div className="entity-copy">
-                <h3 className="entity-title">{formatDate(latestLog.log_date)}</h3>
-                <p className="muted">{latestLog.summary || 'No summary.'}</p>
-              </div>
-              <Badge tone="neutral">{(latestLog.total_focus_hours ?? 0).toFixed(1)}h focus</Badge>
-            </div>
-            <div className="detail-grid">
-              <div>
-                <div className="muted small">Blockers</div>
-                <div>{latestLog.blockers || 'None'}</div>
-              </div>
-              <div>
-                <div className="muted small">Next step</div>
-                <div>{latestLog.next_step || 'Not set'}</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <EmptyState
-            title="No daily logs yet"
-            description="Add today&apos;s log."
-            action={<Link className="btn btn-primary" href="/daily-logs">Create log</Link>}
+      <div className="grid two">
+        <Card className="section-card">
+          <SectionHeader
+            title="Latest log"
+            action={<Link className="btn btn-ghost" href="/daily-logs">Logs</Link>}
           />
-        )}
-      </Card>
+          {latestLog ? (
+            <div className="surface-soft">
+              <div className="entity-top">
+                <div className="entity-copy">
+                  <h3 className="entity-title">{formatDate(latestLog.log_date)}</h3>
+                  <p className="muted">{latestLog.summary || 'No summary.'}</p>
+                </div>
+                <Badge tone="neutral">{(latestLog.total_focus_hours ?? 0).toFixed(1)}h focus</Badge>
+              </div>
+
+              <div className="detail-grid">
+                <div>
+                  <div className="muted small">Blockers</div>
+                  <div>{latestLog.blockers || 'None'}</div>
+                </div>
+                <div>
+                  <div className="muted small">Next step</div>
+                  <div>{latestLog.next_step || 'Not set'}</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="No daily logs yet"
+              description="Add today&apos;s log."
+              action={<Link className="btn btn-primary" href="/daily-logs">Create log</Link>}
+            />
+          )}
+        </Card>
+
+        <Card className="section-card">
+          <SectionHeader
+            title="Recent updates"
+            action={<Link className="btn btn-ghost" href="/updates">Open feed</Link>}
+          />
+          <div className="cluster-grid">
+            {recentProductUpdates.length ? (
+              recentProductUpdates.map((entry) => (
+                <div key={entry.id} className="surface-soft">
+                  <div className="entity-top">
+                    <div className="entity-copy">
+                      <div className="detail-row">
+                        <Badge tone={toneForProductUpdateType(entry.change_type)}>{formatEnumLabel(entry.change_type)}</Badge>
+                        <Badge tone="neutral">{formatEnumLabel(entry.area)}</Badge>
+                      </div>
+                      <h3 className="entity-title">{entry.title}</h3>
+                      <p className="muted">{entry.summary}</p>
+                    </div>
+                    <div className="muted small">{formatDateTime(entry.changed_at)}</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState title="No updates yet" description="Publish the first note." />
+            )}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
