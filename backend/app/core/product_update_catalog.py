@@ -195,4 +195,19 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=False,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="cuda-asr-runtime",
+        version_tag="v1.0.61",
+        title="CUDA Breeze ASR runtime",
+        summary="The local Breeze ASR path is now wired for NVIDIA CUDA instead of CPU-only inference.",
+        details=(
+            "The backend image now includes the CUDA libraries required by faster-whisper, the repo ships a "
+            "docker-compose.cuda.yml GPU overlay, and ASR endpoints return a clear service error if Docker "
+            "cannot yet reach the NVIDIA runtime."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

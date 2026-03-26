@@ -2,6 +2,8 @@ cryptography==44.0.2
 faster-whisper==1.2.1
 fastapi==0.115.12
 itsdangerous==2.2.0
+nvidia-cublas-cu12
+nvidia-cudnn-cu12==9.*
 passlib==1.7.4
 pydantic-settings==2.8.1
 psycopg[binary]==3.2.6

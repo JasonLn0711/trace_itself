@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     db_connect_max_attempts: int = 30
     db_connect_retry_seconds: int = 2
     asr_model_name: str = "SoybeanMilk/faster-whisper-Breeze-ASR-25"
-    asr_device: str = "cpu"
-    asr_compute_type: str = "float32"
+    asr_device: str = "cuda"
+    asr_compute_type: str = "float16"
     asr_cpu_threads: int = 4
     asr_live_sample_rate: int = 16000
     asr_live_partial_interval_ms: int = 1500

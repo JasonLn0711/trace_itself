@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,13 +8,19 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.db.session import init_db
+from app.services.asr import AsrRuntimeUnavailableError, service as asr_service
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    try:
+        asr_service.log_runtime_status()
+    except AsrRuntimeUnavailableError as exc:
+        logger.warning("ASR runtime is not ready: %s", exc)
     yield
 
 

@@ -18,7 +18,7 @@ from app.core.config import get_settings
 from app.models.meeting_record import MeetingRecord
 from app.models.user import User
 from app.schemas.meeting import MeetingRecordRead, MeetingRecordSummaryRead
-from app.services.asr import AsrServiceError, service as asr_service
+from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
 from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
 from app.services.meeting_ai import MeetingAiError, generate_meeting_artifacts
 from app.services.usage_policy import ensure_audio_duration_allowed, ensure_llm_budget_available, get_or_create_usage_policy, record_usage_event
@@ -98,6 +98,10 @@ def create_meeting(
         current_user=current_user,
         db=db,
     )
+    try:
+        asr_service.ensure_model_ready(asr_provider.model_name)
+    except AsrRuntimeUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     stored_audio = save_upload_file(
         file,
         storage_root=Path(settings.meeting_upload_dir),

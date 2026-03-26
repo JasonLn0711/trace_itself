@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -7,9 +8,14 @@ import numpy as np
 from app.core.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class AsrServiceError(RuntimeError):
+    pass
+
+
+class AsrRuntimeUnavailableError(AsrServiceError):
     pass
 
 
@@ -24,8 +30,62 @@ class AsrTranscriptionResult:
 class AsrService:
     def __init__(self) -> None:
         self._models: dict[str, object] = {}
+        self._runtime_validated = False
+
+    def assert_runtime_available(self) -> None:
+        normalized_device = settings.asr_device.strip().lower()
+        if normalized_device != "cuda":
+            self._runtime_validated = True
+            return
+
+        try:
+            import ctranslate2
+        except Exception as exc:
+            raise AsrRuntimeUnavailableError(
+                "CUDA ASR is configured but CTranslate2 could not load its CUDA runtime."
+            ) from exc
+
+        try:
+            cuda_count = ctranslate2.get_cuda_device_count()
+            supported_compute_types = {
+                getattr(item, "value", str(item)) for item in ctranslate2.get_supported_compute_types("cuda")
+            }
+        except Exception as exc:
+            raise AsrRuntimeUnavailableError(
+                "CUDA ASR is configured but Docker cannot access the NVIDIA runtime. "
+                "Install NVIDIA Container Toolkit and start the backend with docker-compose.cuda.yml."
+            ) from exc
+
+        if cuda_count < 1:
+            raise AsrRuntimeUnavailableError(
+                "CUDA ASR is configured but no GPU is visible inside the backend container."
+            )
+
+        if settings.asr_compute_type not in supported_compute_types:
+            supported_label = ", ".join(sorted(supported_compute_types)) or "unknown"
+            raise AsrRuntimeUnavailableError(
+                f"ASR_COMPUTE_TYPE={settings.asr_compute_type} is not supported on CUDA. "
+                f"Supported values: {supported_label}."
+            )
+
+        self._runtime_validated = True
+
+    def ensure_model_ready(self, model_name: str | None = None) -> None:
+        resolved_model_name = model_name or settings.asr_model_name
+        self._get_model(resolved_model_name)
+
+    def log_runtime_status(self) -> None:
+        normalized_device = settings.asr_device.strip().lower()
+        if normalized_device != "cuda":
+            logger.info("ASR runtime is configured for %s with compute_type=%s", normalized_device, settings.asr_compute_type)
+            return
+
+        self.assert_runtime_available()
+        logger.info("ASR runtime is configured for CUDA with compute_type=%s", settings.asr_compute_type)
 
     def _get_model(self, model_name: str):
+        if not self._runtime_validated:
+            self.assert_runtime_available()
         if model_name not in self._models:
             from faster_whisper import WhisperModel
 

@@ -59,8 +59,8 @@ Use these security settings:
 Optional ASR tuning:
 
 - `ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25` for the default local ASR model
-- `ASR_DEVICE=cpu` for normal lab-machine use
-- `ASR_COMPUTE_TYPE=float32` for the default Breeze CPU path
+- `ASR_DEVICE=cuda` for the NVIDIA lab-machine path
+- `ASR_COMPUTE_TYPE=float16` for the default Breeze CUDA path
 - `ASR_LIVE_PARTIAL_INTERVAL_MS=1500` for the live partial refresh cadence
 - `ASR_LIVE_COMMIT_SILENCE_MS=1200` for the pause length that commits a live utterance
 - `ASR_LIVE_MAX_WINDOW_SECONDS=18` for the rolling live decode window
@@ -79,6 +79,29 @@ After first login, use the `Control` page to:
 
 ## Start the app
 
+If you want Breeze ASR to run on the local NVIDIA GPU, install the NVIDIA Container Toolkit on the Ubuntu host first:
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+Recommended CUDA startup:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cuda.yml up --build -d
+docker compose ps
+```
+
+Temporary CPU-only fallback:
+
 ```bash
 docker compose up --build -d
 docker compose ps
@@ -91,12 +114,25 @@ curl http://127.0.0.1:8000/healthz
 curl http://127.0.0.1:3000/
 ```
 
+Useful CUDA check after the GPU stack is up:
+
+```bash
+docker compose exec backend python - <<'PY'
+import ctranslate2
+print("cuda_count", ctranslate2.get_cuda_device_count())
+print("cuda_compute_types", ctranslate2.get_supported_compute_types("cuda"))
+PY
+```
+
 ASR notes:
 
 - The first transcription request downloads the Breeze ASR model into the Docker volume `asr_model_cache`.
+- The backend image now includes the CUDA user-space libraries faster-whisper expects for GPU inference.
+- `docker-compose.cuda.yml` is the overlay that exposes the NVIDIA GPU to the backend container.
 - The first live ASR chunk can also trigger that model warm-up, so the very first live response may be slower.
 - That first ASR run can take longer than normal, depending on your network and chosen model.
 - After the model is cached, later transcriptions are much faster.
+- If CUDA is configured but unavailable, the backend stays up and the ASR endpoints return `503` with a clear fix message.
 - The live ASR page streams mic audio in small normalized chunks and still stores a compact Opus/WebM recording when the take is saved.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.

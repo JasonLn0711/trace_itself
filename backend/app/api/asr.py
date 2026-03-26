@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.models.asr_transcript import AsrTranscript
 from app.models.user import User
 from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary, LiveAsrSessionCreate, LiveAsrSessionRead
-from app.services.asr import AsrServiceError, service as asr_service
+from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
 from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
 from app.services.live_asr import LiveAsrSessionError, service as live_asr_service
 from app.services.usage_policy import ensure_audio_duration_allowed, get_or_create_usage_policy, record_usage_event
@@ -110,6 +110,10 @@ def create_live_session(
         current_user=current_user,
         db=db,
     )
+    try:
+        asr_service.ensure_model_ready(provider.model_name)
+    except AsrRuntimeUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     policy = get_or_create_usage_policy(db)
     session = live_asr_service.create_session(
         user_id=current_user.id,
@@ -132,6 +136,8 @@ async def ingest_live_chunk(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Audio chunk is empty.")
     try:
         session = await live_asr_service.ingest_chunk(session_id, current_user.id, raw_chunk)
+    except AsrRuntimeUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except LiveAsrSessionError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return to_live_read(live_asr_service.build_payload(session))
@@ -144,6 +150,8 @@ async def finalize_live_session(
 ) -> LiveAsrSessionRead:
     try:
         session = await live_asr_service.finalize_session(session_id, current_user.id)
+    except AsrRuntimeUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except LiveAsrSessionError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return to_live_read(live_asr_service.build_payload(session))
@@ -231,6 +239,10 @@ async def transcribe_audio(
         current_user=current_user,
         db=db,
     )
+    try:
+        asr_service.ensure_model_ready(provider.model_name)
+    except AsrRuntimeUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     stored_audio = save_upload_file(
         file,
         storage_root=Path(settings.asr_upload_dir),

@@ -143,8 +143,8 @@ flowchart TB
    Optional ASR tuning:
 
    - `ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25`
-   - `ASR_DEVICE=cpu`
-   - `ASR_COMPUTE_TYPE=float32`
+   - `ASR_DEVICE=cuda`
+   - `ASR_COMPUTE_TYPE=float16`
    - `ASR_LIVE_PARTIAL_INTERVAL_MS=1500`
    - `ASR_LIVE_COMMIT_SILENCE_MS=1200`
    - `ASR_MAX_UPLOAD_MB=512`
@@ -155,25 +155,47 @@ flowchart TB
    - `GEMINI_MODEL=gemini-3.1-flash-lite-preview`
    - `MEETING_MAX_UPLOAD_MB=512`
 
-3. Start the stack:
+3. If you want local Breeze ASR to run on the NVIDIA GPU, install the NVIDIA Container Toolkit on Ubuntu first:
+
+   ```bash
+   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+     sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+   curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+   sudo apt-get update
+   sudo apt-get install -y nvidia-container-toolkit
+   sudo nvidia-ctk runtime configure --runtime=docker
+   sudo systemctl restart docker
+   ```
+
+4. Start the stack:
+
+   Recommended for CUDA ASR on the lab machine:
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.cuda.yml up --build -d
+   ```
+
+   Temporary CPU-only fallback:
 
    ```bash
    docker compose up --build -d
    ```
 
-4. Open the app locally:
+5. Open the app locally:
 
    - Frontend: `http://127.0.0.1:3000`
    - Backend API: `http://127.0.0.1:8000`
 
-5. Sign in with:
+6. Sign in with:
 
    - username from `INITIAL_ADMIN_USERNAME`
    - password from `INITIAL_ADMIN_PASSWORD`
 
-6. If you need more accounts or need to manage feature access, sign in as the admin user and open the `Control` page.
+7. If you need more accounts or need to manage feature access, sign in as the admin user and open the `Control` page.
 
-7. Open the `Control` page as an admin when you need to:
+8. Open the `Control` page as an admin when you need to:
 
    - create or disable user accounts
    - assign users to feature access groups
@@ -182,6 +204,14 @@ flowchart TB
    - tune the wallet guardrails for text runs and max audio length
 
 The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
+
+## CUDA ASR notes
+
+- `docker-compose.cuda.yml` is the GPU overlay for the backend.
+- Breeze ASR now expects CUDA through Docker, not CPU-only inference, when `ASR_DEVICE=cuda`.
+- If the NVIDIA runtime is missing, ASR and Meetings return a clear `503` instead of crashing the backend.
+- `ASR_COMPUTE_TYPE=float16` is the recommended fast path.
+- If you need lower VRAM use, try `ASR_COMPUTE_TYPE=int8_float16`.
 
 ## Core workflows
 

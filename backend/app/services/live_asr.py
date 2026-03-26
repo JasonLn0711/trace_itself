@@ -7,7 +7,7 @@ import numpy as np
 from faster_whisper.vad import VadOptions, get_speech_timestamps
 
 from app.core.config import get_settings
-from app.services.asr import AsrServiceError, service as asr_service
+from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
 
 settings = get_settings()
 
@@ -172,6 +172,8 @@ class LiveAsrSessionManager:
                 ),
                 vad_parameters=self._vad_parameters(),
             )
+        except AsrRuntimeUnavailableError:
+            raise
         except AsrServiceError:
             session.last_partial_at = monotonic()
             return
@@ -197,6 +199,8 @@ class LiveAsrSessionManager:
                 ),
                 vad_parameters=self._vad_parameters(),
             )
+        except AsrRuntimeUnavailableError:
+            raise
         except AsrServiceError:
             result = None
 
