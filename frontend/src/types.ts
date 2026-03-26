@@ -198,26 +198,6 @@ export interface UserPasswordResetInput {
   password: string;
 }
 
-export interface ProductUpdateCreateInput {
-  title: string;
-  summary: string;
-  details?: string | null;
-  area: string;
-  change_type: ProductUpdateType;
-  changed_at: string;
-  is_pinned: boolean;
-}
-
-export interface ProductUpdateUpdateInput {
-  title?: string;
-  summary?: string;
-  details?: string | null;
-  area?: string;
-  change_type?: ProductUpdateType;
-  changed_at?: string;
-  is_pinned?: boolean;
-}
-
 export interface ApiErrorPayload {
   detail?: unknown;
   message?: string;

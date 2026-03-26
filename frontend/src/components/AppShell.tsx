@@ -6,13 +6,16 @@ import { usePathname } from 'next/navigation';
 import { Badge } from './Primitives';
 import { useAuth } from '../state/AuthContext';
 
-const navItems = [
+const mainNavItems = [
   { to: '/', label: 'Home' },
   { to: '/asr', label: 'ASR' },
   { to: '/meetings', label: 'Meetings' },
-  { to: '/updates', label: 'Updates' },
   { to: '/projects', label: 'Projects' },
-  { to: '/tasks', label: 'Tasks' },
+  { to: '/tasks', label: 'Tasks' }
+];
+
+const trailingNavItems = [
+  { to: '/updates', label: 'Updates' },
   { to: '/daily-logs', label: 'Logs' }
 ];
 
@@ -26,7 +29,10 @@ function isActivePath(pathname: string, href: string) {
 export function AppShell({ children }: { children: ReactNode }) {
   const { logout, user } = useAuth();
   const pathname = usePathname() ?? '/';
-  const visibleNavItems = user?.role === 'admin' ? [...navItems, { to: '/users', label: 'Users' }] : navItems;
+  const visibleNavItems =
+    user?.role === 'admin'
+      ? [...mainNavItems, { to: '/users', label: 'Users' }, ...trailingNavItems]
+      : [...mainNavItems, ...trailingNavItems];
 
   return (
     <div className="app-shell">
