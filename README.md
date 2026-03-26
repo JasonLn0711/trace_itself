@@ -1,12 +1,14 @@
 # trace_itself
 
-`trace_itself` is a private, self-hosted execution dashboard for one person. This MVP is built for long-horizon learning and project management, not generic team productivity.
+`trace_itself` is a private, self-hosted execution dashboard for long-horizon learning and project management. It stays intentionally narrow, but it now supports multiple private user accounts with isolated data.
 
 ## MVP scope
 
-- Single-user password-protected access
+- Multi-user account login with per-user private data
+- Admin-managed user accounts and password resets
+- Temporary account lockout after repeated failed login attempts
 - Projects, milestones, tasks, and daily logs
-- Dashboard for active work, today tasks, overdue tasks, upcoming milestones, and recent logs
+- Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
 - FastAPI backend with PostgreSQL
 - React frontend served behind Nginx
 - Docker Compose deployment with localhost-only exposure by default
@@ -16,7 +18,7 @@
 - Frontend: React + Vite + React Router
 - Backend: FastAPI + SQLAlchemy
 - Database: PostgreSQL 16
-- Auth: single shared password with signed session cookie
+- Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
 - Deployment: Docker Compose
 - Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
 
@@ -66,7 +68,8 @@ Why this shape:
 
    - `POSTGRES_PASSWORD`
    - `SECRET_KEY`
-   - `APP_PASSWORD`
+   - `INITIAL_ADMIN_USERNAME`
+   - `INITIAL_ADMIN_PASSWORD`
 
 3. Start the stack:
 
@@ -79,9 +82,14 @@ Why this shape:
    - Frontend: `http://127.0.0.1:3000`
    - Backend API: `http://127.0.0.1:8000`
 
-5. Sign in with the password from `APP_PASSWORD`.
+5. Sign in with:
 
-The backend auto-creates the MVP tables on startup.
+   - username from `INITIAL_ADMIN_USERNAME`
+   - password from `INITIAL_ADMIN_PASSWORD`
+
+6. If you need more accounts, sign in as the admin user and open the `Users` page.
+
+The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
 
 ## Local development
 
@@ -117,4 +125,4 @@ Use the guide in [docs/deployment.md](/home/jnln3799/every_on_git_ubuntu/trace_i
 2. Add tags or focus areas across tasks and daily logs.
 3. Add project health metrics such as open-task count and milestone completion trends.
 4. Add backups and restore scripts for the Postgres volume.
-5. Add stronger auth options if the app ever moves beyond a single trusted user.
+5. Add email-based password recovery or MFA if the app ever moves beyond a small trusted environment.

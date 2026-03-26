@@ -52,7 +52,7 @@ export function LoginPage() {
     <div className="login-shell">
       <Card className="login-card hero-banner">
         <div className="hero-chip">
-          <Badge tone="info">Single-user</Badge>
+          <Badge tone="info">Account-based</Badge>
           Private self-hosted progress dashboard
         </div>
         <div>

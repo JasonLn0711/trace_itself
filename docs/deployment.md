@@ -27,12 +27,17 @@ Then change these values:
 
 - `POSTGRES_PASSWORD` to a strong database password
 - `SECRET_KEY` to a long random secret
-- `APP_PASSWORD` to the password you will use to sign in
+- `INITIAL_ADMIN_USERNAME` to the first admin login name
+- `INITIAL_ADMIN_PASSWORD` to the first admin password
+- `AUTH_MAX_FAILED_ATTEMPTS` if you want a different lockout threshold
+- `AUTH_LOCKOUT_MINUTES` if you want a different lockout duration
 
 Use these security settings:
 
 - For local-only testing on the lab machine: `SESSION_COOKIE_SECURE=false`
 - For real remote access over Tailscale HTTPS: `SESSION_COOKIE_SECURE=true`
+
+After first login, use the `Users` page to create more accounts, reset passwords, or unlock accounts that hit the failed-login threshold.
 
 ## Start the app
 
@@ -114,6 +119,6 @@ docker compose exec db sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > tra
 
 ## Operational assumptions
 
-- This MVP is intentionally single-user.
-- The login password is shared-user style, not per-account auth.
+- This MVP supports multiple users, but each user's data is private to their own account.
+- User management is admin-led through the app.
 - The app expects a trusted private network entrypoint rather than a public open-internet deployment.
