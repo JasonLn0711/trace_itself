@@ -11,6 +11,7 @@ It now has two main user-facing functions:
 
 - Multi-user account login with per-user private data
 - Admin-managed user accounts and password resets
+- Admin control panel for access groups, provider storage, and feature permissions
 - Temporary account lockout after repeated failed login attempts
 - Projects, milestones, tasks, and daily logs
 - Private ASR with saved audio and per-user transcript history
@@ -30,6 +31,7 @@ It now has two main user-facing functions:
 - ASR engine: local Breeze ASR 25 via Hugging Face Transformers
 - Meeting summarizer: Gemini 3.1 Flash-Lite API
 - Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
+- Secrets vault: encrypted provider API key storage in Postgres
 - Deployment: Docker Compose with a Next.js standalone frontend container
 - Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
 
@@ -87,6 +89,7 @@ Why this shape:
 
    - `POSTGRES_PASSWORD`
    - `SECRET_KEY`
+   - `CREDENTIALS_SECRET_KEY`
    - `INITIAL_ADMIN_USERNAME`
    - `INITIAL_ADMIN_PASSWORD`
 
@@ -119,7 +122,14 @@ Why this shape:
    - username from `INITIAL_ADMIN_USERNAME`
    - password from `INITIAL_ADMIN_PASSWORD`
 
-6. If you need more accounts, sign in as the admin user and open the `Users` page.
+6. If you need more accounts or need to manage feature access, sign in as the admin user and open the `Control` page.
+
+7. Open the `Control` page as an admin when you need to:
+
+   - create or disable user accounts
+   - assign users to feature access groups
+   - store ASR or LLM provider settings and API keys
+   - choose which providers stay active in the app
 
 The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
 
@@ -136,12 +146,21 @@ Notes for ASR:
 - Uploaded or recorded audio is stored in the Docker volume `app_data`, and transcript/meeting metadata is stored in Postgres.
 - Supported upload formats include common file types such as `wav`, `mp3`, `m4a`, `ogg`, `flac`, and `webm`.
 - In-browser recordings use speech-optimized compressed audio so meeting capture stays storage-friendly.
+- Users only see ASR providers that match their feature permissions.
 
 Notes for meeting records:
 
 - The `Meetings` page runs Breeze ASR locally first, then asks Gemini for minutes, a short summary, and action items.
 - Meeting-note generation requires `GEMINI_API_KEY`.
 - If you change ASR or Gemini settings, rebuild the backend container.
+- The meeting page lets users choose from active providers they are allowed to use.
+
+Notes for the control plane:
+
+- Feature access is grouped through admin-managed access groups such as `Full access`, `Projects only`, or `Meetings`.
+- A user can only see and use pages that match their group's capabilities.
+- Provider secrets are stored encrypted in the database.
+- The `Control` page is admin-only.
 
 ## Local development
 

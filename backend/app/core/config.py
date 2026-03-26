@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://trace_itself:trace_itself@localhost:5432/trace_itself"
     session_cookie_name: str = "trace_itself_session"
     session_cookie_secure: bool = False
+    credentials_secret_key: str | None = None
     backend_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     db_connect_max_attempts: int = 30
     db_connect_retry_seconds: int = 2

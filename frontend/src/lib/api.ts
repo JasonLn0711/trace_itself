@@ -1,4 +1,8 @@
 import type {
+  AccessGroup,
+  AccessGroupInput,
+  AIProvider,
+  AIProviderInput,
   AsrTranscript,
   AsrTranscriptSummary,
   DailyLog,
@@ -178,7 +182,7 @@ export const asrApi = {
   audioUrl(id: number) {
     return `${API_BASE}/asr/transcripts/${id}/audio`;
   },
-  transcribe(input: { file: File; title?: string; language?: string }) {
+  transcribe(input: { file: File; title?: string; language?: string; provider_id?: number | null }) {
     const formData = new FormData();
     formData.append('file', input.file);
     if (input.title?.trim()) {
@@ -186,6 +190,9 @@ export const asrApi = {
     }
     if (input.language?.trim()) {
       formData.append('language', input.language.trim());
+    }
+    if (input.provider_id) {
+      formData.append('provider_id', String(input.provider_id));
     }
     return requestForm<AsrTranscript>('/asr/transcripts', formData, {
       method: 'POST'
@@ -208,7 +215,13 @@ export const meetingsApi = {
   audioUrl(id: number) {
     return `${API_BASE}/meetings/${id}/audio`;
   },
-  create(input: { file: File; title?: string; language?: string }) {
+  create(input: {
+    file: File;
+    title?: string;
+    language?: string;
+    asr_provider_id?: number | null;
+    llm_provider_id?: number | null;
+  }) {
     const formData = new FormData();
     formData.append('file', input.file);
     if (input.title?.trim()) {
@@ -216,6 +229,12 @@ export const meetingsApi = {
     }
     if (input.language?.trim()) {
       formData.append('language', input.language.trim());
+    }
+    if (input.asr_provider_id) {
+      formData.append('asr_provider_id', String(input.asr_provider_id));
+    }
+    if (input.llm_provider_id) {
+      formData.append('llm_provider_id', String(input.llm_provider_id));
     }
     return requestForm<MeetingRecord>('/meetings', formData, {
       method: 'POST'
@@ -259,6 +278,52 @@ export const usersApi = {
   unlock(id: number) {
     return request<User>(`/users/${id}/unlock`, {
       method: 'POST'
+    });
+  }
+};
+
+export const accessGroupsApi = {
+  list() {
+    return request<AccessGroup[]>('/access-groups');
+  },
+  create(body: AccessGroupInput) {
+    return request<AccessGroup>('/access-groups', {
+      method: 'POST',
+      body
+    });
+  },
+  update(id: number, body: Partial<AccessGroupInput>) {
+    return request<AccessGroup>(`/access-groups/${id}`, {
+      method: 'PUT',
+      body
+    });
+  },
+  remove(id: number) {
+    return request<void>(`/access-groups/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
+export const aiProvidersApi = {
+  list(query?: { kind?: string; include_inactive?: boolean }) {
+    return request<AIProvider[]>(withQuery('/ai-providers', query));
+  },
+  create(body: AIProviderInput) {
+    return request<AIProvider>('/ai-providers', {
+      method: 'POST',
+      body
+    });
+  },
+  update(id: number, body: Partial<AIProviderInput>) {
+    return request<AIProvider>(`/ai-providers/${id}`, {
+      method: 'PUT',
+      body
+    });
+  },
+  remove(id: number) {
+    return request<void>(`/ai-providers/${id}`, {
+      method: 'DELETE'
     });
   }
 };

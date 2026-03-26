@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_milestone_or_404
+from app.api.deps import get_current_user, get_milestone_or_404, require_project_tracer
 from app.core.enums import MilestoneStatus
 from app.db.session import get_db
 from app.models.milestone import Milestone
@@ -12,7 +12,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.schemas.milestone import MilestoneCreate, MilestoneRead, MilestoneUpdate
 
-router = APIRouter(prefix="/milestones", tags=["milestones"])
+router = APIRouter(prefix="/milestones", tags=["milestones"], dependencies=[Depends(require_project_tracer)])
 
 
 def ensure_project_exists(project_id: int, current_user: User, db: Session) -> None:

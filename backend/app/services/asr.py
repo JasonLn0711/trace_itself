@@ -25,10 +25,10 @@ class AsrTranscriptionResult:
 
 class AsrService:
     def __init__(self) -> None:
-        self._pipeline: Any | None = None
+        self._pipelines: dict[str, Any] = {}
 
-    def _get_pipeline(self):
-        if self._pipeline is None:
+    def _get_pipeline(self, model_name: str):
+        if model_name not in self._pipelines:
             import torch
             from transformers import AutomaticSpeechRecognitionPipeline, WhisperForConditionalGeneration, WhisperProcessor
 
@@ -38,23 +38,30 @@ class AsrService:
             use_cuda = settings.asr_device == "cuda" and torch.cuda.is_available()
             torch_dtype = torch.float16 if use_cuda else torch.float32
 
-            processor = WhisperProcessor.from_pretrained(settings.asr_model_name)
+            processor = WhisperProcessor.from_pretrained(model_name)
             model = WhisperForConditionalGeneration.from_pretrained(
-                settings.asr_model_name,
+                model_name,
                 torch_dtype=torch_dtype,
             ).eval()
             model = model.to("cuda" if use_cuda else "cpu")
 
-            self._pipeline = AutomaticSpeechRecognitionPipeline(
+            self._pipelines[model_name] = AutomaticSpeechRecognitionPipeline(
                 model=model,
                 tokenizer=processor.tokenizer,
                 feature_extractor=processor.feature_extractor,
                 chunk_length_s=max(0, settings.asr_chunk_length_seconds),
                 device=0 if use_cuda else -1,
             )
-        return self._pipeline
+        return self._pipelines[model_name]
 
-    def transcribe_file(self, file_path: Path, language: str | None = None) -> AsrTranscriptionResult:
+    def transcribe_file(
+        self,
+        file_path: Path,
+        *,
+        language: str | None = None,
+        model_name: str | None = None,
+    ) -> AsrTranscriptionResult:
+        resolved_model_name = model_name or settings.asr_model_name
         wav_path = None
         wav_dir = None
         try:
@@ -68,7 +75,7 @@ class AsrService:
             if language:
                 generate_kwargs["language"] = language
 
-            output = self._get_pipeline()(waveform, generate_kwargs=generate_kwargs)
+            output = self._get_pipeline(resolved_model_name)(waveform, generate_kwargs=generate_kwargs)
             text = (output.get("text") or "").strip()
         except Exception as exc:
             raise AsrServiceError("Transcription failed. Check the audio file and ASR settings.") from exc
@@ -85,7 +92,7 @@ class AsrService:
             text=text,
             language=normalized_language,
             duration_seconds=duration_seconds,
-            model_name=settings.asr_model_name,
+            model_name=resolved_model_name,
         )
 
 

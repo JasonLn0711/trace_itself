@@ -1,4 +1,6 @@
+from app.models.access_group import AccessGroup
 from app.models.asr_transcript import AsrTranscript
+from app.models.ai_provider import AIProvider
 from app.models.base import Base
 from app.models.daily_log import DailyLog
 from app.models.meeting_record import MeetingRecord
@@ -8,4 +10,16 @@ from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
 
-__all__ = ["Base", "User", "Project", "Milestone", "Task", "DailyLog", "ProductUpdate", "AsrTranscript", "MeetingRecord"]
+__all__ = [
+    "Base",
+    "AccessGroup",
+    "AIProvider",
+    "User",
+    "Project",
+    "Milestone",
+    "Task",
+    "DailyLog",
+    "ProductUpdate",
+    "AsrTranscript",
+    "MeetingRecord",
+]

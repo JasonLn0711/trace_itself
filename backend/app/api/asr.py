@@ -5,7 +5,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_asr_transcript_or_404, get_current_user
+from app.api.deps import get_asr_transcript_or_404, get_current_user, require_asr_access, resolve_ai_provider
+from app.core.enums import AIProviderKind
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.asr_transcript import AsrTranscript
@@ -14,7 +15,7 @@ from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary
 from app.services.asr import AsrServiceError, service as asr_service
 from app.services.audio_storage import delete_audio_file, save_upload_file
 
-router = APIRouter(prefix="/asr", tags=["asr"])
+router = APIRouter(prefix="/asr", tags=["asr"], dependencies=[Depends(require_asr_access)])
 settings = get_settings()
 
 
@@ -88,9 +89,16 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
     language: str | None = Form(default=None),
+    provider_id: int | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AsrTranscriptRead:
+    provider = resolve_ai_provider(
+        kind=AIProviderKind.ASR,
+        provider_id=provider_id,
+        current_user=current_user,
+        db=db,
+    )
     stored_audio = save_upload_file(
         file,
         storage_root=Path(settings.asr_upload_dir),
@@ -103,7 +111,11 @@ async def transcribe_audio(
         normalized_language = None
 
     try:
-        result = asr_service.transcribe_file(stored_audio.storage_path, language=normalized_language)
+        result = asr_service.transcribe_file(
+            stored_audio.storage_path,
+            language=normalized_language,
+            model_name=provider.model_name,
+        )
     except AsrServiceError as exc:
         delete_audio_file(stored_audio.storage_path)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc

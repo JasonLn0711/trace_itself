@@ -1,0 +1,44 @@
+import type { User } from '../types';
+
+export type AppFeature = 'project_tracer' | 'asr' | 'llm';
+
+export function canUseFeature(user: User | null | undefined, feature: AppFeature) {
+  return Boolean(user?.capabilities?.[feature]);
+}
+
+export function canUseMeetings(user: User | null | undefined) {
+  return canUseFeature(user, 'asr') && canUseFeature(user, 'llm');
+}
+
+export function preferredRouteForUser(user: User | null | undefined) {
+  if (canUseFeature(user, 'project_tracer')) {
+    return '/';
+  }
+  if (canUseMeetings(user)) {
+    return '/meetings';
+  }
+  if (canUseFeature(user, 'asr')) {
+    return '/asr';
+  }
+  return '/updates';
+}
+
+export function canAccessPath(user: User | null | undefined, path: string) {
+  if (path === '/' || path.startsWith('/projects') || path.startsWith('/tasks') || path.startsWith('/daily-logs')) {
+    return canUseFeature(user, 'project_tracer');
+  }
+  if (path.startsWith('/asr')) {
+    return canUseFeature(user, 'asr');
+  }
+  if (path.startsWith('/meetings')) {
+    return canUseMeetings(user);
+  }
+  return true;
+}
+
+export function resolvePostLoginPath(user: User | null | undefined, nextPath: string) {
+  if (canAccessPath(user, nextPath)) {
+    return nextPath;
+  }
+  return preferredRouteForUser(user);
+}

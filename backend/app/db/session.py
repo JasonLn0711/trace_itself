@@ -9,6 +9,8 @@ from app.db.base import Base
 from app.db.bootstrap import (
     apply_schema_upgrades,
     backfill_existing_data,
+    ensure_default_access_groups,
+    ensure_default_ai_providers,
     ensure_initial_admin,
     finalize_schema_upgrades,
     sync_product_updates_catalog,
@@ -37,7 +39,9 @@ def init_db() -> None:
                 apply_schema_upgrades(connection)
             with SessionLocal() as db:
                 admin = ensure_initial_admin(db)
-                backfill_existing_data(db, admin.id)
+                full_access_group = ensure_default_access_groups(db)
+                ensure_default_ai_providers(db)
+                backfill_existing_data(db, admin.id, full_access_group.id)
                 sync_product_updates_catalog(db, admin.id)
             with engine.begin() as connection:
                 finalize_schema_upgrades(connection)

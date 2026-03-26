@@ -12,14 +12,16 @@ import {
   PageIntro,
   SectionHeader
 } from '../components/Primitives';
-import { asrApi, extractApiErrorMessage } from '../lib/api';
+import { aiProvidersApi, asrApi, extractApiErrorMessage } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import { formatBytes, formatDuration } from '../lib/media';
-import type { AsrTranscript, AsrTranscriptSummary } from '../types';
+import type { AIProvider, AsrTranscript, AsrTranscriptSummary } from '../types';
 
 export function AsrPage() {
   const [entries, setEntries] = useState<AsrTranscriptSummary[]>([]);
   const [selected, setSelected] = useState<AsrTranscript | null>(null);
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [providerId, setProviderId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [language, setLanguage] = useState('');
@@ -53,11 +55,16 @@ export function AsrPage() {
 
     async function load() {
       try {
-        const items = await asrApi.list({ limit: 30 });
+        const [items, nextProviders] = await Promise.all([
+          asrApi.list({ limit: 30 }),
+          aiProvidersApi.list({ kind: 'asr' })
+        ]);
         if (!alive) {
           return;
         }
         setEntries(items);
+        setProviders(nextProviders);
+        setProviderId((current) => current ?? nextProviders[0]?.id ?? null);
         const firstId = items[0]?.id ?? null;
         setSelectedId(firstId);
         if (firstId) {
@@ -123,7 +130,7 @@ export function AsrPage() {
     setError('');
     setNotice('');
     try {
-      const created = await asrApi.transcribe({ file, title, language });
+      const created = await asrApi.transcribe({ file, title, language, provider_id: providerId });
       setSelected(created);
       setSelectedId(created.id);
       setTitle('');
@@ -221,8 +228,23 @@ export function AsrPage() {
                 <input value={language} onChange={(event) => setLanguage(event.target.value)} placeholder="auto, en, zh" />
               </label>
             </div>
-            <div className="list-row-copy">Breeze ASR 25 runs on your server.</div>
-            <Button type="submit" disabled={submitting || !file}>
+            {providers.length > 1 ? (
+              <label className="field">
+                <span>ASR provider</span>
+                <select value={String(providerId ?? '')} onChange={(event) => setProviderId(Number(event.target.value) || null)}>
+                  {providers.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name} · {provider.model_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="list-row-copy">
+                {providers[0] ? `${providers[0].name} · ${providers[0].model_name}` : 'No ASR provider available.'}
+              </div>
+            )}
+            <Button type="submit" disabled={submitting || !file || !providers.length}>
               {submitting ? 'Transcribing...' : 'Transcribe'}
             </Button>
           </form>

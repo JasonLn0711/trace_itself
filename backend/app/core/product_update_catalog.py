@@ -111,4 +111,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-26T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="control-plane-access",
+        version_tag="v1.0.55",
+        title="Control panel and feature access",
+        summary="Admins can now manage access groups, provider secrets, and feature access from one place.",
+        details=(
+            "The new Control page stores ASR and LLM provider settings, assigns users to feature groups, "
+            "and lets each page show only the tools a user is allowed to use."
+        ),
+        area="admin",
+        change_type=ProductUpdateType.BUILD,
+        changed_at=datetime.fromisoformat("2026-03-26T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

@@ -30,11 +30,12 @@ Then change these values:
 
 - `POSTGRES_PASSWORD` to a strong database password
 - `SECRET_KEY` to a long random secret
+- `CREDENTIALS_SECRET_KEY` to a second long random secret for encrypting stored provider API keys
 - `INITIAL_ADMIN_USERNAME` to the first admin login name
 - `INITIAL_ADMIN_PASSWORD` to the first admin password
 - `AUTH_MAX_FAILED_ATTEMPTS` if you want a different lockout threshold
 - `AUTH_LOCKOUT_MINUTES` if you want a different lockout duration
-- `GEMINI_API_KEY` if you want meeting summaries, minutes, and action items
+- `GEMINI_API_KEY` if you want Gemini pre-seeded as a meeting-note provider
 
 Use these security settings:
 
@@ -50,7 +51,13 @@ Optional ASR tuning:
 - `MEETING_MAX_UPLOAD_MB=120` for longer meeting audio
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
 
-After first login, use the `Users` page to create more accounts, reset passwords, or unlock accounts that hit the failed-login threshold.
+After first login, use the `Control` page to:
+
+- create more accounts
+- assign feature access groups
+- reset passwords or unlock locked users
+- store ASR and LLM provider settings
+- enable or disable providers for the user-facing selectors
 
 ## Start the app
 
@@ -73,6 +80,7 @@ ASR notes:
 - After the model is cached, later transcriptions are much faster.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
+- Provider API secrets are stored encrypted in Postgres.
 
 ## Private remote access with Tailscale Serve
 

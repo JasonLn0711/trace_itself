@@ -1,15 +1,29 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { Badge, Button, Card, EmptyState, Field, Notice, SectionHeader, StatCard } from '../components/Primitives';
-import { extractApiErrorMessage, usersApi } from '../lib/api';
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  MetricPill,
+  Notice,
+  PageIntro,
+  SectionHeader,
+  SegmentedControl
+} from '../components/Primitives';
+import { accessGroupsApi, aiProvidersApi, extractApiErrorMessage, usersApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
-import type { User } from '../types';
+import type { AccessGroup, AIProvider, AIProviderDriver, AIProviderKind, User } from '../types';
+
+type AdminTab = 'users' | 'groups' | 'providers';
 
 type UserFormState = {
   username: string;
   display_name: string;
   role: 'admin' | 'member';
+  access_group_id: number | null;
   is_active: boolean;
   password: string;
 };
@@ -17,55 +31,166 @@ type UserFormState = {
 type UserEditState = {
   display_name: string;
   role: 'admin' | 'member';
+  access_group_id: number | null;
   is_active: boolean;
   password: string;
+};
+
+type AccessGroupFormState = {
+  name: string;
+  description: string;
+  can_use_project_tracer: boolean;
+  can_use_asr: boolean;
+  can_use_llm: boolean;
+};
+
+type AIProviderFormState = {
+  name: string;
+  kind: AIProviderKind;
+  driver: AIProviderDriver;
+  model_name: string;
+  base_url: string;
+  description: string;
+  is_active: boolean;
+  api_key: string;
 };
 
 const emptyUserForm = (): UserFormState => ({
   username: '',
   display_name: '',
   role: 'member',
+  access_group_id: null,
   is_active: true,
   password: ''
 });
 
+const emptyAccessGroupForm = (): AccessGroupFormState => ({
+  name: '',
+  description: '',
+  can_use_project_tracer: true,
+  can_use_asr: false,
+  can_use_llm: false
+});
+
+const emptyAIProviderForm = (): AIProviderFormState => ({
+  name: '',
+  kind: 'asr',
+  driver: 'local_breeze',
+  model_name: '',
+  base_url: '',
+  description: '',
+  is_active: true,
+  api_key: ''
+});
+
 function userToEdit(user: User): UserEditState {
   return {
-    display_name: user.display_name,
+    display_name: user.display_name ?? '',
     role: user.role,
+    access_group_id: user.access_group_id,
     is_active: user.is_active,
     password: ''
   };
 }
 
+function accessGroupToEdit(group: AccessGroup): AccessGroupFormState {
+  return {
+    name: group.name,
+    description: group.description ?? '',
+    can_use_project_tracer: group.can_use_project_tracer,
+    can_use_asr: group.can_use_asr,
+    can_use_llm: group.can_use_llm
+  };
+}
+
+function providerToEdit(provider: AIProvider): AIProviderFormState {
+  return {
+    name: provider.name,
+    kind: provider.kind,
+    driver: provider.driver,
+    model_name: provider.model_name,
+    base_url: provider.base_url ?? '',
+    description: provider.description ?? '',
+    is_active: provider.is_active,
+    api_key: ''
+  };
+}
+
+function normalizeProviderDriver(kind: AIProviderKind): AIProviderDriver {
+  return kind === 'asr' ? 'local_breeze' : 'gemini';
+}
+
+function capabilitySummary(group: AccessGroup) {
+  const items = [];
+  if (group.can_use_project_tracer) {
+    items.push('Projects');
+  }
+  if (group.can_use_asr) {
+    items.push('ASR');
+  }
+  if (group.can_use_llm) {
+    items.push('LLM');
+  }
+  return items.length ? items.join(' · ') : 'No feature access';
+}
+
 export function UsersPage() {
+  const [tab, setTab] = useState<AdminTab>('users');
   const [users, setUsers] = useState<User[]>([]);
-  const [createForm, setCreateForm] = useState<UserFormState>(emptyUserForm());
-  const [editForms, setEditForms] = useState<Record<number, UserEditState>>({});
+  const [groups, setGroups] = useState<AccessGroup[]>([]);
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [createUserForm, setCreateUserForm] = useState<UserFormState>(emptyUserForm());
+  const [editUserForms, setEditUserForms] = useState<Record<number, UserEditState>>({});
+  const [createGroupForm, setCreateGroupForm] = useState<AccessGroupFormState>(emptyAccessGroupForm());
+  const [editGroupForms, setEditGroupForms] = useState<Record<number, AccessGroupFormState>>({});
+  const [createProviderForm, setCreateProviderForm] = useState<AIProviderFormState>(emptyAIProviderForm());
+  const [editProviderForms, setEditProviderForms] = useState<Record<number, AIProviderFormState>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
-  const activeUsers = users.filter((user) => user.is_active).length;
-  const adminUsers = users.filter((user) => user.role === 'admin').length;
-  const lockedUsers = users.filter((user) => Boolean(user.locked_until)).length;
-  const inactiveUsers = users.filter((user) => !user.is_active).length;
-
-  async function loadUsers() {
-    const items = await usersApi.list();
-    setUsers(items);
-    setEditForms(Object.fromEntries(items.map((user) => [user.id, userToEdit(user)])));
+  async function loadAll() {
+    const [nextUsers, nextGroups, nextProviders] = await Promise.all([
+      usersApi.list(),
+      accessGroupsApi.list(),
+      aiProvidersApi.list({ include_inactive: true })
+    ]);
+    setUsers(nextUsers);
+    setGroups(nextGroups);
+    setProviders(nextProviders);
+    setEditUserForms(Object.fromEntries(nextUsers.map((user) => [user.id, userToEdit(user)])));
+    setEditGroupForms(Object.fromEntries(nextGroups.map((group) => [group.id, accessGroupToEdit(group)])));
+    setEditProviderForms(Object.fromEntries(nextProviders.map((provider) => [provider.id, providerToEdit(provider)])));
+    setCreateUserForm((current) => ({
+      ...current,
+      access_group_id: current.access_group_id ?? nextGroups[0]?.id ?? null
+    }));
   }
 
   useEffect(() => {
     let alive = true;
+
     async function load() {
       try {
-        const items = await usersApi.list();
-        if (alive) {
-          setUsers(items);
-          setEditForms(Object.fromEntries(items.map((user) => [user.id, userToEdit(user)])));
+        const [nextUsers, nextGroups, nextProviders] = await Promise.all([
+          usersApi.list(),
+          accessGroupsApi.list(),
+          aiProvidersApi.list({ include_inactive: true })
+        ]);
+        if (!alive) {
+          return;
         }
+        setUsers(nextUsers);
+        setGroups(nextGroups);
+        setProviders(nextProviders);
+        setEditUserForms(Object.fromEntries(nextUsers.map((user) => [user.id, userToEdit(user)])));
+        setEditGroupForms(Object.fromEntries(nextGroups.map((group) => [group.id, accessGroupToEdit(group)])));
+        setEditProviderForms(Object.fromEntries(nextProviders.map((provider) => [provider.id, providerToEdit(provider)])));
+        setCreateUserForm((current) => ({
+          ...current,
+          access_group_id: current.access_group_id ?? nextGroups[0]?.id ?? null
+        }));
       } catch (err) {
         if (alive) {
           setError(extractApiErrorMessage(err));
@@ -76,20 +201,28 @@ export function UsersPage() {
         }
       }
     }
+
     void load();
     return () => {
       alive = false;
     };
   }, []);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+  const activeUsers = users.filter((user) => user.is_active).length;
+  const adminUsers = users.filter((user) => user.role === 'admin').length;
+  const asrEnabledProviders = providers.filter((provider) => provider.kind === 'asr' && provider.is_active).length;
+  const llmEnabledProviders = providers.filter((provider) => provider.kind === 'llm' && provider.is_active).length;
+
+  async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError('');
+    setNotice('');
     try {
-      await usersApi.create(createForm);
-      setCreateForm(emptyUserForm());
-      await loadUsers();
+      await usersApi.create(createUserForm);
+      setCreateUserForm(emptyUserForm());
+      await loadAll();
+      setNotice('User created.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     } finally {
@@ -97,23 +230,26 @@ export function UsersPage() {
     }
   }
 
-  async function handleUpdate(userId: number) {
-    const form = editForms[userId];
+  async function handleSaveUser(userId: number) {
+    const form = editUserForms[userId];
     if (!form) {
       return;
     }
     setSaving(true);
     setError('');
+    setNotice('');
     try {
       await usersApi.update(userId, {
         display_name: form.display_name,
         role: form.role,
+        access_group_id: form.access_group_id,
         is_active: form.is_active
       });
       if (form.password.trim()) {
         await usersApi.resetPassword(userId, { password: form.password });
       }
-      await loadUsers();
+      await loadAll();
+      setNotice('User saved.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     } finally {
@@ -123,9 +259,113 @@ export function UsersPage() {
 
   async function handleUnlock(userId: number) {
     setError('');
+    setNotice('');
     try {
       await usersApi.unlock(userId);
-      await loadUsers();
+      await loadAll();
+      setNotice('User unlocked.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    }
+  }
+
+  async function handleCreateGroup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await accessGroupsApi.create(createGroupForm);
+      setCreateGroupForm(emptyAccessGroupForm());
+      await loadAll();
+      setNotice('Access group created.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveGroup(groupId: number) {
+    const form = editGroupForms[groupId];
+    if (!form) {
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await accessGroupsApi.update(groupId, form);
+      await loadAll();
+      setNotice('Access group saved.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteGroup(groupId: number) {
+    if (!window.confirm('Delete this access group?')) {
+      return;
+    }
+    setError('');
+    setNotice('');
+    try {
+      await accessGroupsApi.remove(groupId);
+      await loadAll();
+      setNotice('Access group deleted.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    }
+  }
+
+  async function handleCreateProvider(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await aiProvidersApi.create(createProviderForm);
+      setCreateProviderForm(emptyAIProviderForm());
+      await loadAll();
+      setNotice('AI provider created.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveProvider(providerId: number) {
+    const form = editProviderForms[providerId];
+    if (!form) {
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await aiProvidersApi.update(providerId, form);
+      await loadAll();
+      setNotice('AI provider saved.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteProvider(providerId: number) {
+    if (!window.confirm('Delete this AI provider?')) {
+      return;
+    }
+    setError('');
+    setNotice('');
+    try {
+      await aiProvidersApi.remove(providerId);
+      await loadAll();
+      setNotice('AI provider deleted.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     }
@@ -136,7 +376,7 @@ export function UsersPage() {
       <div className="page">
         <Card className="section-card">
           <div className="spinner" />
-          <p className="muted">Loading users...</p>
+          <p className="muted">Loading control panel...</p>
         </Card>
       </div>
     );
@@ -144,125 +384,412 @@ export function UsersPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>Users</h1>
-          <p className="muted">Admin only</p>
-        </div>
-      </div>
+      <PageIntro
+        title="Control"
+        description="Users, groups, providers."
+        aside={
+          <div className="metric-strip">
+            <MetricPill label="Users" value={users.length} tone="info" />
+            <MetricPill label="Admins" value={adminUsers} tone="warning" />
+            <MetricPill label="Groups" value={groups.length} tone="neutral" />
+            <MetricPill label="ASR" value={asrEnabledProviders} tone="success" />
+            <MetricPill label="LLM" value={llmEnabledProviders} tone="info" />
+          </div>
+        }
+      />
 
-      <div className="grid stats">
-        <StatCard label="Active users" value={activeUsers} />
-        <StatCard label="Admins" value={adminUsers} />
-        <StatCard label="Locked" value={lockedUsers} />
-        <StatCard label="Inactive" value={inactiveUsers} />
-      </div>
+      {error ? <Notice title="Control error" description={error} tone="danger" /> : null}
+      {notice ? <Notice title={notice} tone="success" /> : null}
 
-      {error ? <Notice title="Could not update users" description={error} tone="danger" /> : null}
+      <SegmentedControl
+        label="Control section"
+        value={tab}
+        onChange={(value) => setTab(value as AdminTab)}
+        options={[
+          { value: 'users', label: 'Users', count: users.length },
+          { value: 'groups', label: 'Groups', count: groups.length },
+          { value: 'providers', label: 'Providers', count: providers.length }
+        ]}
+      />
 
-      <div className="grid two">
-        <Card className="section-card">
-          <SectionHeader title="New" />
-          <form className="form-grid" onSubmit={handleCreate}>
-            <Field label="Username">
-              <input value={createForm.username} onChange={(event) => setCreateForm({ ...createForm, username: event.target.value })} required />
-            </Field>
-            <Field label="Display name">
-              <input value={createForm.display_name} onChange={(event) => setCreateForm({ ...createForm, display_name: event.target.value })} required />
-            </Field>
-            <div className="form-grid cols-2">
-              <Field label="Role">
-                <select value={createForm.role} onChange={(event) => setCreateForm({ ...createForm, role: event.target.value as 'admin' | 'member' })}>
-                  <option value="member">member</option>
-                  <option value="admin">admin</option>
-                </select>
+      {tab === 'users' ? (
+        <div className="grid two">
+          <Card className="section-card">
+            <SectionHeader title="New user" />
+            <form className="form-grid" onSubmit={handleCreateUser}>
+              <Field label="Username">
+                <input value={createUserForm.username} onChange={(event) => setCreateUserForm({ ...createUserForm, username: event.target.value })} required />
               </Field>
-              <Field label="Active">
-                <select value={String(createForm.is_active)} onChange={(event) => setCreateForm({ ...createForm, is_active: event.target.value === 'true' })}>
-                  <option value="true">active</option>
-                  <option value="false">inactive</option>
-                </select>
+              <Field label="Display name">
+                <input value={createUserForm.display_name} onChange={(event) => setCreateUserForm({ ...createUserForm, display_name: event.target.value })} required />
               </Field>
-            </div>
-            <Field label="Initial password">
-              <input type="password" value={createForm.password} onChange={(event) => setCreateForm({ ...createForm, password: event.target.value })} required />
-            </Field>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Creating...' : 'Create user'}
-            </Button>
-          </form>
-        </Card>
+              <div className="form-grid cols-2">
+                <Field label="Role">
+                  <select value={createUserForm.role} onChange={(event) => setCreateUserForm({ ...createUserForm, role: event.target.value as 'admin' | 'member' })}>
+                    <option value="member">member</option>
+                    <option value="admin">admin</option>
+                  </select>
+                </Field>
+                <Field label="Group">
+                  <select
+                    value={String(createUserForm.access_group_id ?? '')}
+                    onChange={(event) => setCreateUserForm({ ...createUserForm, access_group_id: Number(event.target.value) || null })}
+                  >
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+              <div className="form-grid cols-2">
+                <Field label="State">
+                  <select value={String(createUserForm.is_active)} onChange={(event) => setCreateUserForm({ ...createUserForm, is_active: event.target.value === 'true' })}>
+                    <option value="true">active</option>
+                    <option value="false">inactive</option>
+                  </select>
+                </Field>
+                <Field label="Password">
+                  <input type="password" value={createUserForm.password} onChange={(event) => setCreateUserForm({ ...createUserForm, password: event.target.value })} required />
+                </Field>
+              </div>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Creating...' : 'Create user'}
+              </Button>
+            </form>
+          </Card>
 
-        <Card className="section-card">
-          <SectionHeader title="Accounts" />
-          <div className="list-table">
-            {users.map((user) => {
-              const form = editForms[user.id] ?? userToEdit(user);
-              const locked = Boolean(user.locked_until);
-              return (
-                <div key={user.id} className="list-row">
-                  <div className="list-row-main">
-                    <div className="list-row-header">
-                      <h3 className="list-row-title">{user.display_name}</h3>
-                      <div className="list-row-meta">
-                        <Badge tone={user.role === 'admin' ? 'warning' : 'info'}>{user.role}</Badge>
-                        <Badge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'active' : 'inactive'}</Badge>
-                        <Badge tone={locked ? 'danger' : 'neutral'}>
-                          {locked ? `locked to ${formatDateTime(user.locked_until)}` : `${user.failed_login_attempts} tries`}
-                        </Badge>
+          <Card className="section-card">
+            <SectionHeader title="Accounts" description={`${activeUsers} active`} />
+            <div className="list-table">
+              {users.length ? (
+                users.map((user) => {
+                  const form = editUserForms[user.id] ?? userToEdit(user);
+                  const locked = Boolean(user.locked_until);
+                  return (
+                    <div key={user.id} className="list-row">
+                      <div className="list-row-main">
+                        <div className="list-row-header">
+                          <h3 className="list-row-title">{user.display_name || user.username}</h3>
+                          <div className="list-row-meta">
+                            <Badge tone={user.role === 'admin' ? 'warning' : 'info'}>{user.role}</Badge>
+                            <Badge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'active' : 'inactive'}</Badge>
+                            {user.access_group_name ? <Badge tone="neutral">{user.access_group_name}</Badge> : null}
+                          </div>
+                        </div>
+                        <div className="list-row-copy line-clamp-1">
+                          @{user.username} · {user.last_login_at ? `last ${formatDateTime(user.last_login_at)}` : 'never logged in'}
+                        </div>
+                        <div className="list-row-copy line-clamp-1">
+                          {user.capabilities.project_tracer ? 'Projects' : 'No projects'} · {user.capabilities.asr ? 'ASR' : 'No ASR'} · {user.capabilities.llm ? 'LLM' : 'No LLM'}
+                        </div>
+                        <div className="form-grid cols-2">
+                          <Field label="Name">
+                            <input value={form.display_name} onChange={(event) => setEditUserForms({ ...editUserForms, [user.id]: { ...form, display_name: event.target.value } })} />
+                          </Field>
+                          <Field label="Group">
+                            <select
+                              value={String(form.access_group_id ?? '')}
+                              onChange={(event) => setEditUserForms({ ...editUserForms, [user.id]: { ...form, access_group_id: Number(event.target.value) || null } })}
+                            >
+                              {groups.map((group) => (
+                                <option key={group.id} value={group.id}>
+                                  {group.name}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                        </div>
+                        <div className="form-grid cols-2">
+                          <Field label="Role">
+                            <select value={form.role} onChange={(event) => setEditUserForms({ ...editUserForms, [user.id]: { ...form, role: event.target.value as 'admin' | 'member' } })}>
+                              <option value="member">member</option>
+                              <option value="admin">admin</option>
+                            </select>
+                          </Field>
+                          <Field label="State">
+                            <select value={String(form.is_active)} onChange={(event) => setEditUserForms({ ...editUserForms, [user.id]: { ...form, is_active: event.target.value === 'true' } })}>
+                              <option value="true">active</option>
+                              <option value="false">inactive</option>
+                            </select>
+                          </Field>
+                        </div>
+                        <Field label="Reset password">
+                          <input
+                            type="password"
+                            value={form.password}
+                            onChange={(event) => setEditUserForms({ ...editUserForms, [user.id]: { ...form, password: event.target.value } })}
+                            placeholder="Optional"
+                          />
+                        </Field>
+                      </div>
+                      <div className="list-row-side">
+                        <div className="muted small">Created {formatDateTime(user.created_at)}</div>
+                        <div className="muted small">
+                          {locked ? `Locked to ${formatDateTime(user.locked_until)}` : `${user.failed_login_attempts} tries`}
+                        </div>
+                        <div className="list-row-actions">
+                          <Button variant="secondary" onClick={() => void handleSaveUser(user.id)}>
+                            Save
+                          </Button>
+                          {locked ? (
+                            <Button variant="ghost" onClick={() => void handleUnlock(user.id)}>
+                              Unlock
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
-                    <div className="list-row-copy line-clamp-1">
-                      @{user.username} · {user.last_login_at ? `last ${formatDateTime(user.last_login_at)}` : 'never logged in'}
+                  );
+                })
+              ) : (
+                <EmptyState title="No users yet" description="Create the first user." />
+              )}
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === 'groups' ? (
+        <div className="grid two">
+          <Card className="section-card">
+            <SectionHeader title="New group" />
+            <form className="form-grid" onSubmit={handleCreateGroup}>
+              <Field label="Name">
+                <input value={createGroupForm.name} onChange={(event) => setCreateGroupForm({ ...createGroupForm, name: event.target.value })} required />
+              </Field>
+              <Field label="Description">
+                <input value={createGroupForm.description} onChange={(event) => setCreateGroupForm({ ...createGroupForm, description: event.target.value })} placeholder="Optional" />
+              </Field>
+              <div className="form-grid cols-3">
+                <Field label="Projects">
+                  <select value={String(createGroupForm.can_use_project_tracer)} onChange={(event) => setCreateGroupForm({ ...createGroupForm, can_use_project_tracer: event.target.value === 'true' })}>
+                    <option value="true">on</option>
+                    <option value="false">off</option>
+                  </select>
+                </Field>
+                <Field label="ASR">
+                  <select value={String(createGroupForm.can_use_asr)} onChange={(event) => setCreateGroupForm({ ...createGroupForm, can_use_asr: event.target.value === 'true' })}>
+                    <option value="true">on</option>
+                    <option value="false">off</option>
+                  </select>
+                </Field>
+                <Field label="LLM">
+                  <select value={String(createGroupForm.can_use_llm)} onChange={(event) => setCreateGroupForm({ ...createGroupForm, can_use_llm: event.target.value === 'true' })}>
+                    <option value="true">on</option>
+                    <option value="false">off</option>
+                  </select>
+                </Field>
+              </div>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Creating...' : 'Create group'}
+              </Button>
+            </form>
+          </Card>
+
+          <Card className="section-card">
+            <SectionHeader title="Groups" />
+            <div className="list-table">
+              {groups.length ? (
+                groups.map((group) => {
+                  const form = editGroupForms[group.id] ?? accessGroupToEdit(group);
+                  return (
+                    <div key={group.id} className="list-row">
+                      <div className="list-row-main">
+                        <div className="list-row-header">
+                          <h3 className="list-row-title">{group.name}</h3>
+                          <div className="list-row-meta">
+                            <Badge tone="neutral">{group.member_count} users</Badge>
+                          </div>
+                        </div>
+                        <div className="list-row-copy line-clamp-1">{capabilitySummary(group)}</div>
+                        <Field label="Name">
+                          <input value={form.name} onChange={(event) => setEditGroupForms({ ...editGroupForms, [group.id]: { ...form, name: event.target.value } })} />
+                        </Field>
+                        <Field label="Description">
+                          <input value={form.description} onChange={(event) => setEditGroupForms({ ...editGroupForms, [group.id]: { ...form, description: event.target.value } })} placeholder="Optional" />
+                        </Field>
+                        <div className="form-grid cols-3">
+                          <Field label="Projects">
+                            <select value={String(form.can_use_project_tracer)} onChange={(event) => setEditGroupForms({ ...editGroupForms, [group.id]: { ...form, can_use_project_tracer: event.target.value === 'true' } })}>
+                              <option value="true">on</option>
+                              <option value="false">off</option>
+                            </select>
+                          </Field>
+                          <Field label="ASR">
+                            <select value={String(form.can_use_asr)} onChange={(event) => setEditGroupForms({ ...editGroupForms, [group.id]: { ...form, can_use_asr: event.target.value === 'true' } })}>
+                              <option value="true">on</option>
+                              <option value="false">off</option>
+                            </select>
+                          </Field>
+                          <Field label="LLM">
+                            <select value={String(form.can_use_llm)} onChange={(event) => setEditGroupForms({ ...editGroupForms, [group.id]: { ...form, can_use_llm: event.target.value === 'true' } })}>
+                              <option value="true">on</option>
+                              <option value="false">off</option>
+                            </select>
+                          </Field>
+                        </div>
+                      </div>
+                      <div className="list-row-side">
+                        <div className="muted small">Updated {formatDateTime(group.updated_at)}</div>
+                        <div className="list-row-actions">
+                          <Button variant="secondary" onClick={() => void handleSaveGroup(group.id)}>
+                            Save
+                          </Button>
+                          <Button variant="danger" onClick={() => void handleDeleteGroup(group.id)}>
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="form-grid cols-2">
-                      <Field label="Name">
-                        <input value={form.display_name} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, display_name: event.target.value } })} />
-                      </Field>
-                      <Field label="Role">
-                        <select value={form.role} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, role: event.target.value as 'admin' | 'member' } })}>
-                          <option value="member">member</option>
-                          <option value="admin">admin</option>
-                        </select>
-                      </Field>
+                  );
+                })
+              ) : (
+                <EmptyState title="No groups yet" description="Create the first access group." />
+              )}
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === 'providers' ? (
+        <div className="grid two">
+          <Card className="section-card">
+            <SectionHeader title="New provider" />
+            <form className="form-grid" onSubmit={handleCreateProvider}>
+              <Field label="Name">
+                <input value={createProviderForm.name} onChange={(event) => setCreateProviderForm({ ...createProviderForm, name: event.target.value })} required />
+              </Field>
+              <div className="form-grid cols-2">
+                <Field label="Kind">
+                  <select
+                    value={createProviderForm.kind}
+                    onChange={(event) => {
+                      const kind = event.target.value as AIProviderKind;
+                      setCreateProviderForm({ ...createProviderForm, kind, driver: normalizeProviderDriver(kind) });
+                    }}
+                  >
+                    <option value="asr">asr</option>
+                    <option value="llm">llm</option>
+                  </select>
+                </Field>
+                <Field label="Driver">
+                  <select value={createProviderForm.driver} onChange={(event) => setCreateProviderForm({ ...createProviderForm, driver: event.target.value as AIProviderDriver })}>
+                    {createProviderForm.kind === 'asr' ? <option value="local_breeze">local_breeze</option> : <option value="gemini">gemini</option>}
+                  </select>
+                </Field>
+              </div>
+              <div className="form-grid cols-2">
+                <Field label="Model">
+                  <input value={createProviderForm.model_name} onChange={(event) => setCreateProviderForm({ ...createProviderForm, model_name: event.target.value })} required />
+                </Field>
+                <Field label="State">
+                  <select value={String(createProviderForm.is_active)} onChange={(event) => setCreateProviderForm({ ...createProviderForm, is_active: event.target.value === 'true' })}>
+                    <option value="true">active</option>
+                    <option value="false">inactive</option>
+                  </select>
+                </Field>
+              </div>
+              <Field label="Base URL">
+                <input value={createProviderForm.base_url} onChange={(event) => setCreateProviderForm({ ...createProviderForm, base_url: event.target.value })} placeholder="Optional" />
+              </Field>
+              <Field label="API key">
+                <input type="password" value={createProviderForm.api_key} onChange={(event) => setCreateProviderForm({ ...createProviderForm, api_key: event.target.value })} placeholder={createProviderForm.kind === 'llm' ? 'Required for Gemini' : 'Optional'} />
+              </Field>
+              <Field label="Description">
+                <input value={createProviderForm.description} onChange={(event) => setCreateProviderForm({ ...createProviderForm, description: event.target.value })} placeholder="Optional" />
+              </Field>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Creating...' : 'Create provider'}
+              </Button>
+            </form>
+          </Card>
+
+          <Card className="section-card">
+            <SectionHeader title="Providers" />
+            <div className="list-table">
+              {providers.length ? (
+                providers.map((provider) => {
+                  const form = editProviderForms[provider.id] ?? providerToEdit(provider);
+                  return (
+                    <div key={provider.id} className="list-row">
+                      <div className="list-row-main">
+                        <div className="list-row-header">
+                          <h3 className="list-row-title">{provider.name}</h3>
+                          <div className="list-row-meta">
+                            <Badge tone={provider.kind === 'asr' ? 'info' : 'warning'}>{provider.kind}</Badge>
+                            <Badge tone={provider.is_active ? 'success' : 'neutral'}>{provider.is_active ? 'active' : 'inactive'}</Badge>
+                            <Badge tone="neutral">{provider.driver}</Badge>
+                          </div>
+                        </div>
+                        <div className="list-row-copy line-clamp-1">
+                          {provider.model_name} · {provider.api_key_hint || (provider.has_api_key ? 'key set' : 'no key')}
+                        </div>
+                        <Field label="Name">
+                          <input value={form.name} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, name: event.target.value } })} />
+                        </Field>
+                        <div className="form-grid cols-2">
+                          <Field label="Kind">
+                            <select
+                              value={form.kind}
+                              onChange={(event) => {
+                                const kind = event.target.value as AIProviderKind;
+                                setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, kind, driver: normalizeProviderDriver(kind) } });
+                              }}
+                            >
+                              <option value="asr">asr</option>
+                              <option value="llm">llm</option>
+                            </select>
+                          </Field>
+                          <Field label="Driver">
+                            <select value={form.driver} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, driver: event.target.value as AIProviderDriver } })}>
+                              {form.kind === 'asr' ? <option value="local_breeze">local_breeze</option> : <option value="gemini">gemini</option>}
+                            </select>
+                          </Field>
+                        </div>
+                        <div className="form-grid cols-2">
+                          <Field label="Model">
+                            <input value={form.model_name} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, model_name: event.target.value } })} />
+                          </Field>
+                          <Field label="State">
+                            <select value={String(form.is_active)} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, is_active: event.target.value === 'true' } })}>
+                              <option value="true">active</option>
+                              <option value="false">inactive</option>
+                            </select>
+                          </Field>
+                        </div>
+                        <Field label="Base URL">
+                          <input value={form.base_url} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, base_url: event.target.value } })} placeholder="Optional" />
+                        </Field>
+                        <Field label={provider.has_api_key ? `Replace key (${provider.api_key_hint || 'stored'})` : 'API key'}>
+                          <input type="password" value={form.api_key} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, api_key: event.target.value } })} placeholder="Leave blank to keep current key" />
+                        </Field>
+                        <Field label="Description">
+                          <input value={form.description} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, description: event.target.value } })} placeholder="Optional" />
+                        </Field>
+                      </div>
+                      <div className="list-row-side">
+                        <div className="muted small">Updated {formatDateTime(provider.updated_at)}</div>
+                        <div className="list-row-actions">
+                          <Button variant="secondary" onClick={() => void handleSaveProvider(provider.id)}>
+                            Save
+                          </Button>
+                          <Button variant="danger" onClick={() => void handleDeleteProvider(provider.id)}>
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="form-grid cols-2">
-                      <Field label="State">
-                        <select value={String(form.is_active)} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, is_active: event.target.value === 'true' } })}>
-                          <option value="true">active</option>
-                          <option value="false">inactive</option>
-                        </select>
-                      </Field>
-                      <Field label="Reset password">
-                        <input
-                          type="password"
-                          value={form.password}
-                          onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, password: event.target.value } })}
-                          placeholder="Optional"
-                        />
-                      </Field>
-                    </div>
-                  </div>
-                  <div className="list-row-side">
-                    <div className="muted small">Created {formatDateTime(user.created_at)}</div>
-                    <div className="list-row-actions">
-                      <Button variant="secondary" onClick={() => void handleUpdate(user.id)}>
-                        Save
-                      </Button>
-                      {locked ? (
-                        <Button variant="ghost" onClick={() => void handleUnlock(user.id)}>
-                          Unlock
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {!users.length ? <EmptyState title="No users yet" description="Create the first one." /> : null}
-          </div>
-        </Card>
-      </div>
+                  );
+                })
+              ) : (
+                <EmptyState title="No providers yet" description="Create the first AI provider." />
+              )}
+            </div>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

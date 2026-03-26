@@ -12,10 +12,10 @@ import {
   PageIntro,
   SectionHeader
 } from '../components/Primitives';
-import { meetingsApi, extractApiErrorMessage } from '../lib/api';
+import { aiProvidersApi, meetingsApi, extractApiErrorMessage } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import { actionItemCount, formatBytes, formatDuration } from '../lib/media';
-import type { MeetingRecord, MeetingRecordSummary } from '../types';
+import type { AIProvider, MeetingRecord, MeetingRecordSummary } from '../types';
 
 type MeetingTab = 'summary' | 'minutes' | 'actions' | 'transcript';
 
@@ -37,6 +37,10 @@ function splitActionItems(value: string) {
 export function MeetingsPage() {
   const [entries, setEntries] = useState<MeetingRecordSummary[]>([]);
   const [selected, setSelected] = useState<MeetingRecord | null>(null);
+  const [asrProviders, setAsrProviders] = useState<AIProvider[]>([]);
+  const [llmProviders, setLlmProviders] = useState<AIProvider[]>([]);
+  const [asrProviderId, setAsrProviderId] = useState<number | null>(null);
+  const [llmProviderId, setLlmProviderId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [language, setLanguage] = useState('');
@@ -71,11 +75,19 @@ export function MeetingsPage() {
 
     async function load() {
       try {
-        const items = await meetingsApi.list({ limit: 30 });
+        const [items, nextAsrProviders, nextLlmProviders] = await Promise.all([
+          meetingsApi.list({ limit: 30 }),
+          aiProvidersApi.list({ kind: 'asr' }),
+          aiProvidersApi.list({ kind: 'llm' })
+        ]);
         if (!alive) {
           return;
         }
         setEntries(items);
+        setAsrProviders(nextAsrProviders);
+        setLlmProviders(nextLlmProviders);
+        setAsrProviderId((current) => current ?? nextAsrProviders[0]?.id ?? null);
+        setLlmProviderId((current) => current ?? nextLlmProviders[0]?.id ?? null);
         const firstId = items[0]?.id ?? null;
         setSelectedId(firstId);
         if (firstId) {
@@ -142,7 +154,13 @@ export function MeetingsPage() {
     setError('');
     setNotice('');
     try {
-      const created = await meetingsApi.create({ file, title, language });
+      const created = await meetingsApi.create({
+        file,
+        title,
+        language,
+        asr_provider_id: asrProviderId,
+        llm_provider_id: llmProviderId
+      });
       setSelected(created);
       setSelectedId(created.id);
       setTitle('');
@@ -276,8 +294,39 @@ export function MeetingsPage() {
                 <input value={language} onChange={(event) => setLanguage(event.target.value)} placeholder="auto, en, zh" />
               </label>
             </div>
-            <div className="list-row-copy">Breeze on-server. Gemini notes.</div>
-            <Button type="submit" disabled={submitting || !file}>
+            {asrProviders.length > 1 ? (
+              <label className="field">
+                <span>ASR provider</span>
+                <select value={String(asrProviderId ?? '')} onChange={(event) => setAsrProviderId(Number(event.target.value) || null)}>
+                  {asrProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name} · {provider.model_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="list-row-copy">
+                {asrProviders[0] ? `${asrProviders[0].name} · ${asrProviders[0].model_name}` : 'No ASR provider available.'}
+              </div>
+            )}
+            {llmProviders.length > 1 ? (
+              <label className="field">
+                <span>LLM provider</span>
+                <select value={String(llmProviderId ?? '')} onChange={(event) => setLlmProviderId(Number(event.target.value) || null)}>
+                  {llmProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name} · {provider.model_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="list-row-copy">
+                {llmProviders[0] ? `${llmProviders[0].name} · ${llmProviders[0].model_name}` : 'No LLM provider available.'}
+              </div>
+            )}
+            <Button type="submit" disabled={submitting || !file || !asrProviders.length || !llmProviders.length}>
               {submitting ? 'Processing...' : 'Save meeting'}
             </Button>
           </form>

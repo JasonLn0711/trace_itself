@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 
-from app.api import asr, auth, daily_logs, dashboard, meetings, milestones, product_updates, projects, tasks, users
+from app.api import access_groups, ai_providers, asr, auth, daily_logs, dashboard, meetings, milestones, product_updates, projects, tasks, users
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
+api_router.include_router(access_groups.router)
+api_router.include_router(ai_providers.router)
 api_router.include_router(asr.router)
 api_router.include_router(meetings.router)
 api_router.include_router(projects.router)

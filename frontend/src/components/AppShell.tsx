@@ -4,20 +4,8 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from './Primitives';
+import { canUseFeature, canUseMeetings } from '../lib/access';
 import { useAuth } from '../state/AuthContext';
-
-const mainNavItems = [
-  { to: '/', label: 'Home' },
-  { to: '/asr', label: 'ASR' },
-  { to: '/meetings', label: 'Meetings' },
-  { to: '/projects', label: 'Projects' },
-  { to: '/tasks', label: 'Tasks' }
-];
-
-const trailingNavItems = [
-  { to: '/updates', label: 'Updates' },
-  { to: '/daily-logs', label: 'Logs' }
-];
 
 function isActivePath(pathname: string, href: string) {
   if (href === '/') {
@@ -29,10 +17,15 @@ function isActivePath(pathname: string, href: string) {
 export function AppShell({ children }: { children: ReactNode }) {
   const { logout, user } = useAuth();
   const pathname = usePathname() ?? '/';
-  const visibleNavItems =
-    user?.role === 'admin'
-      ? [...mainNavItems, { to: '/users', label: 'Users' }, ...trailingNavItems]
-      : [...mainNavItems, ...trailingNavItems];
+  const visibleNavItems = [
+    ...(canUseFeature(user, 'project_tracer') ? [{ to: '/', label: 'Home' }] : []),
+    ...(canUseFeature(user, 'asr') ? [{ to: '/asr', label: 'ASR' }] : []),
+    ...(canUseMeetings(user) ? [{ to: '/meetings', label: 'Meetings' }] : []),
+    ...(canUseFeature(user, 'project_tracer') ? [{ to: '/projects', label: 'Projects' }, { to: '/tasks', label: 'Tasks' }] : []),
+    ...(user?.role === 'admin' ? [{ to: '/users', label: 'Control' }] : []),
+    { to: '/updates', label: 'Updates' },
+    ...(canUseFeature(user, 'project_tracer') ? [{ to: '/daily-logs', label: 'Logs' }] : []),
+  ];
 
   return (
     <div className="app-shell">

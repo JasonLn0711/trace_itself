@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_admin
 from app.core.enums import UserRole
 from app.db.session import get_db
+from app.models.access_group import AccessGroup
 from app.models.user import User
 from app.schemas.user import UserCreate, UserPasswordReset, UserRead, UserUpdate
 from app.services.security import hash_password
@@ -18,6 +19,16 @@ def get_user_for_admin_or_404(user_id: int, db: Session) -> User:
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     return user
+
+
+def resolve_access_group_id(group_id: int | None, db: Session) -> int | None:
+    if group_id is None:
+        default_group = db.scalar(select(AccessGroup).where(AccessGroup.name == "Full access"))
+        return default_group.id if default_group else None
+    group = db.get(AccessGroup, group_id)
+    if not group:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access group not found.")
+    return group.id
 
 
 @router.get("", response_model=list[UserRead], dependencies=[Depends(require_admin)])
@@ -33,6 +44,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         display_name=payload.display_name,
         password_hash=hash_password(payload.password),
         role=payload.role,
+        access_group_id=resolve_access_group_id(payload.access_group_id, db),
         is_active=payload.is_active,
     )
     db.add(user)
@@ -60,6 +72,8 @@ def update_user(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot deactivate your own account.")
         if changes.get("role") and changes["role"] != UserRole.ADMIN:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot remove your own admin role.")
+    if "access_group_id" in changes:
+        changes["access_group_id"] = resolve_access_group_id(changes["access_group_id"], db)
 
     for field, value in changes.items():
         setattr(user, field, value)

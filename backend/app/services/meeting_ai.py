@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 import requests
 
-from app.core.config import get_settings
-
-settings = get_settings()
+from app.core.enums import AIProviderDriver
+from app.models.ai_provider import AIProvider
+from app.services.secrets import decrypt_secret
 
 
 class MeetingAiError(RuntimeError):
@@ -33,9 +33,13 @@ def build_meeting_prompt(transcript_text: str, title: str) -> str:
     )
 
 
-def generate_meeting_artifacts(transcript_text: str, title: str) -> MeetingArtifacts:
-    if not settings.gemini_api_key:
-        raise MeetingAiError("GEMINI_API_KEY is not configured.")
+def generate_meeting_artifacts(transcript_text: str, title: str, provider: AIProvider) -> MeetingArtifacts:
+    if provider.driver != AIProviderDriver.GEMINI:
+        raise MeetingAiError("Selected LLM provider is not supported yet.")
+
+    api_key = decrypt_secret(provider.api_key_encrypted)
+    if not api_key:
+        raise MeetingAiError("Selected LLM provider does not have a valid API key.")
 
     response_schema = {
         "type": "object",
@@ -50,11 +54,12 @@ def generate_meeting_artifacts(transcript_text: str, title: str) -> MeetingArtif
         "required": ["summary_text", "minutes_text", "action_items"],
     }
 
+    base_url = (provider.base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
     response = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent",
+        f"{base_url}/models/{provider.model_name}:generateContent",
         headers={
             "Content-Type": "application/json",
-            "x-goog-api-key": settings.gemini_api_key,
+            "x-goog-api-key": api_key,
         },
         json={
             "contents": [
@@ -75,7 +80,7 @@ def generate_meeting_artifacts(transcript_text: str, title: str) -> MeetingArtif
         timeout=120,
     )
     if not response.ok:
-        raise MeetingAiError(f"Gemini request failed: {response.text[:500]}")
+        raise MeetingAiError("The selected LLM provider request failed.")
 
     payload = response.json()
     try:
@@ -94,5 +99,5 @@ def generate_meeting_artifacts(transcript_text: str, title: str) -> MeetingArtif
         summary_text=summary_text,
         minutes_text=minutes_text,
         action_items_text="\n".join(f"- {item}" for item in action_items),
-        model_name=settings.gemini_model,
+        model_name=provider.model_name,
     )

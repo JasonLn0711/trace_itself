@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_task_or_404
+from app.api.deps import get_current_user, get_task_or_404, require_project_tracer
 from app.core.enums import TaskStatus
 from app.db.session import get_db
 from app.models.milestone import Milestone
@@ -13,7 +13,7 @@ from app.models.task import Task
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
 
-router = APIRouter(prefix="/tasks", tags=["tasks"])
+router = APIRouter(prefix="/tasks", tags=["tasks"], dependencies=[Depends(require_project_tracer)])
 
 
 def validate_task_relations(project_id: int, milestone_id: int | None, current_user: User, db: Session) -> None:

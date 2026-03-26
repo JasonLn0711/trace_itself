@@ -3,9 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.product_update_catalog import PRODUCT_UPDATE_CATALOG
-from app.core.enums import UserRole
+from app.core.enums import AIProviderDriver, AIProviderKind, UserRole
+from app.models.access_group import AccessGroup
+from app.models.ai_provider import AIProvider
 from app.models.product_update import ProductUpdate
 from app.models.user import User
+from app.services.secrets import encrypt_secret, make_secret_hint
 from app.services.security import hash_password, normalize_username
 
 settings = get_settings()
@@ -32,6 +35,7 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE milestones ADD COLUMN IF NOT EXISTS user_id INTEGER"))
     connection.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS user_id INTEGER"))
     connection.execute(text("ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS user_id INTEGER"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_group_id INTEGER"))
     connection.execute(text("ALTER TABLE daily_logs DROP CONSTRAINT IF EXISTS daily_logs_log_date_key"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_storage_path VARCHAR(255)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_mime_type VARCHAR(120)"))
@@ -113,6 +117,7 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_milestones_user_id ON milestones (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_tasks_user_id ON tasks (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_daily_logs_user_id ON daily_logs (user_id)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_users_access_group_id ON users (access_group_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_area ON product_updates (area)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_change_type ON product_updates (change_type)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_changed_at ON product_updates (changed_at)"))
@@ -131,6 +136,29 @@ def apply_schema_upgrades(connection) -> None:
         text("CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_logs_user_log_date ON daily_logs (user_id, log_date)")
     )
 
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                     AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_name = 'users'
+                      AND kcu.column_name = 'access_group_id'
+                ) THEN
+                    ALTER TABLE users
+                    ADD CONSTRAINT fk_users_access_group_id
+                    FOREIGN KEY (access_group_id) REFERENCES access_groups (id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+            """
+        )
+    )
     connection.execute(
         text(
             """
@@ -243,6 +271,98 @@ def ensure_initial_admin(db: Session) -> User:
     return admin
 
 
+def ensure_default_access_groups(db: Session) -> AccessGroup:
+    groups = list(db.scalars(select(AccessGroup).order_by(AccessGroup.id.asc())).all())
+    existing_by_name = {group.name: group for group in groups}
+
+    seed_groups = [
+        {
+            "name": "Full access",
+            "description": "Project tracker, ASR, and LLM features.",
+            "can_use_project_tracer": True,
+            "can_use_asr": True,
+            "can_use_llm": True,
+        },
+        {
+            "name": "Projects only",
+            "description": "Project tracking only.",
+            "can_use_project_tracer": True,
+            "can_use_asr": False,
+            "can_use_llm": False,
+        },
+        {
+            "name": "ASR only",
+            "description": "Standalone transcription only.",
+            "can_use_project_tracer": False,
+            "can_use_asr": True,
+            "can_use_llm": False,
+        },
+        {
+            "name": "Meetings",
+            "description": "Meeting notes with ASR and LLM.",
+            "can_use_project_tracer": False,
+            "can_use_asr": True,
+            "can_use_llm": True,
+        },
+    ]
+
+    created = False
+    for seed in seed_groups:
+        if seed["name"] in existing_by_name:
+            continue
+        group = AccessGroup(**seed)
+        db.add(group)
+        created = True
+
+    if created:
+        db.commit()
+
+    full_access = db.scalar(select(AccessGroup).where(AccessGroup.name == "Full access"))
+    if full_access is None:
+        raise RuntimeError("Full access group is missing after bootstrap.")
+    return full_access
+
+
+def ensure_default_ai_providers(db: Session) -> None:
+    created = False
+
+    local_asr = db.scalar(select(AIProvider).where(AIProvider.name == "Local Breeze ASR"))
+    if local_asr is None:
+        db.add(
+            AIProvider(
+                name="Local Breeze ASR",
+                kind=AIProviderKind.ASR,
+                driver=AIProviderDriver.LOCAL_BREEZE,
+                model_name=settings.asr_model_name,
+                description="Runs Breeze ASR locally on the server.",
+                is_active=True,
+            )
+        )
+        created = True
+
+    if settings.gemini_api_key:
+        gemini = db.scalar(select(AIProvider).where(AIProvider.name == "Gemini Meeting Notes"))
+        if gemini is None:
+            api_key = settings.gemini_api_key.strip()
+            db.add(
+                AIProvider(
+                    name="Gemini Meeting Notes",
+                    kind=AIProviderKind.LLM,
+                    driver=AIProviderDriver.GEMINI,
+                    model_name=settings.gemini_model,
+                    base_url="https://generativelanguage.googleapis.com/v1beta",
+                    api_key_encrypted=encrypt_secret(api_key),
+                    api_key_hint=make_secret_hint(api_key),
+                    description="Gemini provider for meeting summaries and action items.",
+                    is_active=True,
+                )
+            )
+            created = True
+
+    if created:
+        db.commit()
+
+
 def sync_product_updates_catalog(db: Session, admin_id: int) -> None:
     items = list(db.scalars(select(ProductUpdate).order_by(ProductUpdate.id.asc())).all())
     existing_by_key = {item.entry_key: item for item in items if item.entry_key}
@@ -271,7 +391,7 @@ def sync_product_updates_catalog(db: Session, admin_id: int) -> None:
         db.commit()
 
 
-def backfill_existing_data(db: Session, admin_id: int) -> None:
+def backfill_existing_data(db: Session, admin_id: int, full_access_group_id: int) -> None:
     db.execute(text("UPDATE projects SET user_id = :admin_id WHERE user_id IS NULL"), {"admin_id": admin_id})
     db.execute(
         text(
@@ -296,6 +416,10 @@ def backfill_existing_data(db: Session, admin_id: int) -> None:
         )
     )
     db.execute(text("UPDATE daily_logs SET user_id = :admin_id WHERE user_id IS NULL"), {"admin_id": admin_id})
+    db.execute(
+        text("UPDATE users SET access_group_id = :group_id WHERE access_group_id IS NULL"),
+        {"group_id": full_access_group_id},
+    )
     db.commit()
 
 

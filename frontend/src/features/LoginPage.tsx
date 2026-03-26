@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../state/AuthContext';
 import { Button, Card, Field, Notice } from '../components/Primitives';
+import { resolvePostLoginPath } from '../lib/access';
 import { extractApiErrorMessage } from '../lib/api';
 
 function safeRedirectPath(value: string | null) {
@@ -14,7 +15,7 @@ function safeRedirectPath(value: string | null) {
 }
 
 export function LoginPage() {
-  const { authenticated, loading, login } = useAuth();
+  const { authenticated, loading, login, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
@@ -26,9 +27,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (authenticated && !loading) {
-      router.replace(nextPath);
+      router.replace(resolvePostLoginPath(user, nextPath));
     }
-  }, [authenticated, loading, nextPath, router]);
+  }, [authenticated, loading, nextPath, router, user]);
 
   if (loading) {
     return (
@@ -51,8 +52,8 @@ export function LoginPage() {
     setSubmitting(true);
     setError('');
     try {
-      await login(username, password);
-      router.replace(nextPath);
+      const nextUser = await login(username, password);
+      router.replace(resolvePostLoginPath(nextUser, nextPath));
     } catch (err) {
       setError(extractApiErrorMessage(err) || 'Could not sign in');
     } finally {

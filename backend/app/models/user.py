@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import UserRole
@@ -16,9 +16,10 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role"),
-        default=UserRole.ADMIN,
+        default=UserRole.MEMBER,
         nullable=False,
     )
+    access_group_id: Mapped[int | None] = mapped_column(ForeignKey("access_groups.id", ondelete="SET NULL"), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -31,6 +32,7 @@ class User(Base):
         nullable=False,
     )
 
+    access_group = relationship("AccessGroup", back_populates="users")
     projects = relationship("Project", back_populates="user")
     milestones = relationship("Milestone", back_populates="user")
     tasks = relationship("Task", back_populates="user")
@@ -38,3 +40,24 @@ class User(Base):
     asr_transcripts = relationship("AsrTranscript", back_populates="user", cascade="all, delete-orphan")
     meeting_records = relationship("MeetingRecord", back_populates="user", cascade="all, delete-orphan")
     product_updates = relationship("ProductUpdate", back_populates="author")
+
+    @property
+    def access_group_name(self) -> str | None:
+        if not self.access_group:
+            return None
+        return self.access_group.name
+
+    @property
+    def capabilities(self) -> dict[str, bool]:
+        group = self.access_group
+        if self.role == UserRole.ADMIN:
+            return {
+                "project_tracer": True,
+                "asr": True,
+                "llm": True,
+            }
+        return {
+            "project_tracer": bool(group and group.can_use_project_tracer),
+            "asr": bool(group and group.can_use_asr),
+            "llm": bool(group and group.can_use_llm),
+        }

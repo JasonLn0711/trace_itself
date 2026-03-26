@@ -1,8 +1,16 @@
 export type PrimitiveStatus = string;
 export type PrimitivePriority = string;
 export type ProductUpdateType = 'build' | 'fix' | 'update' | 'security';
+export type AIProviderKind = 'asr' | 'llm';
+export type AIProviderDriver = 'local_breeze' | 'gemini';
 
 export type UserRole = 'admin' | 'member';
+
+export interface UserCapabilities {
+  project_tracer: boolean;
+  asr: boolean;
+  llm: boolean;
+}
 
 export interface Project {
   id: number;
@@ -59,6 +67,9 @@ export interface User {
   username: string;
   display_name: string;
   role: UserRole;
+  access_group_id: number | null;
+  access_group_name: string | null;
+  capabilities: UserCapabilities;
   is_active: boolean;
   failed_login_attempts: number;
   locked_until: string | null;
@@ -145,6 +156,52 @@ export interface MeetingRecord {
   updated_at: string;
 }
 
+export interface AccessGroup {
+  id: number;
+  name: string;
+  description: string | null;
+  can_use_project_tracer: boolean;
+  can_use_asr: boolean;
+  can_use_llm: boolean;
+  member_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccessGroupInput {
+  name: string;
+  description?: string | null;
+  can_use_project_tracer: boolean;
+  can_use_asr: boolean;
+  can_use_llm: boolean;
+}
+
+export interface AIProvider {
+  id: number;
+  name: string;
+  kind: AIProviderKind;
+  driver: AIProviderDriver;
+  model_name: string;
+  base_url: string | null;
+  description: string | null;
+  is_active: boolean;
+  has_api_key: boolean;
+  api_key_hint: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIProviderInput {
+  name: string;
+  kind: AIProviderKind;
+  driver: AIProviderDriver;
+  model_name: string;
+  base_url?: string | null;
+  description?: string | null;
+  is_active: boolean;
+  api_key?: string | null;
+}
+
 export interface DashboardSummary {
   active_projects: Project[];
   today_tasks: Task[];
@@ -185,6 +242,7 @@ export interface UserCreateInput {
   username: string;
   display_name: string;
   role: UserRole;
+  access_group_id?: number | null;
   is_active: boolean;
   password: string;
 }
@@ -192,6 +250,7 @@ export interface UserCreateInput {
 export interface UserUpdateInput {
   display_name?: string;
   role?: UserRole;
+  access_group_id?: number | null;
   is_active?: boolean;
 }
 

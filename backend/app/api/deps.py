@@ -2,14 +2,17 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.enums import AIProviderKind, AppFeature
 from app.db.session import get_db
 from app.models.daily_log import DailyLog
 from app.models.asr_transcript import AsrTranscript
+from app.models.ai_provider import AIProvider
 from app.models.milestone import Milestone
 from app.models.meeting_record import MeetingRecord
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
+from app.services.feature_access import user_can_access_provider, user_has_feature
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -37,6 +40,59 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
     return current_user
+
+
+def require_feature(feature: AppFeature):
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
+        if not user_has_feature(current_user, feature):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Feature access denied.")
+        return current_user
+
+    return dependency
+
+
+require_project_tracer = require_feature(AppFeature.PROJECT_TRACER)
+require_asr_access = require_feature(AppFeature.ASR)
+require_llm_access = require_feature(AppFeature.LLM)
+
+
+def list_available_ai_providers(
+    kind: AIProviderKind,
+    current_user: User,
+    db: Session,
+    *,
+    include_inactive: bool = False,
+) -> list[AIProvider]:
+    stmt = select(AIProvider).where(AIProvider.kind == kind).order_by(AIProvider.is_active.desc(), AIProvider.name.asc())
+    if not include_inactive:
+        stmt = stmt.where(AIProvider.is_active.is_(True))
+    providers = list(db.scalars(stmt).all())
+    if current_user.role == "admin":
+        return providers
+    return [provider for provider in providers if provider.is_active and user_can_access_provider(current_user, provider)]
+
+
+def resolve_ai_provider(
+    *,
+    kind: AIProviderKind,
+    provider_id: int | None,
+    current_user: User,
+    db: Session,
+) -> AIProvider:
+    if provider_id is not None:
+        provider = db.get(AIProvider, provider_id)
+        if provider is None or provider.kind != kind:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="AI provider not found.")
+        if not provider.is_active:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="AI provider is inactive.")
+        if not user_can_access_provider(current_user, provider):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Provider access denied.")
+        return provider
+
+    providers = list_available_ai_providers(kind, current_user, db)
+    if not providers:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="No active AI provider is available.")
+    return providers[0]
 
 
 def get_project_or_404(

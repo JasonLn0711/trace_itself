@@ -5,7 +5,15 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, get_meeting_record_or_404
+from app.api.deps import (
+    get_current_user,
+    get_db,
+    get_meeting_record_or_404,
+    require_asr_access,
+    require_llm_access,
+    resolve_ai_provider,
+)
+from app.core.enums import AIProviderKind
 from app.core.config import get_settings
 from app.models.meeting_record import MeetingRecord
 from app.models.user import User
@@ -14,7 +22,11 @@ from app.services.asr import AsrServiceError, service as asr_service
 from app.services.audio_storage import delete_audio_file, save_upload_file
 from app.services.meeting_ai import MeetingAiError, generate_meeting_artifacts
 
-router = APIRouter(prefix="/meetings", tags=["meetings"])
+router = APIRouter(
+    prefix="/meetings",
+    tags=["meetings"],
+    dependencies=[Depends(require_asr_access), Depends(require_llm_access)],
+)
 settings = get_settings()
 
 
@@ -67,9 +79,23 @@ def create_meeting(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
     language: str | None = Form(default=None),
+    asr_provider_id: int | None = Form(default=None),
+    llm_provider_id: int | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MeetingRecordRead:
+    asr_provider = resolve_ai_provider(
+        kind=AIProviderKind.ASR,
+        provider_id=asr_provider_id,
+        current_user=current_user,
+        db=db,
+    )
+    llm_provider = resolve_ai_provider(
+        kind=AIProviderKind.LLM,
+        provider_id=llm_provider_id,
+        current_user=current_user,
+        db=db,
+    )
     stored_audio = save_upload_file(
         file,
         storage_root=Path(settings.meeting_upload_dir),
@@ -81,10 +107,15 @@ def create_meeting(
         normalized_language = None
 
     try:
-        transcript = asr_service.transcribe_file(stored_audio.storage_path, language=normalized_language)
+        transcript = asr_service.transcribe_file(
+            stored_audio.storage_path,
+            language=normalized_language,
+            model_name=asr_provider.model_name,
+        )
         artifacts = generate_meeting_artifacts(
             transcript_text=transcript.text,
             title=meeting_title_from_filename(title, stored_audio.original_filename),
+            provider=llm_provider,
         )
     except AsrServiceError as exc:
         delete_audio_file(stored_audio.storage_path)

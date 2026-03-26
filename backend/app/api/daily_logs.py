@@ -3,13 +3,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_daily_log_or_404
+from app.api.deps import get_current_user, get_daily_log_or_404, require_project_tracer
 from app.db.session import get_db
 from app.models.daily_log import DailyLog
 from app.models.user import User
 from app.schemas.daily_log import DailyLogCreate, DailyLogRead, DailyLogUpdate
 
-router = APIRouter(prefix="/daily-logs", tags=["daily_logs"])
+router = APIRouter(prefix="/daily-logs", tags=["daily_logs"], dependencies=[Depends(require_project_tracer)])
 
 
 @router.get("", response_model=list[DailyLogRead])

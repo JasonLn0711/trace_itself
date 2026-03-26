@@ -34,6 +34,22 @@ class UserRole(StrEnum):
     MEMBER = "member"
 
 
+class AppFeature(StrEnum):
+    PROJECT_TRACER = "project_tracer"
+    ASR = "asr"
+    LLM = "llm"
+
+
+class AIProviderKind(StrEnum):
+    ASR = "asr"
+    LLM = "llm"
+
+
+class AIProviderDriver(StrEnum):
+    LOCAL_BREEZE = "local_breeze"
+    GEMINI = "gemini"
+
+
 class ProductUpdateType(StrEnum):
     BUILD = "build"
     FIX = "fix"
