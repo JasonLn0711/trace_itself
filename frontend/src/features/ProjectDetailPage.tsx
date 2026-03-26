@@ -402,13 +402,12 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Project"
         title={project.name}
         description={project.description || undefined}
         actions={
           <>
-            <Link className="btn btn-primary" href="/projects">Back to projects</Link>
-            <Link className="btn btn-ghost" href="/tasks">Open full task queue</Link>
+            <Link className="btn btn-primary" href="/projects">Projects</Link>
+            <Link className="btn btn-ghost" href="/tasks">Tasks</Link>
           </>
         }
         aside={
@@ -426,9 +425,9 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
 
       <div className="grid three">
         <Card className="section-card">
-          <SectionHeader title="Project progress" />
+          <SectionHeader title="Progress" />
           <ProgressBar
-            label="Done work"
+            label="Done"
             value={projectCompletion}
             caption={tasks.length ? `${completedTaskCount}/${tasks.length} tasks complete` : 'No tasks yet'}
             tone={projectCompletion >= 80 ? 'success' : projectCompletion >= 50 ? 'info' : 'warning'}
@@ -461,7 +460,7 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
       </div>
 
       <Card className="section-card">
-        <SectionHeader title="Project details" />
+        <SectionHeader title="Project" />
         <form className="form-grid" onSubmit={handleProjectSubmit}>
           <div className="form-grid cols-2">
             <Field label="Name">
@@ -478,7 +477,7 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
             </Field>
           </div>
           <Field label="Description">
-            <textarea value={project.description ?? ''} onChange={(event) => setProject({ ...project, description: event.target.value })} />
+            <textarea value={project.description ?? ''} onChange={(event) => setProject({ ...project, description: event.target.value })} placeholder="Short note" />
           </Field>
           <div className="form-grid cols-2">
             <Field label="Priority">
@@ -513,18 +512,18 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title={editingMilestoneId ? 'Edit milestone' : 'Add milestone'} />
+          <SectionHeader title={editingMilestoneId ? 'Edit milestone' : 'New milestone'} />
           <form className="form-grid" onSubmit={handleMilestoneSubmit}>
             <Field label="Title">
               <input value={milestoneForm.title} onChange={(event) => setMilestoneForm({ ...milestoneForm, title: event.target.value })} required />
             </Field>
             <Field label="Description">
-              <textarea
-                value={milestoneForm.description}
-                onChange={(event) => setMilestoneForm({ ...milestoneForm, description: event.target.value })}
-                placeholder="Optional note."
-              />
-            </Field>
+                <textarea
+                  value={milestoneForm.description}
+                  onChange={(event) => setMilestoneForm({ ...milestoneForm, description: event.target.value })}
+                  placeholder="Short note"
+                />
+              </Field>
             <div className="form-grid cols-2">
               <Field label="Due date">
                 <input type="date" value={milestoneForm.due_date} onChange={(event) => setMilestoneForm({ ...milestoneForm, due_date: event.target.value })} />
@@ -560,28 +559,31 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
 
           <div className="divider" />
 
-          <div className="cluster-grid">
+          <div className="list-table">
             {orderedMilestones.length ? (
               orderedMilestones.map((milestone) => (
-                <div key={milestone.id} className="surface-soft">
-                  <div className="entity-top">
-                    <div className="entity-copy">
-                      <h3 className="entity-title">{milestone.title}</h3>
-                      <p className="muted">{milestone.description || 'No description.'}</p>
+                <div key={milestone.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title line-clamp-1">{milestone.title}</h3>
+                      <div className="list-row-meta">
+                        <Badge tone={toneForMilestoneStatus(milestone.status)}>{formatEnumLabel(milestone.status)}</Badge>
+                        <Badge tone={toneForDueState(milestone.due_date)}>{relativeDueLabel(milestone.due_date)}</Badge>
+                      </div>
                     </div>
-                    <Badge tone={toneForMilestoneStatus(milestone.status)}>{formatEnumLabel(milestone.status)}</Badge>
+                    <div className="list-row-copy line-clamp-1">
+                      {milestone.description || 'No note'} · {formatDate(milestone.due_date)}
+                    </div>
+                    <div className="list-row-progress">
+                      <ProgressBar
+                        label="Progress"
+                        value={clampPercent(milestone.progress)}
+                        caption={`${clampPercent(milestone.progress)}%`}
+                        tone={toneForMilestoneStatus(milestone.status)}
+                      />
+                    </div>
                   </div>
-                  <div className="entity-meta">
-                    <Badge tone={toneForDueState(milestone.due_date)}>{relativeDueLabel(milestone.due_date)}</Badge>
-                    <Badge tone="neutral">Progress {clampPercent(milestone.progress)}%</Badge>
-                  </div>
-                  <ProgressBar
-                    label="Milestone progress"
-                    value={clampPercent(milestone.progress)}
-                    caption={formatDate(milestone.due_date)}
-                    tone={toneForMilestoneStatus(milestone.status)}
-                  />
-                  <div className="quick-actions">
+                  <div className="list-row-actions">
                     <Button variant="secondary" onClick={() => editMilestone(milestone)}>
                       Edit
                     </Button>
@@ -598,7 +600,7 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title={editingTaskId ? 'Edit task' : 'Add task'} />
+          <SectionHeader title={editingTaskId ? 'Edit task' : 'New task'} />
           <form className="form-grid" onSubmit={handleTaskSubmit}>
             <div className="form-grid cols-2">
               <Field label="Milestone">
@@ -627,7 +629,7 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
               <textarea
                 value={taskForm.description}
                 onChange={(event) => setTaskForm({ ...taskForm, description: event.target.value })}
-                placeholder="Optional note."
+                placeholder="Short note"
               />
             </Field>
             <div className="form-grid cols-2">
@@ -671,30 +673,27 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
 
           <div className="divider" />
 
-          <div className="cluster-grid">
+          <div className="list-table">
             {orderedTasks.length ? (
               orderedTasks.map((task) => {
                 const milestoneName = task.milestone_id ? milestones.find((item) => item.id === task.milestone_id)?.title : null;
                 return (
-                  <div key={task.id} className="surface-soft">
-                    <div className="entity-top">
-                      <div className="entity-copy">
-                        <h3 className="entity-title">{task.title}</h3>
-                        <p className="muted">{task.description || 'No note.'}</p>
+                  <div key={task.id} className="list-row">
+                    <div className="list-row-main">
+                      <div className="list-row-header">
+                        <h3 className="list-row-title line-clamp-1">{task.title}</h3>
+                        <div className="list-row-meta">
+                          <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
+                          <Badge tone={toneForPriority(task.priority)}>{formatEnumLabel(task.priority)}</Badge>
+                          <Badge tone={toneForDueState(task.due_date)}>{relativeDueLabel(task.due_date)}</Badge>
+                        </div>
                       </div>
-                      <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
+                      <div className="list-row-copy line-clamp-1">
+                        {milestoneName ? `${milestoneName} · ` : ''}
+                        {formatDate(task.due_date)} · {task.estimated_hours ?? 0}h / {task.actual_hours ?? 0}h
+                      </div>
                     </div>
-                    <div className="entity-meta">
-                      {milestoneName ? <Badge tone="neutral">{milestoneName}</Badge> : null}
-                      <Badge tone={toneForPriority(task.priority)}>{formatEnumLabel(task.priority)}</Badge>
-                      <Badge tone={toneForDueState(task.due_date)}>{relativeDueLabel(task.due_date)}</Badge>
-                    </div>
-                    <div className="detail-row">
-                      <span className="muted small">Due {formatDate(task.due_date)}</span>
-                      <span className="muted small">Estimate {task.estimated_hours ?? 0}h</span>
-                      <span className="muted small">Actual {task.actual_hours ?? 0}h</span>
-                    </div>
-                    <div className="quick-actions">
+                    <div className="list-row-actions">
                       {task.status !== 'in_progress' ? (
                         <Button variant="secondary" disabled={actingTaskId === task.id} onClick={() => void changeTaskStatus(task, 'in_progress')}>
                           Start

@@ -15,7 +15,7 @@ import {
   Sparkline
 } from '../components/Primitives';
 import { dashboardApi, extractApiErrorMessage } from '../lib/api';
-import { formatDate, relativeDueLabel, todayIso } from '../lib/dates';
+import { formatDate, formatDateTime, relativeDueLabel, todayIso } from '../lib/dates';
 import {
   formatEnumLabel,
   shortDueLabel,
@@ -145,12 +145,11 @@ export function DashboardPage() {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Today"
         title="Dashboard"
         actions={
           <>
-            <Link className="btn btn-primary" href="/tasks">Open tasks</Link>
-            <Link className="btn btn-secondary" href="/daily-logs">Write log</Link>
+            <Link className="btn btn-primary" href="/tasks">Tasks</Link>
+            <Link className="btn btn-secondary" href="/daily-logs">Log</Link>
             <Link className="btn btn-ghost" href="/projects">Projects</Link>
           </>
         }
@@ -172,7 +171,7 @@ export function DashboardPage() {
           <SectionHeader title="Today" />
           <div className="stack compact-stack">
             <ProgressBar
-              label="Tasks due today"
+              label="Due today"
               value={todayTasksProgressValue}
               max={todayTasksProgressMax}
               caption={
@@ -183,7 +182,7 @@ export function DashboardPage() {
               tone={todayTasksTone}
             />
             <ProgressBar
-              label="Daily log"
+              label="Log"
               value={hasTodayLog ? 1 : 0}
               max={1}
               caption={hasTodayLog ? 'Captured today' : 'Still missing'}
@@ -211,7 +210,7 @@ export function DashboardPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Project progress" />
+          <SectionHeader title="Projects" />
           <div className="stack compact-stack">
             {projectProgressItems.length ? (
               projectProgressItems.map((item) => (
@@ -233,22 +232,25 @@ export function DashboardPage() {
       <div className="grid two">
         <Card className="section-card">
           <SectionHeader
-            title="Needs attention"
-            action={<Link className="btn btn-ghost" href="/tasks">Open tasks</Link>}
+            title="Queue"
+            action={<Link className="btn btn-ghost" href="/tasks">Open</Link>}
           />
-          <div className="cluster-grid">
+          <div className="list-table">
             {attentionTasks.length ? (
               attentionTasks.map((task) => (
-                <div key={task.id} className="surface-soft">
-                  <div className="entity-top">
-                    <div className="entity-copy">
-                      <h3 className="entity-title">{task.title}</h3>
+                <div key={task.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title line-clamp-1">{task.title}</h3>
+                      <div className="list-row-meta">
+                        <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
+                        <Badge tone={toneForDueState(task.due_date)}>{relativeDueLabel(task.due_date)}</Badge>
+                      </div>
                     </div>
-                    <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
+                    <div className="list-row-copy line-clamp-1">{formatDate(task.due_date)}</div>
                   </div>
-                  <div className="entity-meta">
-                    <Badge tone={toneForDueState(task.due_date)}>{relativeDueLabel(task.due_date)}</Badge>
-                    <Badge tone="neutral">{formatDate(task.due_date)}</Badge>
+                  <div className="list-row-side">
+                    <Link className="btn btn-ghost" href="/tasks">Open</Link>
                   </div>
                 </div>
               ))
@@ -259,27 +261,28 @@ export function DashboardPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Upcoming milestones" />
-          <div className="cluster-grid">
+          <SectionHeader title="Milestones" />
+          <div className="list-table">
             {attentionMilestones.length ? (
               attentionMilestones.map((milestone) => (
-                <div className="surface-soft" key={milestone.id}>
-                  <div className="entity-top">
-                    <div className="entity-copy">
-                      <h3 className="entity-title">{milestone.title}</h3>
+                <div className="list-row" key={milestone.id}>
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title line-clamp-1">{milestone.title}</h3>
+                      <div className="list-row-meta">
+                        <Badge tone={toneForMilestoneStatus(milestone.status)}>{formatEnumLabel(milestone.status)}</Badge>
+                        <Badge tone={toneForDueState(milestone.due_date)}>{shortDueLabel(milestone.due_date)}</Badge>
+                      </div>
                     </div>
-                    <Badge tone={toneForMilestoneStatus(milestone.status)}>{formatEnumLabel(milestone.status)}</Badge>
+                    <div className="list-row-progress">
+                      <ProgressBar
+                        label="Progress"
+                        value={milestone.progress ?? 0}
+                        caption={relativeDueLabel(milestone.due_date)}
+                        tone={toneForMilestoneStatus(milestone.status)}
+                      />
+                    </div>
                   </div>
-                  <div className="entity-meta">
-                    <Badge tone={toneForDueState(milestone.due_date)}>{shortDueLabel(milestone.due_date)}</Badge>
-                    <Badge tone="neutral">{formatDate(milestone.due_date)}</Badge>
-                  </div>
-                  <ProgressBar
-                    label="Progress"
-                    value={milestone.progress ?? 0}
-                    caption={relativeDueLabel(milestone.due_date)}
-                    tone={toneForMilestoneStatus(milestone.status)}
-                  />
                 </div>
               ))
             ) : (
@@ -292,28 +295,20 @@ export function DashboardPage() {
       <div className="grid two">
         <Card className="section-card">
           <SectionHeader
-            title="Latest log"
-            action={<Link className="btn btn-ghost" href="/daily-logs">Logs</Link>}
+            title="Log"
+            action={<Link className="btn btn-ghost" href="/daily-logs">Open</Link>}
           />
           {latestLog ? (
-            <div className="surface-soft">
-              <div className="entity-top">
-                <div className="entity-copy">
-                  <h3 className="entity-title">{formatDate(latestLog.log_date)}</h3>
-                  <p className="muted">{latestLog.summary || 'No summary.'}</p>
+            <div className="list-row">
+              <div className="list-row-main">
+                <div className="list-row-header">
+                  <h3 className="list-row-title">{formatDate(latestLog.log_date)}</h3>
+                  <div className="list-row-meta">
+                    <Badge tone="neutral">{(latestLog.total_focus_hours ?? 0).toFixed(1)}h</Badge>
+                  </div>
                 </div>
-                <Badge tone="neutral">{(latestLog.total_focus_hours ?? 0).toFixed(1)}h focus</Badge>
-              </div>
-
-              <div className="detail-grid">
-                <div>
-                  <div className="muted small">Blockers</div>
-                  <div>{latestLog.blockers || 'None'}</div>
-                </div>
-                <div>
-                  <div className="muted small">Next step</div>
-                  <div>{latestLog.next_step || 'Not set'}</div>
-                </div>
+                <div className="list-row-copy line-clamp-1">{latestLog.summary || 'No summary.'}</div>
+                <div className="list-row-copy line-clamp-1">{latestLog.next_step || latestLog.blockers || 'No next step.'}</div>
               </div>
             </div>
           ) : (
@@ -327,22 +322,24 @@ export function DashboardPage() {
 
         <Card className="section-card">
           <SectionHeader
-            title="Recent updates"
-            action={<Link className="btn btn-ghost" href="/updates">Open feed</Link>}
+            title="Updates"
+            action={<Link className="btn btn-ghost" href="/updates">Open</Link>}
           />
-          <div className="cluster-grid">
+          <div className="list-table">
             {recentProductUpdates.length ? (
               recentProductUpdates.map((entry) => (
-                <div key={entry.id} className="surface-soft">
-                  <div className="entity-top">
-                    <div className="entity-copy">
-                      <div className="detail-row">
+                <div key={entry.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title line-clamp-1">{entry.title}</h3>
+                      <div className="list-row-meta">
                         <Badge tone={toneForProductUpdateType(entry.change_type)}>{formatEnumLabel(entry.change_type)}</Badge>
                         <Badge tone="neutral">{formatEnumLabel(entry.area)}</Badge>
                       </div>
-                      <h3 className="entity-title">{entry.title}</h3>
-                      <p className="muted">{entry.summary}</p>
                     </div>
+                    <div className="list-row-copy line-clamp-1">{entry.summary}</div>
+                  </div>
+                  <div className="list-row-side">
                     <div className="muted small">{formatDateTime(entry.changed_at)}</div>
                   </div>
                 </div>

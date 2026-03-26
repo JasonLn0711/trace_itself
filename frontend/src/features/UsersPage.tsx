@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { Badge, Button, Card, EmptyState, Field, SectionHeader, StatCard } from '../components/Primitives';
+import { Badge, Button, Card, EmptyState, Field, Notice, SectionHeader, StatCard } from '../components/Primitives';
 import { extractApiErrorMessage, usersApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import type { User } from '../types';
@@ -147,7 +147,7 @@ export function UsersPage() {
       <div className="page-header">
         <div>
           <h1>Users</h1>
-          <p className="muted">Admin only.</p>
+          <p className="muted">Admin only</p>
         </div>
       </div>
 
@@ -158,11 +158,11 @@ export function UsersPage() {
         <StatCard label="Inactive" value={inactiveUsers} />
       </div>
 
-      {error ? <EmptyState title="Could not update users" description={error} /> : null}
+      {error ? <Notice title="Could not update users" description={error} tone="danger" /> : null}
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title="Create user" />
+          <SectionHeader title="New" />
           <form className="form-grid" onSubmit={handleCreate}>
             <Field label="Username">
               <input value={createForm.username} onChange={(event) => setCreateForm({ ...createForm, username: event.target.value })} required />
@@ -194,63 +194,67 @@ export function UsersPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Account status" />
-          <div className="list-grid">
+          <SectionHeader title="Accounts" />
+          <div className="list-table">
             {users.map((user) => {
               const form = editForms[user.id] ?? userToEdit(user);
               const locked = Boolean(user.locked_until);
               return (
-                <div key={user.id} className="entity">
-                  <div className="entity-top">
-                    <div>
-                      <h3 className="entity-title">{user.display_name}</h3>
-                      <p className="muted">@{user.username} · created {formatDateTime(user.created_at)}</p>
+                <div key={user.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title">{user.display_name}</h3>
+                      <div className="list-row-meta">
+                        <Badge tone={user.role === 'admin' ? 'warning' : 'info'}>{user.role}</Badge>
+                        <Badge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'active' : 'inactive'}</Badge>
+                        <Badge tone={locked ? 'danger' : 'neutral'}>
+                          {locked ? `locked to ${formatDateTime(user.locked_until)}` : `${user.failed_login_attempts} tries`}
+                        </Badge>
+                      </div>
                     </div>
-                    <Badge tone={user.role === 'admin' ? 'warning' : 'info'}>{user.role}</Badge>
+                    <div className="list-row-copy line-clamp-1">
+                      @{user.username} · {user.last_login_at ? `last ${formatDateTime(user.last_login_at)}` : 'never logged in'}
+                    </div>
+                    <div className="form-grid cols-2">
+                      <Field label="Name">
+                        <input value={form.display_name} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, display_name: event.target.value } })} />
+                      </Field>
+                      <Field label="Role">
+                        <select value={form.role} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, role: event.target.value as 'admin' | 'member' } })}>
+                          <option value="member">member</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      </Field>
+                    </div>
+                    <div className="form-grid cols-2">
+                      <Field label="State">
+                        <select value={String(form.is_active)} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, is_active: event.target.value === 'true' } })}>
+                          <option value="true">active</option>
+                          <option value="false">inactive</option>
+                        </select>
+                      </Field>
+                      <Field label="Reset password">
+                        <input
+                          type="password"
+                          value={form.password}
+                          onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, password: event.target.value } })}
+                          placeholder="Optional"
+                        />
+                      </Field>
+                    </div>
                   </div>
-                  <div className="entity-meta">
-                    <Badge tone={user.is_active ? 'success' : 'danger'}>{user.is_active ? 'active' : 'inactive'}</Badge>
-                    <Badge tone={locked ? 'danger' : 'neutral'}>
-                      {locked ? `locked until ${formatDateTime(user.locked_until)}` : `failed attempts ${user.failed_login_attempts}`}
-                    </Badge>
-                    <Badge tone="neutral">{user.last_login_at ? `last login ${formatDateTime(user.last_login_at)}` : 'never logged in'}</Badge>
-                  </div>
-                  <div className="form-grid cols-2">
-                    <Field label="Display name">
-                      <input value={form.display_name} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, display_name: event.target.value } })} />
-                    </Field>
-                    <Field label="Role">
-                      <select value={form.role} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, role: event.target.value as 'admin' | 'member' } })}>
-                        <option value="member">member</option>
-                        <option value="admin">admin</option>
-                      </select>
-                    </Field>
-                  </div>
-                  <div className="form-grid cols-2">
-                    <Field label="Active">
-                      <select value={String(form.is_active)} onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, is_active: event.target.value === 'true' } })}>
-                        <option value="true">active</option>
-                        <option value="false">inactive</option>
-                      </select>
-                    </Field>
-                    <Field label="Reset password">
-                      <input
-                        type="password"
-                        value={form.password}
-                        onChange={(event) => setEditForms({ ...editForms, [user.id]: { ...form, password: event.target.value } })}
-                        placeholder="Leave blank to keep current password"
-                      />
-                    </Field>
-                  </div>
-                  <div className="entity-actions">
-                    <Button variant="secondary" onClick={() => void handleUpdate(user.id)}>
-                      Save changes
-                    </Button>
-                    {locked ? (
-                      <Button variant="ghost" onClick={() => void handleUnlock(user.id)}>
-                        Unlock
+                  <div className="list-row-side">
+                    <div className="muted small">Created {formatDateTime(user.created_at)}</div>
+                    <div className="list-row-actions">
+                      <Button variant="secondary" onClick={() => void handleUpdate(user.id)}>
+                        Save
                       </Button>
-                    ) : null}
+                      {locked ? (
+                        <Button variant="ghost" onClick={() => void handleUnlock(user.id)}>
+                          Unlock
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               );

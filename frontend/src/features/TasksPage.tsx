@@ -316,13 +316,11 @@ export function TasksPage() {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Execution queue"
         title="Tasks"
-        description="What to do next."
         actions={
           <>
-            <Link className="btn btn-primary" href="/projects">Review by project</Link>
-            <Link className="btn btn-ghost" href="/daily-logs">Write daily log</Link>
+            <Link className="btn btn-primary" href="/projects">Projects</Link>
+            <Link className="btn btn-ghost" href="/daily-logs">Log</Link>
           </>
         }
         aside={
@@ -340,7 +338,7 @@ export function TasksPage() {
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title={editingId ? 'Edit task' : 'Add task'} />
+          <SectionHeader title={editingId ? 'Edit' : 'New'} />
           {formDisabled ? (
             <EmptyState
               title="Create a project first"
@@ -373,14 +371,14 @@ export function TasksPage() {
               </div>
 
               <Field label="Title">
-                <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Example: Draft milestone checklist" required />
+                <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Task title" required />
               </Field>
 
               <Field label="Description">
                 <textarea
                   value={form.description}
                   onChange={(event) => setForm({ ...form, description: event.target.value })}
-                  placeholder="Optional note."
+                  placeholder="Short note"
                 />
               </Field>
 
@@ -437,13 +435,13 @@ export function TasksPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Task queue" />
+          <SectionHeader title="Queue" />
 
           <div className="toolbar">
             <SegmentedControl label="Task queue filter" value={queueFilter} onChange={(value) => setQueueFilter(value as QueueFilter)} options={queueOptions} />
             <div className="toolbar-row">
               <Field label="Search">
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tasks" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find task" />
               </Field>
               <Field label="Project filter">
                 <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
@@ -460,43 +458,31 @@ export function TasksPage() {
 
           <div className="divider" />
 
-          <div className="cluster-grid">
+          <div className="list-table">
             {visibleTasks.length ? (
               visibleTasks.map((task) => {
                 const project = projects.find((item) => item.id === task.project_id);
                 const milestone = task.milestone_id ? milestones.find((item) => item.id === task.milestone_id) : null;
                 return (
-                  <div key={task.id} className="surface-soft">
-                    <div className="entity-top">
-                      <div className="entity-copy">
-                        <h3 className="entity-title">{task.title}</h3>
-                        <p className="muted">{task.description || 'No note.'}</p>
+                  <div key={task.id} className="list-row">
+                    <div className="list-row-main">
+                      <div className="list-row-header">
+                        <h3 className="list-row-title line-clamp-1">{task.title}</h3>
+                        <div className="list-row-meta">
+                          <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
+                          <Badge tone={toneForPriority(task.priority)}>{formatEnumLabel(task.priority)}</Badge>
+                          <Badge tone={toneForDueState(task.due_date)}>{shortDueLabel(task.due_date)}</Badge>
+                        </div>
                       </div>
-                      <Badge tone={toneForTaskStatus(task.status)}>{formatEnumLabel(task.status)}</Badge>
-                    </div>
-
-                    <div className="entity-meta">
-                      <Badge tone="neutral">{project?.name ?? `Project ${task.project_id}`}</Badge>
-                      {milestone ? <Badge tone="neutral">{milestone.title}</Badge> : null}
-                      <Badge tone={toneForPriority(task.priority)}>{formatEnumLabel(task.priority)}</Badge>
-                      <Badge tone={toneForDueState(task.due_date)}>{shortDueLabel(task.due_date)}</Badge>
-                    </div>
-
-                    <div className="detail-grid">
-                      <div className="detail-row">
-                        <span className="muted small">Due</span>
-                        <strong>{formatDate(task.due_date)}</strong>
-                        <span className="muted small">{relativeDueLabel(task.due_date)}</span>
-                      </div>
-                      <div className="detail-row">
-                        <span className="muted small">Estimate</span>
-                        <strong>{task.estimated_hours ?? 0}h</strong>
-                        <span className="muted small">Actual</span>
-                        <strong>{task.actual_hours ?? 0}h</strong>
+                      <div className="list-row-copy line-clamp-1">
+                        {(project?.name ?? `Project ${task.project_id}`)}
+                        {milestone ? ` · ${milestone.title}` : ''}
+                        {` · ${formatDate(task.due_date)}`}
+                        {` · ${relativeDueLabel(task.due_date)}`}
+                        {` · ${task.estimated_hours ?? 0}h / ${task.actual_hours ?? 0}h`}
                       </div>
                     </div>
-
-                    <div className="quick-actions">
+                    <div className="list-row-actions">
                       {task.status !== 'in_progress' ? (
                         <Button variant="secondary" disabled={actingTaskId === task.id} onClick={() => void changeTaskStatus(task, 'in_progress')}>
                           Start

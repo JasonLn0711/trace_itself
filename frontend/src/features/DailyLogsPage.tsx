@@ -167,13 +167,11 @@ export function DailyLogsPage() {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Daily reflection"
         title="Daily Logs"
-        description="One note per day."
         actions={
           <>
             <button className="btn btn-primary" type="button" onClick={() => setForm(emptyLogForm(todayIso()))}>
-              Start today&apos;s log
+              Today
             </button>
             <button
               className="btn btn-ghost"
@@ -202,7 +200,7 @@ export function DailyLogsPage() {
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title={editingId ? 'Edit log' : 'Add log'} />
+          <SectionHeader title={editingId ? 'Edit' : 'New'} />
           <form className="form-grid" onSubmit={handleSubmit}>
             <Field label="Date">
               <input type="date" value={form.log_date} onChange={(event) => setForm({ ...form, log_date: event.target.value })} required />
@@ -215,21 +213,23 @@ export function DailyLogsPage() {
                 required
               />
             </Field>
-            <Field label="Blockers">
-              <textarea
-                value={form.blockers}
-                onChange={(event) => setForm({ ...form, blockers: event.target.value })}
-                placeholder="What got in the way?"
-              />
-            </Field>
-            <Field label="Next step">
-              <textarea
-                value={form.next_step}
-                onChange={(event) => setForm({ ...form, next_step: event.target.value })}
-                placeholder="What comes next?"
-              />
-            </Field>
-            <Field label="Total focus hours">
+            <div className="form-grid cols-2">
+              <Field label="Blockers">
+                <textarea
+                  value={form.blockers}
+                  onChange={(event) => setForm({ ...form, blockers: event.target.value })}
+                  placeholder="Blockers"
+                />
+              </Field>
+              <Field label="Next">
+                <textarea
+                  value={form.next_step}
+                  onChange={(event) => setForm({ ...form, next_step: event.target.value })}
+                  placeholder="Next step"
+                />
+              </Field>
+            </div>
+            <Field label="Focus hours">
               <input type="number" min="0" step="0.25" value={form.total_focus_hours} onChange={(event) => setForm({ ...form, total_focus_hours: event.target.value })} />
             </Field>
             <div className="helper-row">
@@ -252,43 +252,32 @@ export function DailyLogsPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Recent logs" />
-          <div className="cluster-grid">
+          <SectionHeader title="Recent" />
+          <div className="list-table">
             {recentLogs.length ? (
               recentLogs.map((log) => (
-                <div key={log.id} className="surface-soft">
-                  <div className="entity-top">
-                    <div className="entity-copy">
-                      <h3 className="entity-title">{formatDate(log.log_date)}</h3>
-                      <p className="muted">{log.summary || 'No summary.'}</p>
+                <div key={log.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title">{formatDate(log.log_date)}</h3>
+                      <div className="list-row-meta">
+                        <Badge tone="neutral">{(log.total_focus_hours ?? 0).toFixed(1)}h</Badge>
+                        {log.blockers?.trim() ? <Badge tone="warning">Blockers</Badge> : null}
+                      </div>
                     </div>
-                    <Button variant="secondary" onClick={() => editLog(log)}>
-                      Edit
-                    </Button>
+                    <div className="list-row-copy line-clamp-1">{log.summary || 'No summary.'}</div>
+                    <div className="list-row-copy line-clamp-1">{log.next_step || 'No next step.'}</div>
                   </div>
-
-                  <div className="detail-grid">
-                    <div>
-                      <div className="muted small">Blockers</div>
-                      <div>{log.blockers || 'None'}</div>
-                    </div>
-                    <div>
-                      <div className="muted small">Next step</div>
-                      <div>{log.next_step || 'Not set'}</div>
-                    </div>
-                    <div className="detail-row">
-                      <Badge tone="neutral">{(log.total_focus_hours ?? 0).toFixed(1)}h focus</Badge>
-                      <Badge tone="neutral">Updated {formatDateTime(log.updated_at)}</Badge>
-                    </div>
-                  </div>
-
-                  <div className="quick-actions">
+                  <div className="list-row-side">
+                    <div className="muted small">Updated {formatDateTime(log.updated_at)}</div>
+                    <div className="list-row-actions">
                     <Button variant="secondary" onClick={() => editLog(log)}>
                       Edit
                     </Button>
                     <Button variant="danger" onClick={() => void removeLog(log)}>
                       Delete
                     </Button>
+                    </div>
                   </div>
                 </div>
               ))

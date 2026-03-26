@@ -75,16 +75,16 @@ button {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 20px;
-  padding: 20px;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
 }
 
 .sidebar {
   position: sticky;
-  top: 24px;
+  top: 16px;
   align-self: start;
-  padding: 18px;
+  padding: 14px;
 }
 
 .content {
@@ -94,14 +94,14 @@ button {
 .brand {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   color: white;
@@ -111,21 +111,21 @@ button {
 }
 
 .brand-title {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .nav {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .nav a {
   display: grid;
   gap: 0;
-  padding: 11px 14px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
   color: var(--muted);
   font-weight: 700;
   transition: 160ms ease;
@@ -155,7 +155,7 @@ button {
 
 .sidebar-logout {
   width: 100%;
-  margin-top: 24px;
+  margin-top: 18px;
 }
 
 .sidebar-panel {
@@ -206,13 +206,13 @@ button {
 }
 
 .account-card {
-  padding: 16px;
-  border-radius: 18px;
+  padding: 12px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
   display: grid;
   gap: 4px;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .account-name {
@@ -227,7 +227,7 @@ button {
 
 .page {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .page-header {
@@ -262,10 +262,10 @@ button {
 }
 
 .page-intro {
-  padding: 20px;
+  padding: 14px;
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
-  gap: 18px;
+  gap: 14px;
   align-items: start;
   background:
     linear-gradient(145deg, rgba(88, 208, 190, 0.08), rgba(16, 23, 32, 0.94)),
@@ -278,8 +278,8 @@ button {
 }
 
 .page-intro-copy p {
-  margin: 8px 0 0;
-  max-width: 52ch;
+  margin: 6px 0 0;
+  max-width: 44ch;
 }
 
 .eyebrow {
@@ -300,8 +300,8 @@ button {
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .page-intro-aside {
@@ -310,6 +310,7 @@ button {
 
 .metric-strip {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 8px;
 }
 
@@ -317,20 +318,20 @@ button {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 14px;
-  padding: 11px 13px;
-  border-radius: 16px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.04);
 }
 
 .metric-pill-label {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
 
 .metric-pill strong {
-  font-size: 1.15rem;
+  font-size: 1rem;
   letter-spacing: -0.03em;
 }
 
@@ -355,12 +356,12 @@ button {
 }
 
 .section-card {
-  padding: 18px;
+  padding: 14px;
 }
 
 .grid {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .grid.stats {
@@ -384,8 +385,8 @@ button {
 }
 
 .stat-card {
-  padding: 18px;
-  min-height: 132px;
+  padding: 14px;
+  min-height: 108px;
 }
 
 .stat-label {
@@ -405,7 +406,7 @@ button {
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .section-header p {
@@ -418,13 +419,13 @@ button {
 
 .stack {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .entity {
-  padding: 16px;
+  padding: 12px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   animation: rise 280ms ease both;
 }
 
@@ -441,7 +442,7 @@ a.card.entity {
 
 .entity-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .entity-meta {
@@ -468,7 +469,7 @@ a.card.entity {
 
 .progress-block {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .progress-head {
@@ -577,9 +578,9 @@ a.card.entity {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.01em;
 }
@@ -615,8 +616,8 @@ a.card.entity {
   justify-content: center;
   gap: 8px;
   border: 0;
-  border-radius: 14px;
-  padding: 11px 16px;
+  border-radius: 12px;
+  padding: 10px 14px;
   font-weight: 800;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
@@ -664,7 +665,7 @@ a.card.entity {
 
 .toolbar {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .toolbar-row {
@@ -681,12 +682,12 @@ a.card.entity {
 .quick-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .form-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .form-grid.cols-2 {
@@ -695,11 +696,11 @@ a.card.entity {
 
 .field {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .field label {
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   font-weight: 800;
 }
 
@@ -707,8 +708,8 @@ a.card.entity {
 .field textarea,
 .field select {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--panel-strong);
   color: var(--text);
@@ -717,7 +718,7 @@ a.card.entity {
 }
 
 .field textarea {
-  min-height: 96px;
+  min-height: 72px;
   resize: vertical;
 }
 
@@ -741,15 +742,15 @@ a.card.entity {
 .helper-row {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   flex-wrap: wrap;
 }
 
 .empty-state {
-  padding: 18px;
+  padding: 14px;
   text-align: center;
-  border-radius: 22px;
+  border-radius: 18px;
   border: 1px dashed rgba(148, 163, 184, 0.2);
   background: rgba(255, 255, 255, 0.03);
 }
@@ -760,8 +761,8 @@ a.card.entity {
   gap: 14px;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
   border: 1px solid var(--line);
 }
 
@@ -822,7 +823,7 @@ a.card.entity {
   background: rgba(255, 255, 255, 0.04);
   color: var(--muted);
   border-radius: 999px;
-  padding: 10px 14px;
+  padding: 9px 12px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1010,7 +1011,7 @@ a.card.entity {
 
 .list-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .divider {
@@ -1076,12 +1077,12 @@ a.card.entity {
 }
 
 .compact-stack {
-  gap: 10px;
+  gap: 8px;
 }
 
 .detail-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .detail-row {
@@ -1092,8 +1093,8 @@ a.card.entity {
 }
 
 .surface-soft {
-  padding: 12px;
-  border-radius: 18px;
+  padding: 10px;
+  border-radius: 16px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
 }
@@ -1109,13 +1110,13 @@ a.card.entity {
 
 .cluster-grid {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .timeline-list {
   display: grid;
-  gap: 14px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .timeline-item {
@@ -1146,7 +1147,7 @@ a.card.entity {
 
 .timeline-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .timeline-date {
@@ -1158,8 +1159,105 @@ a.card.entity {
 
 .timeline-details {
   color: var(--text);
-  line-height: 1.6;
+  line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.list-table {
+  display: grid;
+  gap: 8px;
+}
+
+.list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.list-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.list-row-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-row-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.list-row-copy {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.list-row-copy,
+.list-row-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.list-row-side {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.list-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.list-row-actions .btn {
+  padding: 8px 11px;
+  border-radius: 10px;
+}
+
+.list-row-progress {
+  min-width: 180px;
+}
+
+.line-clamp-1,
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-1 {
+  -webkit-line-clamp: 1;
+}
+
+.line-clamp-2 {
+  -webkit-line-clamp: 2;
+}
+
+.subtle-grid {
+  display: grid;
+  gap: 8px;
 }
 
 @keyframes spin {
@@ -1223,6 +1321,10 @@ a.card.entity {
     grid-template-columns: 1fr;
   }
 
+  .metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .callout,
   .notice {
     flex-direction: column;
@@ -1230,8 +1332,18 @@ a.card.entity {
 
   .hero-actions,
   .quick-actions,
-  .toolbar-row {
+  .toolbar-row,
+  .list-row,
+  .list-row-actions {
     flex-direction: column;
+  }
+
+  .list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .list-row-side {
+    justify-items: start;
   }
 
   .login-surface {

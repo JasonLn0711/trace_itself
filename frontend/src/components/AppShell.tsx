@@ -7,7 +7,7 @@ import { Badge } from './Primitives';
 import { useAuth } from '../state/AuthContext';
 
 const navItems = [
-  { to: '/', label: 'Dashboard' },
+  { to: '/', label: 'Home' },
   { to: '/updates', label: 'Updates' },
   { to: '/projects', label: 'Projects' },
   { to: '/tasks', label: 'Tasks' },

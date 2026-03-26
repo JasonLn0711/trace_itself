@@ -206,13 +206,11 @@ export function ProjectsPage() {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Projects"
         title="Projects"
-        description="Long-horizon tracks."
         actions={
           <>
-            <Link className="btn btn-primary" href="/tasks">Open task queue</Link>
-            <Link className="btn btn-ghost" href="/">Back to dashboard</Link>
+            <Link className="btn btn-primary" href="/tasks">Tasks</Link>
+            <Link className="btn btn-ghost" href="/">Home</Link>
           </>
         }
         aside={
@@ -230,16 +228,16 @@ export function ProjectsPage() {
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title={editingId ? 'Edit project' : 'Add project'} />
+          <SectionHeader title={editingId ? 'Edit' : 'New'} />
           <form className="form-grid" onSubmit={handleSubmit}>
             <Field label="Name">
-              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Example: FastAPI fundamentals" required />
+              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Project name" required />
             </Field>
             <Field label="Description">
               <textarea
                 value={form.description}
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
-                placeholder="What this project is for."
+                placeholder="Short note"
               />
             </Field>
             <div className="form-grid cols-2">
@@ -290,37 +288,38 @@ export function ProjectsPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title="Project list" />
+          <SectionHeader title="List" />
           <div className="toolbar">
             <SegmentedControl label="Project status filter" value={viewFilter} onChange={(value) => setViewFilter(value as ViewFilter)} options={filterOptions} />
             <div className="toolbar-row">
               <Field label="Search">
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects" />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find project" />
               </Field>
             </div>
           </div>
 
           <div className="divider" />
 
-          <div className="cluster-grid">
+          <div className="list-table">
             {visibleProjects.length ? (
               visibleProjects.map((project) => (
-                <div key={project.id} className="surface-soft">
-                  <div className="entity-top">
-                    <div className="entity-copy">
-                      <h3 className="entity-title">{project.name}</h3>
-                      <p className="muted">{project.description || 'No description.'}</p>
+                <div key={project.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title line-clamp-1">{project.name}</h3>
+                      <div className="list-row-meta">
+                        <Badge tone={toneForProjectStatus(project.status)}>{formatEnumLabel(project.status)}</Badge>
+                        <Badge tone={toneForPriority(project.priority)}>{formatEnumLabel(project.priority)}</Badge>
+                        <Badge tone={project.target_date ? 'info' : 'warning'}>
+                          {formatDate(project.target_date)}
+                        </Badge>
+                      </div>
                     </div>
-                    <Badge tone={toneForProjectStatus(project.status)}>{formatEnumLabel(project.status)}</Badge>
+                    <div className="list-row-copy line-clamp-1">
+                      {project.description || 'No note'} · Start {formatDate(project.start_date)}
+                    </div>
                   </div>
-                  <div className="entity-meta">
-                    <Badge tone={toneForPriority(project.priority)}>{formatEnumLabel(project.priority)}</Badge>
-                    <Badge tone="neutral">Start {formatDate(project.start_date)}</Badge>
-                    <Badge tone={project.target_date ? 'info' : 'warning'}>
-                      Target {formatDate(project.target_date)}
-                    </Badge>
-                  </div>
-                  <div className="quick-actions">
+                  <div className="list-row-actions">
                     <Link className="btn btn-primary" href={`/projects/${project.id}`}>
                       Open
                     </Link>
@@ -339,33 +338,6 @@ export function ProjectsPage() {
           </div>
         </Card>
       </div>
-
-      <Card className="section-card">
-        <SectionHeader title="Active tracks" />
-        <div className="grid cards">
-          {projects.filter((project) => project.status === 'active').length ? (
-            projects
-              .filter((project) => project.status === 'active')
-              .map((project) => (
-                <Link key={project.id} className="card entity" href={`/projects/${project.id}`}>
-                  <div className="entity-top">
-                    <div className="entity-copy">
-                      <h3 className="entity-title">{project.name}</h3>
-                      <p className="muted">{project.description || 'No description.'}</p>
-                    </div>
-                    <Badge tone="info">Active</Badge>
-                  </div>
-                  <div className="entity-meta">
-                    <Badge tone={toneForPriority(project.priority)}>{formatEnumLabel(project.priority)}</Badge>
-                    <Badge tone={project.target_date ? 'info' : 'warning'}>{formatDate(project.target_date)}</Badge>
-                  </div>
-                </Link>
-              ))
-          ) : (
-            <EmptyState title="No active projects" description="Move one to active when ready." />
-          )}
-        </div>
-      </Card>
     </div>
   );
 }

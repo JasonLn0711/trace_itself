@@ -201,12 +201,10 @@ export function UpdatesPage() {
   return (
     <div className="page">
       <PageIntro
-        eyebrow="Release log"
         title="Updates"
-        description="When, where, and what changed."
         actions={
           <>
-            <Link className="btn btn-primary" href="/">Dashboard</Link>
+            <Link className="btn btn-primary" href="/">Home</Link>
             <Link className="btn btn-ghost" href="/tasks">Tasks</Link>
           </>
         }
@@ -226,16 +224,16 @@ export function UpdatesPage() {
       <div className={isAdmin ? 'grid two' : 'page'}>
         {isAdmin ? (
           <Card className="section-card">
-            <SectionHeader title={editingId ? 'Edit update' : 'Publish update'} />
+            <SectionHeader title={editingId ? 'Edit' : 'New'} />
             <form className="form-grid" onSubmit={handleSubmit}>
               <Field label="Title">
-                <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Example: Tasks page speed pass" required />
+                <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Title" required />
               </Field>
               <Field label="Summary">
                 <textarea
                   value={form.summary}
                   onChange={(event) => setForm({ ...form, summary: event.target.value })}
-                  placeholder="Short user-facing summary."
+                  placeholder="Summary"
                   required
                 />
               </Field>
@@ -243,7 +241,7 @@ export function UpdatesPage() {
                 <textarea
                   value={form.details}
                   onChange={(event) => setForm({ ...form, details: event.target.value })}
-                  placeholder="Optional extra detail."
+                  placeholder="Optional detail"
                 />
               </Field>
               <div className="form-grid cols-2">
@@ -292,7 +290,7 @@ export function UpdatesPage() {
 
         <Card className="section-card">
           <SectionHeader
-            title="Update feed"
+            title="Feed"
             action={
               <SegmentedControl
                 label="Update type"
@@ -306,34 +304,29 @@ export function UpdatesPage() {
             <Badge tone={pinnedCount ? 'info' : 'neutral'}>{pinnedCount} pinned</Badge>
             <Badge tone="neutral">{visibleEntries.length} visible</Badge>
           </div>
-          <div className="timeline-list">
+          <div className="list-table">
             {visibleEntries.length ? (
               visibleEntries.map((entry) => (
-                <div key={entry.id} className="timeline-item">
-                  <div className="timeline-rail" aria-hidden="true" />
-                  <div className="surface-soft timeline-card">
-                    <div className="entity-top">
-                      <div className="entity-copy">
-                        <div className="detail-row">
+                <div key={entry.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title line-clamp-1">{entry.title}</h3>
+                      <div className="list-row-meta">
                           <Badge tone={toneForProductUpdateType(entry.change_type)}>{formatEnumLabel(entry.change_type)}</Badge>
                           <Badge tone="neutral">{formatEnumLabel(entry.area)}</Badge>
                           {entry.is_pinned ? <Badge tone="info">Pinned</Badge> : null}
-                        </div>
-                        <h3 className="entity-title">{entry.title}</h3>
-                        <p className="muted">{entry.summary}</p>
                       </div>
-                      <div className="timeline-date">{formatDateTime(entry.changed_at)}</div>
                     </div>
-
-                    {entry.details ? <div className="timeline-details">{entry.details}</div> : null}
-
-                    <div className="detail-row">
-                      <span className="muted small">By {entry.author_display_name || 'System'}</span>
-                      <span className="muted small">Updated {formatDateTime(entry.updated_at)}</span>
+                    <div className="list-row-copy line-clamp-1">{entry.summary}</div>
+                    <div className="list-row-copy line-clamp-1">
+                      {formatDateTime(entry.changed_at)} · {entry.author_display_name || 'System'}
                     </div>
-
-                    {isAdmin ? (
-                      <div className="quick-actions">
+                    {entry.details ? <div className="list-row-copy line-clamp-2">{entry.details}</div> : null}
+                  </div>
+                  {isAdmin ? (
+                    <div className="list-row-side">
+                      <div className="muted small">Updated {formatDateTime(entry.updated_at)}</div>
+                      <div className="list-row-actions">
                         <Button variant="secondary" onClick={() => startEdit(entry)}>
                           Edit
                         </Button>
@@ -341,8 +334,12 @@ export function UpdatesPage() {
                           Delete
                         </Button>
                       </div>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="list-row-side">
+                      <div className="muted small">{formatDateTime(entry.updated_at)}</div>
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
