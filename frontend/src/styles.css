@@ -211,8 +211,51 @@ button {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
   display: grid;
-  gap: 4px;
+  gap: 10px;
   margin-top: 14px;
+}
+
+.session-clock {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.session-clock-label,
+.session-clock-state {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.session-clock strong {
+  justify-self: center;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.session-clock-neutral strong {
+  color: var(--text);
+}
+
+.session-clock-info strong {
+  color: #89d8ff;
+}
+
+.session-clock-warning strong {
+  color: #ffc266;
+}
+
+.session-clock-danger strong {
+  color: #ff8585;
 }
 
 .account-name {

@@ -224,4 +224,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="idle-timeout-countdown",
+        version_tag="v1.0.63",
+        title="Visible timeout countdown",
+        summary="The sidebar now shows a live session timeout clock.",
+        details=(
+            "Users can now see the remaining auto sign-out time at a glance, and the countdown pauses cleanly "
+            "while recordings or active page operations are keeping the session alive."
+        ),
+        area="security",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

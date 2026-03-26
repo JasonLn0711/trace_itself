@@ -6,8 +6,8 @@ import { authApi, subscribeApiActivity } from '../lib/api';
 import type { User } from '../types';
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
-const IDLE_CHECK_INTERVAL_MS = 5 * 1000;
-const ACTIVITY_THROTTLE_MS = 10 * 1000;
+const IDLE_CHECK_INTERVAL_MS = 1000;
+const ACTIVITY_THROTTLE_MS = 1000;
 
 interface AuthContextValue {
   authenticated: boolean;
@@ -18,6 +18,8 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   markActivity: () => void;
   setSessionHold: (key: string, active: boolean) => void;
+  idleCountdownMs: number;
+  sessionTimeoutPaused: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -26,11 +28,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [idleCountdownMs, setIdleCountdownMs] = useState(IDLE_TIMEOUT_MS);
+  const [sessionTimeoutPaused, setSessionTimeoutPaused] = useState(false);
   const lastActivityAtRef = useRef(Date.now());
   const lastMarkedAtRef = useRef(0);
   const pendingApiCountRef = useRef(0);
   const sessionHoldsRef = useRef<Set<string>>(new Set());
   const logoutInFlightRef = useRef(false);
+
+  const syncIdleCountdown = useCallback(() => {
+    if (!authenticated || logoutInFlightRef.current) {
+      setIdleCountdownMs(IDLE_TIMEOUT_MS);
+      setSessionTimeoutPaused(false);
+      return;
+    }
+
+    const hasActiveWork = pendingApiCountRef.current > 0 || sessionHoldsRef.current.size > 0;
+    if (hasActiveWork) {
+      const now = Date.now();
+      lastActivityAtRef.current = now;
+      lastMarkedAtRef.current = now;
+    }
+
+    const remaining = Math.max(0, IDLE_TIMEOUT_MS - (Date.now() - lastActivityAtRef.current));
+    setIdleCountdownMs(remaining);
+    setSessionTimeoutPaused(hasActiveWork);
+  }, [authenticated]);
 
   const buildLoginRedirect = useCallback((reason?: 'idle') => {
     if (typeof window === 'undefined') {
@@ -55,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pendingApiCountRef.current = 0;
     setAuthenticated(false);
     setUser(null);
+    setIdleCountdownMs(IDLE_TIMEOUT_MS);
+    setSessionTimeoutPaused(false);
     lastActivityAtRef.current = Date.now();
     lastMarkedAtRef.current = 0;
     logoutInFlightRef.current = false;
@@ -94,6 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     lastMarkedAtRef.current = now;
     lastActivityAtRef.current = now;
+    setIdleCountdownMs(IDLE_TIMEOUT_MS);
+    setSessionTimeoutPaused(false);
   }, [authenticated]);
 
   const setSessionHold = useCallback((key: string, active: boolean) => {
@@ -104,12 +131,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionHoldsRef.current.add(key);
       lastActivityAtRef.current = Date.now();
       lastMarkedAtRef.current = Date.now();
+      syncIdleCountdown();
       return;
     }
 
     sessionHoldsRef.current.delete(key);
+    syncIdleCountdown();
     void evaluateIdleTimeout();
-  }, [evaluateIdleTimeout]);
+  }, [evaluateIdleTimeout, syncIdleCountdown]);
 
   async function refresh() {
     try {
@@ -118,9 +147,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session.user ?? null);
       lastActivityAtRef.current = Date.now();
       lastMarkedAtRef.current = Date.now();
+      setIdleCountdownMs(IDLE_TIMEOUT_MS);
+      setSessionTimeoutPaused(false);
     } catch {
       setAuthenticated(false);
       setUser(null);
+      setIdleCountdownMs(IDLE_TIMEOUT_MS);
+      setSessionTimeoutPaused(false);
     } finally {
       setLoading(false);
     }
@@ -136,6 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(session.user ?? null);
     lastActivityAtRef.current = Date.now();
     lastMarkedAtRef.current = Date.now();
+    setIdleCountdownMs(IDLE_TIMEOUT_MS);
+    setSessionTimeoutPaused(false);
     return session.user ?? null;
   }
 
@@ -151,11 +186,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return subscribeApiActivity((pendingCount) => {
       pendingApiCountRef.current = pendingCount;
+      syncIdleCountdown();
       if (pendingCount === 0) {
         void evaluateIdleTimeout();
       }
     });
-  }, [evaluateIdleTimeout]);
+  }, [evaluateIdleTimeout, syncIdleCountdown]);
 
   useEffect(() => {
     if (!authenticated || typeof window === 'undefined') {
@@ -169,6 +205,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!document.hidden) {
         lastActivityAtRef.current = Date.now();
         lastMarkedAtRef.current = Date.now();
+        setIdleCountdownMs(IDLE_TIMEOUT_MS);
+        setSessionTimeoutPaused(false);
       }
     };
 
@@ -194,12 +232,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const timer = window.setInterval(() => {
+      syncIdleCountdown();
       void evaluateIdleTimeout();
     }, IDLE_CHECK_INTERVAL_MS);
     return () => {
       window.clearInterval(timer);
     };
-  }, [authenticated, evaluateIdleTimeout]);
+  }, [authenticated, evaluateIdleTimeout, syncIdleCountdown]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -210,9 +249,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refresh,
       markActivity,
-      setSessionHold
+      setSessionHold,
+      idleCountdownMs,
+      sessionTimeoutPaused
     }),
-    [authenticated, loading, user, markActivity, setSessionHold]
+    [authenticated, idleCountdownMs, loading, sessionTimeoutPaused, user, markActivity, setSessionHold]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

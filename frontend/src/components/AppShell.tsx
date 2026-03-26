@@ -14,9 +14,18 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function formatCountdown(ms: number) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
-  const { logout, user } = useAuth();
+  const { idleCountdownMs, logout, sessionTimeoutPaused, user } = useAuth();
   const pathname = usePathname() ?? '/';
+  const timeoutTone =
+    sessionTimeoutPaused ? 'info' : idleCountdownMs <= 60_000 ? 'danger' : idleCountdownMs <= 120_000 ? 'warning' : 'neutral';
   const visibleNavItems = [
     ...(canUseFeature(user, 'project_tracer') ? [{ to: '/', label: 'Home' }] : []),
     ...(canUseFeature(user, 'asr') ? [{ to: '/asr', label: 'ASR' }] : []),
@@ -51,6 +60,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Badge tone={user?.role === 'admin' ? 'warning' : 'info'}>{user?.role ?? 'member'}</Badge>
           </div>
           <div className="account-meta">@{user?.username ?? 'unknown'}</div>
+          <div className={`session-clock session-clock-${timeoutTone}`} role="status" aria-live="polite">
+            <span className="session-clock-label">Timeout</span>
+            <strong>{formatCountdown(idleCountdownMs)}</strong>
+            <span className="session-clock-state">{sessionTimeoutPaused ? 'Active' : 'Idle'}</span>
+          </div>
         </div>
 
         <button className="btn btn-ghost sidebar-logout" type="button" onClick={() => void logout()}>
