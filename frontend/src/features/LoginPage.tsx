@@ -1,23 +1,34 @@
+'use client';
+
 import { FormEvent, useEffect, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../state/AuthContext';
 import { Button, Card, Field, Notice } from '../components/Primitives';
 import { extractApiErrorMessage } from '../lib/api';
 
+function safeRedirectPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return '/';
+  }
+  return value;
+}
+
 export function LoginPage() {
   const { authenticated, loading, login } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const nextPath = safeRedirectPath(searchParams?.get('next') ?? null);
 
   useEffect(() => {
     if (authenticated && !loading) {
-      navigate('/');
+      router.replace(nextPath);
     }
-  }, [authenticated, loading, navigate]);
+  }, [authenticated, loading, nextPath, router]);
 
   if (loading) {
     return (
@@ -32,7 +43,7 @@ export function LoginPage() {
   }
 
   if (authenticated) {
-    return <Navigate to="/" replace />;
+    return null;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -41,7 +52,7 @@ export function LoginPage() {
     setError('');
     try {
       await login(username, password);
-      navigate('/');
+      router.replace(nextPath);
     } catch (err) {
       setError(extractApiErrorMessage(err) || 'Could not sign in');
     } finally {
@@ -63,17 +74,17 @@ export function LoginPage() {
         <form className="stack login-form" onSubmit={handleSubmit}>
           <div className="login-fields">
             <Field label="Username">
-            <input
-              type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              autoComplete="username"
-              autoFocus
-              className="login-input"
-              placeholder="Username"
-              enterKeyHint="next"
-              required
-            />
+              <input
+                type="text"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="username"
+                autoFocus
+                className="login-input"
+                placeholder="Username"
+                enterKeyHint="next"
+                required
+              />
             </Field>
             <Field label="Password">
               <div className="password-field">

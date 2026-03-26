@@ -1,5 +1,7 @@
+'use client';
+
 import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import {
   Badge,
   Button,
@@ -319,8 +321,8 @@ export function TasksPage() {
         description="What to do next."
         actions={
           <>
-            <Link className="btn btn-primary" to="/projects">Review by project</Link>
-            <Link className="btn btn-ghost" to="/daily-logs">Write daily log</Link>
+            <Link className="btn btn-primary" href="/projects">Review by project</Link>
+            <Link className="btn btn-ghost" href="/daily-logs">Write daily log</Link>
           </>
         }
         aside={
@@ -343,7 +345,7 @@ export function TasksPage() {
             <EmptyState
               title="Create a project first"
               description="Tasks need a project."
-              action={<Link className="btn btn-primary" to="/projects">Create project</Link>}
+              action={<Link className="btn btn-primary" href="/projects">Create project</Link>}
             />
           ) : (
             <form className="form-grid" onSubmit={handleSubmit}>

@@ -1,3 +1,5 @@
+'use client';
+
 import { FormEvent, useEffect, useState } from 'react';
 import { Badge, Button, Card, EmptyState, Field, SectionHeader, StatCard } from '../components/Primitives';
 import { extractApiErrorMessage, usersApi } from '../lib/api';

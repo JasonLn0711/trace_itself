@@ -272,7 +272,7 @@ If `tailscale serve status` shows no config, re-run:
 sudo tailscale serve --bg 3000
 ```
 
-### I am seeing scanner traffic like `/payment` or `/.env` in Nginx logs
+### I am seeing scanner traffic like `/payment` or `/.env` in frontend logs
 
 That usually means the site was published with Funnel instead of private Serve.
 

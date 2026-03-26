@@ -1,5 +1,7 @@
+'use client';
+
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import Link from 'next/link';
 import {
   Badge,
   Button,
@@ -110,9 +112,7 @@ function taskToPayload(task: Task, status = task.status) {
   };
 }
 
-export function ProjectDetailPage() {
-  const { id } = useParams();
-  const projectId = Number(id);
+export function ProjectDetailPage({ projectId }: { projectId: number }) {
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -391,7 +391,7 @@ export function ProjectDetailPage() {
       <div className="page">
         <Card className="section-card">
           <EmptyState title="Project unavailable" description={projectError || 'Could not load this project.'} />
-          <Link className="btn btn-primary" to="/projects">
+          <Link className="btn btn-primary" href="/projects">
             Back to projects
           </Link>
         </Card>
@@ -407,8 +407,8 @@ export function ProjectDetailPage() {
         description={project.description || undefined}
         actions={
           <>
-            <Link className="btn btn-primary" to="/projects">Back to projects</Link>
-            <Link className="btn btn-ghost" to="/tasks">Open full task queue</Link>
+            <Link className="btn btn-primary" href="/projects">Back to projects</Link>
+            <Link className="btn btn-ghost" href="/tasks">Open full task queue</Link>
           </>
         }
         aside={

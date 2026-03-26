@@ -1,4 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom';
+'use client';
+
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Badge } from './Primitives';
 import { useAuth } from '../state/AuthContext';
 
@@ -9,8 +13,16 @@ const navItems = [
   { to: '/daily-logs', label: 'Logs' }
 ];
 
-export function AppShell() {
+function isActivePath(pathname: string, href: string) {
+  if (href === '/') {
+    return pathname === '/';
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
   const { logout, user } = useAuth();
+  const pathname = usePathname() ?? '/';
   const visibleNavItems = user?.role === 'admin' ? [...navItems, { to: '/users', label: 'Users' }] : navItems;
 
   return (
@@ -25,9 +37,9 @@ export function AppShell() {
 
         <nav className="nav">
           {visibleNavItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'}>
+            <Link key={item.to} href={item.to} className={isActivePath(pathname, item.to) ? 'active' : ''}>
               <span className="nav-title">{item.label}</span>
-            </NavLink>
+            </Link>
           ))}
         </nav>
 
@@ -45,7 +57,7 @@ export function AppShell() {
       </aside>
 
       <div className="content">
-        <Outlet />
+        {children}
       </div>
     </div>
   );

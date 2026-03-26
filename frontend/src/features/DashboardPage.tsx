@@ -1,5 +1,7 @@
+'use client';
+
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import {
   Badge,
   Card,
@@ -144,9 +146,9 @@ export function DashboardPage() {
         title="Dashboard"
         actions={
           <>
-            <Link className="btn btn-primary" to="/tasks">Open tasks</Link>
-            <Link className="btn btn-secondary" to="/daily-logs">Write log</Link>
-            <Link className="btn btn-ghost" to="/projects">Projects</Link>
+            <Link className="btn btn-primary" href="/tasks">Open tasks</Link>
+            <Link className="btn btn-secondary" href="/daily-logs">Write log</Link>
+            <Link className="btn btn-ghost" href="/projects">Projects</Link>
           </>
         }
         aside={
@@ -229,7 +231,7 @@ export function DashboardPage() {
         <Card className="section-card">
           <SectionHeader
             title="Needs attention"
-            action={<Link className="btn btn-ghost" to="/tasks">Open tasks</Link>}
+            action={<Link className="btn btn-ghost" href="/tasks">Open tasks</Link>}
           />
           <div className="cluster-grid">
             {attentionTasks.length ? (
@@ -287,7 +289,7 @@ export function DashboardPage() {
       <Card className="section-card">
         <SectionHeader
           title="Latest log"
-          action={<Link className="btn btn-ghost" to="/daily-logs">Logs</Link>}
+          action={<Link className="btn btn-ghost" href="/daily-logs">Logs</Link>}
         />
         {latestLog ? (
           <div className="surface-soft">
@@ -313,7 +315,7 @@ export function DashboardPage() {
           <EmptyState
             title="No daily logs yet"
             description="Add today&apos;s log."
-            action={<Link className="btn btn-primary" to="/daily-logs">Create log</Link>}
+            action={<Link className="btn btn-primary" href="/daily-logs">Create log</Link>}
           />
         )}
       </Card>

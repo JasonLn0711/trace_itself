@@ -10,22 +10,22 @@
 - Projects, milestones, tasks, and daily logs
 - Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
 - FastAPI backend with PostgreSQL
-- React frontend served behind Nginx
+- Next.js frontend with App Router
 - Docker Compose deployment with localhost-only exposure by default
 - Tailscale-first private remote access tutorial for lab-server deployment
 
 ## Architecture
 
-- Frontend: React + Vite + React Router
+- Frontend: Next.js + React
 - Backend: FastAPI + SQLAlchemy
 - Database: PostgreSQL 16
 - Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
-- Deployment: Docker Compose
+- Deployment: Docker Compose with a Next.js standalone frontend container
 - Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
 
 Why this shape:
 
-- React + Vite keeps the frontend small and easy to ship because the MVP does not need SSR.
+- Next.js gives us file-based routing, a cleaner production runtime, and an easier path to future server-side optimization without changing the product model.
 - FastAPI + SQLAlchemy gives us typed APIs and a clean data layer without extra framework weight.
 - Postgres stays on the internal Docker network and is never published.
 - The frontend and backend bind to `127.0.0.1` on the host so the default posture is private-first.
@@ -50,8 +50,13 @@ Why this shape:
 │   └── tailscale.md
 ├── frontend/
 │   ├── src/
+│   │   ├── app/
+│   │   ├── components/
+│   │   ├── features/
+│   │   ├── lib/
+│   │   └── state/
 │   ├── Dockerfile
-│   ├── nginx.conf
+│   ├── next.config.mjs
 │   └── package.json
 ├── .env.example
 ├── docker-compose.yml
@@ -115,7 +120,7 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api` to `http://localhost:8000` by default.
+The Next.js dev server proxies `/api` to `API_PROXY_TARGET`. The default target in [frontend/.env.example](/home/jnln3799/every_on_git_ubuntu/trace_itself/frontend/.env.example) is `http://127.0.0.1:8000`.
 
 ## Updating a running Docker stack
 
@@ -149,7 +154,7 @@ Use these commands when you change code:
   docker compose restart frontend backend
   ```
 
-- After `.env`, `docker-compose.yml`, Dockerfile, or Nginx config changes:
+- After `.env`, `docker-compose.yml`, Dockerfile, or Next.js config changes:
 
   ```bash
   docker compose up --build -d

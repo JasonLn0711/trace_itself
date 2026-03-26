@@ -1,5 +1,7 @@
+'use client';
+
 import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import {
   Badge,
   Button,
@@ -209,8 +211,8 @@ export function ProjectsPage() {
         description="Long-horizon tracks."
         actions={
           <>
-            <Link className="btn btn-primary" to="/tasks">Open task queue</Link>
-            <Link className="btn btn-ghost" to="/">Back to dashboard</Link>
+            <Link className="btn btn-primary" href="/tasks">Open task queue</Link>
+            <Link className="btn btn-ghost" href="/">Back to dashboard</Link>
           </>
         }
         aside={
@@ -319,7 +321,7 @@ export function ProjectsPage() {
                     </Badge>
                   </div>
                   <div className="quick-actions">
-                    <Link className="btn btn-primary" to={`/projects/${project.id}`}>
+                    <Link className="btn btn-primary" href={`/projects/${project.id}`}>
                       Open
                     </Link>
                     <Button variant="secondary" onClick={() => editProject(project)}>
@@ -345,7 +347,7 @@ export function ProjectsPage() {
             projects
               .filter((project) => project.status === 'active')
               .map((project) => (
-                <Link key={project.id} className="card entity" to={`/projects/${project.id}`}>
+                <Link key={project.id} className="card entity" href={`/projects/${project.id}`}>
                   <div className="entity-top">
                     <div className="entity-copy">
                       <h3 className="entity-title">{project.name}</h3>

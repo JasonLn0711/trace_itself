@@ -24,7 +24,7 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       APP_PASSWORD: ${APP_PASSWORD}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
-      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       - db
     ports:
@@ -35,11 +35,15 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        API_PROXY_TARGET: ${API_PROXY_TARGET:-http://backend:8000}
     restart: unless-stopped
+    environment:
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-http://backend:8000}
     depends_on:
       - backend
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     networks:
       - internal
 
