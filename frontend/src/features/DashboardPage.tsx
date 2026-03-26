@@ -16,6 +16,7 @@ import {
 } from '../components/Primitives';
 import { dashboardApi, extractApiErrorMessage } from '../lib/api';
 import { formatDate, formatDateTime, relativeDueLabel, todayIso } from '../lib/dates';
+import { canUseAudioWorkspace } from '../lib/access';
 import {
   formatEnumLabel,
   shortDueLabel,
@@ -27,6 +28,7 @@ import {
   toneForProductUpdateType,
   toneForTaskStatus
 } from '../lib/presentation';
+import { useAuth } from '../state/AuthContext';
 import type { DashboardSummary } from '../types';
 
 const emptySummary: DashboardSummary = {
@@ -42,6 +44,7 @@ const emptySummary: DashboardSummary = {
 };
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary>(emptySummary);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -149,7 +152,7 @@ export function DashboardPage() {
         actions={
           <>
             <Link className="btn btn-primary" href="/tasks">Tasks</Link>
-            <Link className="btn btn-secondary" href="/asr">ASR</Link>
+            {canUseAudioWorkspace(user) ? <Link className="btn btn-secondary" href="/meetings">Audio</Link> : null}
             <Link className="btn btn-ghost" href="/daily-logs">Log</Link>
             <Link className="btn btn-ghost" href="/projects">Projects</Link>
           </>

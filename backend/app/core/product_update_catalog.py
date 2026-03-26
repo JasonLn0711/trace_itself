@@ -238,4 +238,19 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="merged-audio-workspace",
+        version_tag="v1.0.64",
+        title="Unified audio workspace",
+        summary="ASR now lives inside the Meetings page so transcript and notes start from one simpler flow.",
+        details=(
+            "The separate ASR navigation has been folded into one Audio workspace with a compact mode switch, "
+            "shared provider setup, live transcript support, and a shorter path to either transcript-only or "
+            "meeting-note output."
+        ),
+        area="frontend",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

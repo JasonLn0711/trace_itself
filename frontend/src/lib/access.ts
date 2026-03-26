@@ -6,7 +6,11 @@ export function canUseFeature(user: User | null | undefined, feature: AppFeature
   return Boolean(user?.capabilities?.[feature]);
 }
 
-export function canUseMeetings(user: User | null | undefined) {
+export function canUseAudioWorkspace(user: User | null | undefined) {
+  return canUseFeature(user, 'asr');
+}
+
+export function canUseMeetingNotes(user: User | null | undefined) {
   return canUseFeature(user, 'asr') && canUseFeature(user, 'llm');
 }
 
@@ -14,11 +18,8 @@ export function preferredRouteForUser(user: User | null | undefined) {
   if (canUseFeature(user, 'project_tracer')) {
     return '/';
   }
-  if (canUseMeetings(user)) {
+  if (canUseAudioWorkspace(user)) {
     return '/meetings';
-  }
-  if (canUseFeature(user, 'asr')) {
-    return '/asr';
   }
   return '/updates';
 }
@@ -28,10 +29,10 @@ export function canAccessPath(user: User | null | undefined, path: string) {
     return canUseFeature(user, 'project_tracer');
   }
   if (path.startsWith('/asr')) {
-    return canUseFeature(user, 'asr');
+    return canUseAudioWorkspace(user);
   }
   if (path.startsWith('/meetings')) {
-    return canUseMeetings(user);
+    return canUseAudioWorkspace(user);
   }
   return true;
 }

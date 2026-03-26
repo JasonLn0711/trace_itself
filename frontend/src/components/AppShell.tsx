@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from './Primitives';
-import { canUseFeature, canUseMeetings } from '../lib/access';
+import { canUseAudioWorkspace, canUseFeature } from '../lib/access';
 import { useAuth } from '../state/AuthContext';
 
 function isActivePath(pathname: string, href: string) {
@@ -28,8 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     sessionTimeoutPaused ? 'info' : idleCountdownMs <= 60_000 ? 'danger' : idleCountdownMs <= 120_000 ? 'warning' : 'neutral';
   const visibleNavItems = [
     ...(canUseFeature(user, 'project_tracer') ? [{ to: '/', label: 'Home' }] : []),
-    ...(canUseFeature(user, 'asr') ? [{ to: '/asr', label: 'ASR' }] : []),
-    ...(canUseMeetings(user) ? [{ to: '/meetings', label: 'Meetings' }] : []),
+    ...(canUseAudioWorkspace(user) ? [{ to: '/meetings', label: 'Audio' }] : []),
     ...(canUseFeature(user, 'project_tracer') ? [{ to: '/projects', label: 'Projects' }, { to: '/tasks', label: 'Tasks' }] : []),
     ...(user?.role === 'admin' ? [{ to: '/users', label: 'Control' }] : []),
     { to: '/updates', label: 'Updates' },
