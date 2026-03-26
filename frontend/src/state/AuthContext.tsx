@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { authApi } from '../lib/api';
+import type { User } from '../types';
 
 interface AuthContextValue {
   authenticated: boolean;
   loading: boolean;
-  login: (password: string) => Promise<void>;
+  user: User | null;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -14,14 +16,17 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function refresh() {
     try {
-      await authApi.me();
+      const session = await authApi.me();
       setAuthenticated(true);
+      setUser(session.user ?? null);
     } catch {
       setAuthenticated(false);
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -31,9 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, []);
 
-  async function login(password: string) {
-    await authApi.login(password);
+  async function login(username: string, password: string) {
+    const session = await authApi.login(username, password);
     setAuthenticated(true);
+    setUser(session.user ?? null);
   }
 
   async function logout() {
@@ -41,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authApi.logout();
     } finally {
       setAuthenticated(false);
+      setUser(null);
       window.location.assign('/login');
     }
   }
@@ -49,11 +56,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       authenticated,
       loading,
+      user,
       login,
       logout,
       refresh
     }),
-    [authenticated, loading]
+    [authenticated, loading, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

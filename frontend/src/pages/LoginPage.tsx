@@ -5,8 +5,9 @@ import { Badge, Button, Card, EmptyState, Field } from '../components/Primitives
 import { extractApiErrorMessage } from '../lib/api';
 
 export function LoginPage() {
-  const { authenticated, loading, login } = useAuth();
+  const { authenticated, loading, login, user } = useAuth();
   const navigate = useNavigate();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +39,7 @@ export function LoginPage() {
     setSubmitting(true);
     setError('');
     try {
-      await login(password);
+      await login(username, password);
       navigate('/');
     } catch (err) {
       setError(extractApiErrorMessage(err) || 'Could not sign in');
@@ -59,9 +60,21 @@ export function LoginPage() {
           <p className="muted">
             Sign in to review projects, milestones, daily logs, and the work that needs attention today.
           </p>
+          <p className="muted small">Repeated failed sign-ins may temporarily lock an account.</p>
         </div>
+        {user ? <Badge tone="info">Last session: {user.display_name}</Badge> : null}
 
         <form className="stack" onSubmit={handleSubmit}>
+          <Field label="Username" hint="Use your account username.">
+            <input
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="username"
+              placeholder="your-username"
+              required
+            />
+          </Field>
           <Field label="Access password" hint="Use the password configured on your lab server.">
             <input
               type="password"
@@ -83,4 +96,3 @@ export function LoginPage() {
     </div>
   );
 }
-

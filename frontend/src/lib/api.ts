@@ -1,4 +1,15 @@
-import type { DailyLog, DashboardSummary, Milestone, Project, Task } from '../types';
+import type {
+  DailyLog,
+  DashboardSummary,
+  Milestone,
+  Project,
+  Task,
+  User,
+  UserCreateInput,
+  UserPasswordResetInput,
+  UserSession,
+  UserUpdateInput
+} from '../types';
 
 export class ApiError extends Error {
   status: number;
@@ -103,21 +114,21 @@ export function extractApiErrorMessage(error: unknown) {
 }
 
 export const authApi = {
-  login(password: string) {
-    return request<{ ok?: boolean }>('/auth/login', {
+  login(username: string, password: string) {
+    return request<UserSession>('/auth/login', {
       method: 'POST',
-      body: { password },
+      body: { username, password },
       handleUnauthorized: false
     });
   },
   logout() {
-    return request<{ ok?: boolean }>('/auth/logout', {
+    return request<UserSession>('/auth/logout', {
       method: 'POST',
       handleUnauthorized: false
     });
   },
   me() {
-    return request<{ authenticated?: boolean }>('/auth/me', {
+    return request<UserSession>('/auth/me', {
       handleUnauthorized: false
     });
   }
@@ -126,6 +137,35 @@ export const authApi = {
 export const dashboardApi = {
   summary() {
     return request<DashboardSummary>('/dashboard/summary');
+  }
+};
+
+export const usersApi = {
+  list() {
+    return request<User[]>('/users');
+  },
+  create(body: UserCreateInput) {
+    return request<User>('/users', {
+      method: 'POST',
+      body
+    });
+  },
+  update(id: number, body: UserUpdateInput) {
+    return request<User>(`/users/${id}`, {
+      method: 'PUT',
+      body
+    });
+  },
+  resetPassword(id: number, body: UserPasswordResetInput) {
+    return request<User>(`/users/${id}/reset-password`, {
+      method: 'POST',
+      body
+    });
+  },
+  unlock(id: number) {
+    return request<User>(`/users/${id}/unlock`, {
+      method: 'POST'
+    });
   }
 };
 
@@ -238,4 +278,3 @@ export const dailyLogsApi = {
     });
   }
 };
-

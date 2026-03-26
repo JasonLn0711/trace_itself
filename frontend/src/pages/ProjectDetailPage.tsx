@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Badge, Button, Card, EmptyState, Field, SectionHeader } from '../components/Primitives';
+import { Badge, Button, Card, EmptyState, Field, MiniBarChart, ProgressBar, SectionHeader } from '../components/Primitives';
 import { extractApiErrorMessage, milestonesApi, projectsApi, tasksApi } from '../lib/api';
 import { clampPercent, formatDate, relativeDueLabel } from '../lib/dates';
 import type { Milestone, Project, Task } from '../types';
@@ -138,6 +138,28 @@ export function ProjectDetailPage() {
   }, [projectId]);
 
   const milestoneOptions = useMemo(() => milestones.map((milestone) => ({ id: milestone.id, title: milestone.title })), [milestones]);
+  const projectCompletion = useMemo(() => {
+    if (!tasks.length) {
+      return 0;
+    }
+    return Math.round((tasks.filter((task) => task.status === 'done').length / tasks.length) * 100);
+  }, [tasks]);
+  const taskStatusBreakdown = useMemo(() => {
+    const base = [
+      { status: 'todo', count: 0 },
+      { status: 'in_progress', count: 0 },
+      { status: 'blocked', count: 0 },
+      { status: 'done', count: 0 }
+    ];
+    tasks.forEach((task) => {
+      const entry = base.find((item) => item.status === task.status);
+      if (entry) {
+        entry.count += 1;
+      }
+    });
+    return base;
+  }, [tasks]);
+  const completedTaskCount = tasks.filter((task) => task.status === 'done').length;
 
   async function refresh() {
     await loadAll();
@@ -301,6 +323,42 @@ export function ProjectDetailPage() {
         </Link>
       </div>
 
+      <div className="grid three">
+        <Card className="section-card">
+          <SectionHeader title="Project progress" description="Current completion across all tasks." />
+          <ProgressBar
+            label="Done work"
+            value={projectCompletion}
+            caption={tasks.length ? `${completedTaskCount}/${tasks.length} tasks complete` : 'No tasks yet'}
+            tone={projectCompletion >= 80 ? 'success' : projectCompletion >= 50 ? 'info' : 'warning'}
+          />
+        </Card>
+
+        <Card className="section-card">
+          <SectionHeader title="Task mix" description="How this project's tasks are distributed." />
+          <MiniBarChart values={taskStatusBreakdown.map((item) => item.count)} labels={taskStatusBreakdown.map((item) => item.status.slice(0, 3))} />
+        </Card>
+
+        <Card className="section-card">
+          <SectionHeader title="Milestone momentum" description="Milestone progress is the clearest short-term signal." />
+          <div className="stack">
+            {milestones.slice(0, 3).length ? (
+              milestones.slice(0, 3).map((milestone) => (
+                <ProgressBar
+                  key={milestone.id}
+                  label={milestone.title}
+                  value={clampPercent(milestone.progress)}
+                  caption={relativeDueLabel(milestone.due_date)}
+                  tone={milestone.status === 'completed' ? 'success' : milestone.status === 'active' ? 'info' : 'warning'}
+                />
+              ))
+            ) : (
+              <EmptyState title="No milestones yet" description="Add milestones to make project progress easier to track." />
+            )}
+          </div>
+        </Card>
+      </div>
+
       <Card className="section-card">
         <SectionHeader title="Project details" description="Keep the high-level track current." />
         <form className="form-grid" onSubmit={handleProjectSubmit}>
@@ -411,6 +469,12 @@ export function ProjectDetailPage() {
                   <div className="entity-meta">
                     <Badge tone="neutral">Progress {clampPercent(milestone.progress)}%</Badge>
                   </div>
+                  <ProgressBar
+                    label="Milestone progress"
+                    value={clampPercent(milestone.progress)}
+                    caption={relativeDueLabel(milestone.due_date)}
+                    tone={milestone.status === 'completed' ? 'success' : milestone.status === 'active' ? 'info' : 'warning'}
+                  />
                   <div className="entity-actions">
                     <Button variant="secondary" onClick={() => editMilestone(milestone)}>
                       Edit

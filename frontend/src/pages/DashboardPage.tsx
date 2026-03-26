@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, EmptyState, SectionHeader, StatCard, Badge } from '../components/Primitives';
+import { Badge, Card, EmptyState, MiniBarChart, ProgressBar, SectionHeader, Sparkline, StatCard } from '../components/Primitives';
 import { dashboardApi } from '../lib/api';
 import { formatDate, relativeDueLabel } from '../lib/dates';
 import type { DashboardSummary } from '../types';
@@ -10,7 +10,10 @@ const emptySummary: DashboardSummary = {
   today_tasks: [],
   overdue_tasks: [],
   upcoming_milestones: [],
-  recent_daily_logs: []
+  recent_daily_logs: [],
+  project_progress: [],
+  task_status_breakdown: [],
+  focus_hours_trend: []
 };
 
 export function DashboardPage() {
@@ -55,6 +58,12 @@ export function DashboardPage() {
     { label: 'Upcoming milestones', value: summary.upcoming_milestones.length }
   ];
 
+  const projectProgress = summary.project_progress ?? [];
+  const taskBreakdown = summary.task_status_breakdown ?? [];
+  const focusTrend = summary.focus_hours_trend ?? [];
+  const completedProjects = projectProgress.filter((item) => item.completion_percent >= 100).length;
+  const completedTodayTasks = summary.today_tasks.filter((task) => task.status === 'done').length;
+
   return (
     <div className="page">
       <div className="page-header">
@@ -68,6 +77,71 @@ export function DashboardPage() {
         {stats.map((stat) => (
           <StatCard key={stat.label} {...stat} />
         ))}
+      </div>
+
+      <div className="grid three">
+        <Card className="section-card">
+          <SectionHeader title="Project progress" description="How far each active track has moved." />
+          <div className="stack">
+            {projectProgress.length ? (
+              projectProgress.slice(0, 4).map((item) => (
+                <ProgressBar
+                  key={item.project_id}
+                  label={item.project_name}
+                  value={item.completion_percent}
+                  caption={`${item.completed_tasks}/${item.total_tasks} tasks complete · ${item.overdue_tasks} overdue`}
+                  tone={item.completion_percent >= 80 ? 'success' : item.overdue_tasks > 0 ? 'warning' : 'info'}
+                />
+              ))
+            ) : (
+              <EmptyState title="No progress data yet" description="Once tasks exist, project progress will show up here." />
+            )}
+            <div className="chart-legend">
+              <div className="legend-row">
+                <span>Completed projects</span>
+                <strong>{completedProjects}</strong>
+              </div>
+              <div className="legend-row">
+                <span>Today tasks done</span>
+                <strong>{completedTodayTasks}</strong>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="section-card">
+          <SectionHeader title="Task mix" description="A quick read on task status distribution." />
+          <MiniBarChart values={taskBreakdown.map((item) => item.count)} labels={taskBreakdown.map((item) => item.status.slice(0, 3))} />
+          <div className="chart-legend">
+            {taskBreakdown.length ? (
+              taskBreakdown.map((item) => (
+                <div key={item.status} className="legend-row">
+                  <span>{item.status}</span>
+                  <strong>{item.count}</strong>
+                </div>
+              ))
+            ) : (
+              <p className="muted">No tasks yet.</p>
+            )}
+          </div>
+        </Card>
+
+        <Card className="section-card">
+          <SectionHeader title="Focus trend" description="Recent daily focus hours at a glance." />
+          <Sparkline values={focusTrend.map((item) => item.total_focus_hours)} />
+          <div className="chart-legend">
+            {focusTrend.length ? (
+              focusTrend.slice(-4).map((item) => (
+                <div key={item.log_date} className="legend-row">
+                  <span>{formatDate(item.log_date)}</span>
+                  <strong>{item.total_focus_hours.toFixed(1)}h</strong>
+                </div>
+              ))
+            ) : (
+              <p className="muted">No daily logs yet.</p>
+            )}
+          </div>
+        </Card>
       </div>
 
       <div className="grid two">
@@ -92,6 +166,11 @@ export function DashboardPage() {
                     <Badge tone="neutral">Priority: {project.priority}</Badge>
                     <Badge tone="neutral">Target {formatDate(project.target_date)}</Badge>
                   </div>
+                  <ProgressBar
+                    label="Completion"
+                    value={projectProgress.find((item) => item.project_id === project.id)?.completion_percent ?? 0}
+                    caption="Based on completed tasks."
+                  />
                 </div>
               ))
             ) : (
@@ -167,6 +246,7 @@ export function DashboardPage() {
                   <div className="entity-meta">
                     <Badge tone="neutral">Progress {milestone.progress ?? 0}%</Badge>
                   </div>
+                  <ProgressBar label="Milestone progress" value={milestone.progress ?? 0} caption={formatDate(milestone.due_date)} />
                 </div>
               ))
             ) : (
@@ -206,4 +286,3 @@ export function DashboardPage() {
     </div>
   );
 }
-

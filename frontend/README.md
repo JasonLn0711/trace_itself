@@ -2,6 +2,8 @@
 
 This is the React + Vite client for the trace_itself MVP.
 
+It now supports username/password sign-in, an admin-only Users page, and lightweight progress visuals on the dashboard and project detail views.
+
 ## Development
 
 ```bash
@@ -19,4 +21,3 @@ The included `Dockerfile` builds the app and serves it through Nginx. The Nginx 
 ## Notes
 
 The app assumes cookie-based auth and a same-origin `/api` prefix so it can sit behind a private reverse proxy or VPN-style deployment.
-

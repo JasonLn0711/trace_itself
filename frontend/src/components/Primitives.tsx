@@ -65,6 +65,93 @@ export function StatCard({ label, value, hint }: { label: string; value: string 
   );
 }
 
+export function ProgressBar({
+  label,
+  value,
+  max = 100,
+  caption,
+  tone = 'info'
+}: {
+  label: string;
+  value: number;
+  max?: number;
+  caption?: string;
+  tone?: 'info' | 'success' | 'warning' | 'danger';
+}) {
+  const percent = max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100));
+  return (
+    <div className="progress-block">
+      <div className="progress-head">
+        <span className="progress-label">{label}</span>
+        <strong>{Math.round(percent)}%</strong>
+      </div>
+      <div className="progress-track" aria-hidden="true">
+        <div className={`progress-fill progress-${tone}`} style={{ width: `${percent}%` }} />
+      </div>
+      {caption ? <div className="muted small">{caption}</div> : null}
+    </div>
+  );
+}
+
+export function MiniBarChart({
+  values,
+  labels,
+  height = 90
+}: {
+  values: number[];
+  labels?: string[];
+  height?: number;
+}) {
+  const safeValues = values.length ? values : [0];
+  const max = Math.max(...safeValues, 1);
+  const width = safeValues.length * 28 + (safeValues.length - 1) * 12;
+
+  return (
+    <div className="mini-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Simple bar chart">
+        {safeValues.map((value, index) => {
+          const barHeight = Math.max(6, (value / max) * (height - 18));
+          const x = index * 40;
+          const y = height - barHeight;
+          return (
+            <g key={`${labels?.[index] ?? index}-${value}`}>
+              <rect x={x} y={y} width="28" height={barHeight} rx="8" className="mini-chart-bar" />
+              {labels?.[index] ? <text x={x + 14} y={height - 2} textAnchor="middle" className="mini-chart-label">{labels[index]}</text> : null}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+export function Sparkline({
+  values,
+  colorClass = 'info'
+}: {
+  values: number[];
+  colorClass?: 'info' | 'success' | 'warning' | 'danger';
+}) {
+  const safeValues = values.length ? values : [0];
+  const max = Math.max(...safeValues, 1);
+  const min = Math.min(...safeValues, 0);
+  const width = Math.max(160, safeValues.length * 28);
+  const height = 72;
+  const points = safeValues
+    .map((value, index) => {
+      const x = safeValues.length === 1 ? width / 2 : (index / (safeValues.length - 1)) * (width - 10) + 5;
+      const y = height - 8 - ((value - min) / Math.max(max - min, 1)) * 48;
+      return `${x},${y}`;
+    })
+    .join(' ');
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className={`sparkline sparkline-${colorClass}`} role="img" aria-label="Trend line chart">
+      <polyline points={points} fill="none" />
+    </svg>
+  );
+}
+
 export function EmptyState({
   title,
   description,

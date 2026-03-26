@@ -7,6 +7,7 @@ import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { TasksPage } from './pages/TasksPage';
 import { DailyLogsPage } from './pages/DailyLogsPage';
+import { UsersPage } from './pages/UsersPage';
 
 function ProtectedRoute() {
   const { authenticated, loading } = useAuth();
@@ -30,6 +31,16 @@ function ProtectedRoute() {
   return <Outlet />;
 }
 
+function AdminRoute() {
+  const { user } = useAuth();
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -41,10 +52,12 @@ export default function App() {
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/daily-logs" element={<DailyLogsPage />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/users" element={<UsersPage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
