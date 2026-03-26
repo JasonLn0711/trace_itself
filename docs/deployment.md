@@ -49,6 +49,9 @@ Optional ASR tuning:
 - `ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25` for the default local ASR model
 - `ASR_DEVICE=cpu` for normal lab-machine use
 - `ASR_COMPUTE_TYPE=float32` for the default Breeze CPU path
+- `ASR_LIVE_PARTIAL_INTERVAL_MS=1500` for the live partial refresh cadence
+- `ASR_LIVE_COMMIT_SILENCE_MS=1200` for the pause length that commits a live utterance
+- `ASR_LIVE_MAX_WINDOW_SECONDS=18` for the rolling live decode window
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
 - `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
@@ -79,8 +82,10 @@ curl http://127.0.0.1:3000/
 ASR notes:
 
 - The first transcription request downloads the Breeze ASR model into the Docker volume `asr_model_cache`.
+- The first live ASR chunk can also trigger that model warm-up, so the very first live response may be slower.
 - That first ASR run can take longer than normal, depending on your network and chosen model.
 - After the model is cached, later transcriptions are much faster.
+- The live ASR page streams mic audio in small normalized chunks and still stores a compact Opus/WebM recording when the take is saved.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
 - Provider API secrets are stored encrypted in Postgres.

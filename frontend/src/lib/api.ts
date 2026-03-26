@@ -5,6 +5,7 @@ import type {
   AIProviderInput,
   AsrTranscript,
   AsrTranscriptSummary,
+  LiveAsrSessionSnapshot,
   DailyLog,
   DashboardSummary,
   MeetingRecord,
@@ -80,6 +81,37 @@ async function requestForm<T>(
       ...(headers ?? {})
     },
     body: formData
+  });
+
+  const contentType = response.headers.get('content-type') ?? '';
+  const isJson = contentType.includes('application/json');
+  const payload = isJson ? await response.json().catch(() => undefined) : await response.text().catch(() => undefined);
+
+  if (!response.ok) {
+    if (response.status === 401 && handleUnauthorized && typeof window !== 'undefined') {
+      window.location.assign('/login');
+    }
+    throw new ApiError(response.status, normalizeErrorMessage(payload) ?? response.statusText, payload);
+  }
+
+  return payload as T;
+}
+
+async function requestBinary<T>(
+  path: string,
+  body: ArrayBuffer | Uint8Array,
+  options: Omit<RequestOptions, 'body'> = {}
+): Promise<T> {
+  const { headers, handleUnauthorized = true, ...init } = options;
+  const binaryBody = body instanceof Uint8Array ? body.slice().buffer : body;
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    ...init,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      ...(headers ?? {})
+    },
+    body: binaryBody
   });
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -199,6 +231,40 @@ export const asrApi = {
     }
     return requestForm<AsrTranscript>('/asr/transcripts', formData, {
       method: 'POST'
+    });
+  },
+  createLiveSession(input?: { language?: string; provider_id?: number | null }) {
+    return request<LiveAsrSessionSnapshot>('/asr/live-sessions', {
+      method: 'POST',
+      body: {
+        language: input?.language?.trim() || null,
+        provider_id: input?.provider_id ?? null
+      }
+    });
+  },
+  pushLiveChunk(sessionId: string, chunk: ArrayBuffer | Uint8Array) {
+    return requestBinary<LiveAsrSessionSnapshot>(`/asr/live-sessions/${sessionId}/chunks`, chunk, {
+      method: 'POST'
+    });
+  },
+  finalizeLiveSession(sessionId: string) {
+    return request<LiveAsrSessionSnapshot>(`/asr/live-sessions/${sessionId}/finalize`, {
+      method: 'POST'
+    });
+  },
+  persistLiveSession(input: { session_id: string; file: File; title?: string }) {
+    const formData = new FormData();
+    formData.append('file', input.file);
+    if (input.title?.trim()) {
+      formData.append('title', input.title.trim());
+    }
+    return requestForm<AsrTranscript>(`/asr/live-sessions/${input.session_id}/persist`, formData, {
+      method: 'POST'
+    });
+  },
+  discardLiveSession(sessionId: string) {
+    return request<void>(`/asr/live-sessions/${sessionId}`, {
+      method: 'DELETE'
     });
   },
   remove(id: number) {

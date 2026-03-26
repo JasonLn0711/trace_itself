@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     asr_device: str = "cpu"
     asr_compute_type: str = "float32"
     asr_cpu_threads: int = 4
+    asr_live_sample_rate: int = 16000
+    asr_live_partial_interval_ms: int = 1500
+    asr_live_commit_silence_ms: int = 1200
+    asr_live_max_window_seconds: int = 18
+    asr_live_prompt_tail_words: int = 48
+    asr_live_vad_threshold: float = 0.45
+    asr_live_vad_min_silence_ms: int = 450
+    asr_live_vad_speech_pad_ms: int = 180
+    asr_live_preview_beam_size: int = 1
+    asr_live_final_beam_size: int = 5
     asr_upload_dir: str = "/data/asr"
     asr_max_upload_mb: int = 512
     meeting_upload_dir: str = "/data/meetings"
@@ -48,6 +58,14 @@ class Settings(BaseSettings):
     @property
     def asr_max_upload_bytes(self) -> int:
         return self.asr_max_upload_mb * 1024 * 1024
+
+    @property
+    def asr_live_partial_interval_seconds(self) -> float:
+        return self.asr_live_partial_interval_ms / 1000
+
+    @property
+    def asr_live_commit_silence_seconds(self) -> float:
+        return self.asr_live_commit_silence_ms / 1000
 
     @property
     def meeting_max_upload_bytes(self) -> int:

@@ -153,4 +153,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-asr-streaming",
+        version_tag="v1.0.58",
+        title="Live streaming ASR",
+        summary="The ASR page now supports real-time transcript updates with noise-aware live capture.",
+        details=(
+            "Live ASR now streams normalized mic audio in rolling chunks, uses faster-whisper with Silero VAD-backed "
+            "speech gating, and auto-saves a compact recording with the finished transcript."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.BUILD,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

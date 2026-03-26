@@ -14,7 +14,7 @@ It now has two main user-facing functions:
 - Admin control panel for access groups, provider storage, and feature permissions
 - Temporary account lockout after repeated failed login attempts
 - Projects, milestones, tasks, and daily logs
-- Private ASR with saved audio and per-user transcript history
+- Private ASR with live streaming, saved audio, and per-user transcript history
 - Meeting records with transcript, minutes, summary, and action items
 - Shared product updates log for fixes, builds, and release notes
 - Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
@@ -28,7 +28,7 @@ It now has two main user-facing functions:
 - Frontend: Next.js + React
 - Backend: FastAPI + SQLAlchemy
 - Database: PostgreSQL 16
-- ASR engine: local Breeze ASR 25 via faster-whisper
+- ASR engine: local Breeze ASR 25 via faster-whisper with rolling live-stream decode
 - Meeting summarizer: Gemini 3.1 Flash-Lite API
 - Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
 - Secrets vault: encrypted provider API key storage in Postgres
@@ -100,6 +100,8 @@ Why this shape:
    - `ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25`
    - `ASR_DEVICE=cpu`
    - `ASR_COMPUTE_TYPE=float32`
+   - `ASR_LIVE_PARTIAL_INTERVAL_MS=1500`
+   - `ASR_LIVE_COMMIT_SILENCE_MS=1200`
    - `ASR_MAX_UPLOAD_MB=512`
 
    Optional meeting-note setup:
@@ -146,11 +148,14 @@ Notes for the versioned updates log:
 Notes for ASR:
 
 - The first transcription request downloads the ASR model into the Docker volume `asr_model_cache`.
+- The live ASR path streams normalized mic audio in small chunks instead of waiting for a full upload.
+- The browser capture path applies echo cancellation, noise suppression, adaptive loudness control, and a speech-friendly compressed recording for storage.
 - Uploaded or recorded audio is stored in the Docker volume `app_data`, and transcript/meeting metadata is stored in Postgres.
 - Supported upload formats include common file types such as `wav`, `mp3`, `m4a`, `ogg`, `flac`, and `webm`.
 - In-browser recordings use speech-optimized compressed audio so meeting capture stays storage-friendly.
 - Users only see ASR providers that match their feature permissions.
 - Audio jobs follow the admin policy limit for max duration per file. The default is 5 hours.
+- The first live chunk can take longer than normal if the ASR model still needs to warm the cache on the server.
 
 Notes for meeting records:
 

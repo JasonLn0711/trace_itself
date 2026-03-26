@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,9 +11,10 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.asr_transcript import AsrTranscript
 from app.models.user import User
-from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary
+from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary, LiveAsrSessionCreate, LiveAsrSessionRead
 from app.services.asr import AsrServiceError, service as asr_service
 from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
+from app.services.live_asr import LiveAsrSessionError, service as live_asr_service
 from app.services.usage_policy import ensure_audio_duration_allowed, get_or_create_usage_policy, record_usage_event
 from app.core.enums import UsageEventKind
 
@@ -56,6 +57,17 @@ def normalize_title(raw_title: str | None, original_filename: str) -> str:
     return (stem or "Transcript")[:200]
 
 
+def normalize_language(raw_language: str | None) -> str | None:
+    normalized_language = (raw_language or "").strip().lower() or None
+    if normalized_language == "auto":
+        normalized_language = None
+    return normalized_language
+
+
+def to_live_read(payload: dict[str, str | float | bool | None]) -> LiveAsrSessionRead:
+    return LiveAsrSessionRead.model_validate(payload)
+
+
 @router.get("/transcripts/{transcript_id}/audio")
 def download_audio(transcript: AsrTranscript = Depends(get_asr_transcript_or_404)) -> FileResponse:
     if not transcript.audio_storage_path:
@@ -84,6 +96,124 @@ def list_transcripts(
 @router.get("/transcripts/{transcript_id}", response_model=AsrTranscriptRead)
 def get_transcript(transcript: AsrTranscript = Depends(get_asr_transcript_or_404)) -> AsrTranscriptRead:
     return to_read(transcript)
+
+
+@router.post("/live-sessions", response_model=LiveAsrSessionRead, status_code=status.HTTP_201_CREATED)
+def create_live_session(
+    payload: LiveAsrSessionCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LiveAsrSessionRead:
+    provider = resolve_ai_provider(
+        kind=AIProviderKind.ASR,
+        provider_id=payload.provider_id,
+        current_user=current_user,
+        db=db,
+    )
+    policy = get_or_create_usage_policy(db)
+    session = live_asr_service.create_session(
+        user_id=current_user.id,
+        provider_id=provider.id,
+        model_name=provider.model_name,
+        language_hint=normalize_language(payload.language),
+        max_duration_seconds=policy.max_audio_seconds_per_request,
+    )
+    return to_live_read(live_asr_service.build_payload(session))
+
+
+@router.post("/live-sessions/{session_id}/chunks", response_model=LiveAsrSessionRead)
+async def ingest_live_chunk(
+    session_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> LiveAsrSessionRead:
+    raw_chunk = await request.body()
+    if not raw_chunk:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Audio chunk is empty.")
+    try:
+        session = await live_asr_service.ingest_chunk(session_id, current_user.id, raw_chunk)
+    except LiveAsrSessionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return to_live_read(live_asr_service.build_payload(session))
+
+
+@router.post("/live-sessions/{session_id}/finalize", response_model=LiveAsrSessionRead)
+async def finalize_live_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+) -> LiveAsrSessionRead:
+    try:
+        session = await live_asr_service.finalize_session(session_id, current_user.id)
+    except LiveAsrSessionError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return to_live_read(live_asr_service.build_payload(session))
+
+
+@router.post("/live-sessions/{session_id}/persist", response_model=AsrTranscriptRead, status_code=status.HTTP_201_CREATED)
+async def persist_live_session(
+    session_id: str,
+    file: UploadFile = File(...),
+    title: str | None = Form(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AsrTranscriptRead:
+    try:
+        session = live_asr_service.get_session(session_id, current_user.id)
+    except LiveAsrSessionError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    if not session.finalized:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Finalize the live session before saving it.")
+    if not session.committed_text.strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No speech was captured in this live session.")
+
+    stored_audio = save_upload_file(
+        file,
+        storage_root=Path(settings.asr_upload_dir),
+        max_bytes=settings.asr_max_upload_bytes,
+        prefix=f"asr-live-{current_user.id}",
+    )
+    try:
+        policy = get_or_create_usage_policy(db)
+        probed_duration_seconds = probe_audio_duration_seconds(stored_audio.storage_path)
+        ensure_audio_duration_allowed(probed_duration_seconds, policy)
+    except HTTPException:
+        delete_audio_file(stored_audio.storage_path)
+        raise
+
+    transcript = AsrTranscript(
+        user_id=current_user.id,
+        title=normalize_title(title, stored_audio.original_filename),
+        original_filename=stored_audio.original_filename,
+        audio_storage_path=stored_audio.relative_storage_path,
+        audio_mime_type=stored_audio.mime_type,
+        language=session.detected_language or session.language_hint,
+        duration_seconds=probed_duration_seconds,
+        file_size_bytes=stored_audio.file_size_bytes,
+        model_name=session.model_name,
+        transcript_text=session.committed_text,
+    )
+    db.add(transcript)
+    record_usage_event(
+        db,
+        user_id=current_user.id,
+        provider_id=session.provider_id,
+        kind=UsageEventKind.ASR_AUDIO,
+        source="asr_live_stream",
+        duration_seconds=probed_duration_seconds,
+    )
+    db.commit()
+    db.refresh(transcript)
+    live_asr_service.mark_persisted(session_id, current_user.id)
+    return to_read(transcript)
+
+
+@router.delete("/live-sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def discard_live_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+) -> None:
+    live_asr_service.discard_session(session_id, current_user.id)
 
 
 @router.post("/transcripts", response_model=AsrTranscriptRead, status_code=status.HTTP_201_CREATED)
@@ -115,9 +245,7 @@ async def transcribe_audio(
         delete_audio_file(stored_audio.storage_path)
         raise
 
-    normalized_language = (language or "").strip().lower() or None
-    if normalized_language == "auto":
-        normalized_language = None
+    normalized_language = normalize_language(language)
 
     try:
         result = asr_service.transcribe_file(

@@ -122,6 +122,19 @@ export interface AsrTranscript {
   updated_at: string;
 }
 
+export interface LiveAsrSessionSnapshot {
+  session_id: string;
+  state: string;
+  language: string | null;
+  duration_seconds: number;
+  level: number;
+  committed_text: string;
+  partial_text: string;
+  preview_text: string;
+  model_name: string;
+  final_ready: boolean;
+}
+
 export interface MeetingRecordSummary {
   id: number;
   title: string;

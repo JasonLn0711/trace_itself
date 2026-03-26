@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AudioCapturePanel } from '../components/AudioCapturePanel';
+import { LiveAsrPanel } from '../components/LiveAsrPanel';
 import {
   Badge,
   Button,
@@ -176,6 +177,15 @@ export function AsrPage() {
     setNotice('Transcript copied.');
   }
 
+  async function handleLiveSaved(created: AsrTranscript) {
+    setSelected(created);
+    setSelectedId(created.id);
+    setTitle('');
+    setLanguage('');
+    setPolicySnapshot(await usagePolicyApi.get());
+    await loadEntries(created.id);
+  }
+
   if (loading) {
     return (
       <div className="page">
@@ -191,7 +201,7 @@ export function AsrPage() {
     <div className="page">
       <PageIntro
         title="ASR"
-        description="Record or upload. Save text."
+        description="Live or file. Save text."
         actions={
           <>
             <button className="btn btn-primary" type="button" onClick={() => void loadEntries(selectedId)}>
@@ -220,7 +230,55 @@ export function AsrPage() {
 
       <div className="grid two">
         <Card className="section-card">
-          <SectionHeader title="New transcript" />
+          <SectionHeader title="Live" description="Streaming text with rolling context." />
+          <div className="form-grid">
+            <div className="form-grid cols-2">
+              <label className="field">
+                <span>Title</span>
+                <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Optional" />
+              </label>
+              <label className="field">
+                <span>Language</span>
+                <input value={language} onChange={(event) => setLanguage(event.target.value)} placeholder="auto, en, zh" />
+              </label>
+            </div>
+            {providers.length > 1 ? (
+              <label className="field">
+                <span>ASR provider</span>
+                <select value={String(providerId ?? '')} onChange={(event) => setProviderId(Number(event.target.value) || null)}>
+                  {providers.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.name} · {provider.model_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="list-row-copy">
+                {providers[0] ? `${providers[0].name} · ${providers[0].model_name}` : 'No ASR provider available.'}
+              </div>
+            )}
+            <LiveAsrPanel
+              providerId={providerId}
+              providerLabel={providers.find((provider) => provider.id === providerId)?.name ?? providers[0]?.name ?? 'ASR'}
+              language={language}
+              title={title}
+              maxDurationSeconds={policySnapshot?.policy.max_audio_seconds_per_request ?? null}
+              onSaved={handleLiveSaved}
+              onNotice={(message) => {
+                setNotice(message);
+                setError('');
+              }}
+              onError={(message) => {
+                setError(message);
+                setNotice('');
+              }}
+            />
+          </div>
+        </Card>
+
+        <Card className="section-card">
+          <SectionHeader title="Upload" description="One-shot file transcription." />
           <form className="form-grid" onSubmit={handleSubmit}>
             <AudioCapturePanel file={file} onChange={setFile} filenameBase="asr" disabled={submitting} />
             <div className="form-grid cols-2">
@@ -259,7 +317,9 @@ export function AsrPage() {
             </Button>
           </form>
         </Card>
+      </div>
 
+      <div className="grid two">
         <Card className="section-card">
           <SectionHeader title="History" />
           <div className="list-table">

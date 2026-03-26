@@ -1281,6 +1281,17 @@ a.card.entity {
   gap: 10px;
 }
 
+.live-asr-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.live-asr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .audio-capture-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1377,6 +1388,11 @@ a.card.entity {
   word-break: break-word;
   max-height: 480px;
   overflow: auto;
+}
+
+.live-transcript-surface .transcript-body {
+  min-height: 220px;
+  max-height: 360px;
 }
 
 @keyframes spin {
