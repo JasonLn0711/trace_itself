@@ -12,6 +12,7 @@
 - FastAPI backend with PostgreSQL
 - React frontend served behind Nginx
 - Docker Compose deployment with localhost-only exposure by default
+- Tailscale-first private remote access tutorial for lab-server deployment
 
 ## Architecture
 
@@ -45,7 +46,8 @@ Why this shape:
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── docs/
-│   └── deployment.md
+│   ├── deployment.md
+│   └── tailscale.md
 ├── frontend/
 │   ├── src/
 │   ├── Dockerfile
@@ -117,7 +119,38 @@ The Vite dev server proxies `/api` to `http://localhost:8000` by default.
 
 ## Deployment
 
-Use the guide in [docs/deployment.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/deployment.md) for the lab-server setup and private remote access flow.
+Use the guide in [docs/deployment.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/deployment.md) for the lab-server deployment flow and [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md) for the step-by-step Tailscale setup tutorial.
+
+## Private remote access with Tailscale
+
+`trace_itself` is designed to stay local to the host and then be shared privately through Tailscale:
+
+- `db` stays on Docker's internal network only
+- `backend` binds to `127.0.0.1:8000`
+- `frontend` binds to `127.0.0.1:3000`
+- Tailscale Serve publishes the frontend privately to your tailnet
+
+Recommended flow:
+
+1. Start the app with Docker Compose.
+2. Install and sign into Tailscale on the lab server.
+3. Run:
+
+   ```bash
+   sudo tailscale serve --bg 3000
+   tailscale serve status
+   tailscale funnel status
+   ```
+
+4. Open the `https://...ts.net` URL shown by `tailscale serve status` from a device that is signed into the same tailnet.
+
+Important:
+
+- Use `tailscale serve`, not `tailscale funnel`, for normal `trace_itself` access.
+- `tailscale funnel` exposes the site to the public internet.
+- Set `SESSION_COOKIE_SECURE=true` in `.env` before real remote use over Tailscale HTTPS, then restart the stack.
+
+The full tutorial, firewall steps, troubleshooting checks, and optional Tailscale SSH notes are in [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md).
 
 ## Suggested next steps after MVP
 
