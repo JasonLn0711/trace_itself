@@ -167,4 +167,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="docs-mermaid-maps",
+        version_tag="v1.0.59",
+        title="Architecture diagrams in docs",
+        summary="The repo docs now include Mermaid diagrams for structure, workflow, deployment, and SOPs.",
+        details=(
+            "README, deployment, Tailscale, and frontend docs now show visual maps for the system layout, "
+            "update flow, private access path, and runtime structure to make onboarding and operations easier."
+        ),
+        area="docs",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=False,
+    ),
 )

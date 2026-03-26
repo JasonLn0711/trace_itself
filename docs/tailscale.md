@@ -11,6 +11,17 @@ It matches this repo's deployment model:
 
 This is the recommended production path for a personal or small trusted deployment.
 
+## Private access map
+
+```mermaid
+flowchart LR
+    DEV[Phone / Laptop] --> TNET[Tailscale tailnet]
+    TNET --> URL[https://...ts.net]
+    URL --> FE[Frontend on 127.0.0.1:3000]
+    FE --> BE[Backend on 127.0.0.1:8000]
+    BE --> DB[(Postgres)]
+```
+
 ## Why Tailscale here
 
 `trace_itself` is meant to be a private execution dashboard, not a public SaaS app.
@@ -154,6 +165,20 @@ You can also connect using the Tailscale IP or MagicDNS hostname for server oper
 
 ## Step 6: Lock down Ubuntu firewall rules
 
+### Security SOP
+
+```mermaid
+flowchart TD
+    START[Start hardening] --> DENY[ufw default deny incoming]
+    DENY --> ALLOW[Allow tailscale0]
+    ALLOW --> CHECK1[Check tailscale serve status]
+    CHECK1 --> CHECK2[Check tailscale funnel status]
+    CHECK2 --> OK{Funnel off?}
+    OK -->|Yes| READY[Private access ready]
+    OK -->|No| RESET[sudo tailscale funnel reset]
+    RESET --> READY
+```
+
 If you use `ufw`, the safe default is:
 
 ```bash
@@ -209,6 +234,17 @@ sudo tailscale set --ssh=false
 ```
 
 ## Day-2 operations
+
+### Remote access operating flow
+
+```mermaid
+flowchart TD
+    APP[Update or restart app] --> CHECK[Check docker compose ps]
+    CHECK --> SERVE[Check tailscale serve status]
+    SERVE --> FUNNEL[Check tailscale funnel status]
+    FUNNEL --> TEST[Open ts.net URL from another device]
+    TEST --> DONE[Remote path verified]
+```
 
 Check the app:
 

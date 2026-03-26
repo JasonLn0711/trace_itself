@@ -35,6 +35,19 @@ It now has two main user-facing functions:
 - Deployment: Docker Compose with a Next.js standalone frontend container
 - Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
 
+### System map
+
+```mermaid
+flowchart LR
+    U[User Device] --> T[Tailscale / Private HTTPS]
+    T --> F[Next.js Frontend]
+    F --> A[FastAPI Backend]
+    A --> P[(PostgreSQL)]
+    A --> D[(app_data volume)]
+    A --> C[(asr_model_cache)]
+    A --> G[Gemini API]
+```
+
 Why this shape:
 
 - Next.js gives us file-based routing, a cleaner production runtime, and an easier path to future server-side optimization without changing the product model.
@@ -75,6 +88,36 @@ Why this shape:
 ├── .env.example
 ├── docker-compose.yml
 └── README.md
+```
+
+### Repo structure map
+
+```mermaid
+flowchart TB
+    R[trace_itself]
+    R --> B[backend]
+    R --> FE[frontend]
+    R --> DOCS[docs]
+    R --> ENV[.env.example]
+    R --> DC[docker-compose.yml]
+
+    B --> BAPP[app]
+    BAPP --> BAPI[api]
+    BAPP --> BCORE[core]
+    BAPP --> BDB[db]
+    BAPP --> BMODELS[models]
+    BAPP --> BSCHEMAS[schemas]
+    BAPP --> BSERVICES[services]
+
+    FE --> FESRC[src]
+    FESRC --> FEAPP[app]
+    FESRC --> FECOMP[components]
+    FESRC --> FEFEATURES[features]
+    FESRC --> FELIB[lib]
+    FESRC --> FESTATE[state]
+
+    DOCS --> DEPLOY[deployment.md]
+    DOCS --> TAILSCALE[tailscale.md]
 ```
 
 ## Quick start
@@ -137,6 +180,40 @@ Why this shape:
    - tune the wallet guardrails for text runs and max audio length
 
 The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
+
+## Core workflows
+
+### Main user workflow
+
+```mermaid
+flowchart LR
+    L[Login] --> H[Home / Dashboard]
+    H --> PT[Project tracer]
+    H --> ASR[ASR]
+    H --> MT[Meetings]
+    H --> CT[Control]
+    H --> UP[Updates]
+
+    PT --> P1[Projects / Milestones / Tasks / Daily logs]
+    ASR --> A1[Live stream or upload]
+    A1 --> A2[Transcript saved]
+    MT --> M1[Audio]
+    M1 --> M2[Transcript]
+    M2 --> M3[Minutes / Summary / To-do]
+    CT --> C1[Users / Groups / Providers / Policy]
+```
+
+### Change and release workflow
+
+```mermaid
+flowchart TD
+    CH[Code or page change] --> IMPL[Implement and verify]
+    IMPL --> DOC[Update README / docs if needed]
+    DOC --> LOG[Add versioned entry in product_update_catalog.py]
+    LOG --> REBUILD[Rebuild containers]
+    REBUILD --> START[Restart stack]
+    START --> FEED[Updates page shows new release]
+```
 
 Notes for the versioned updates log:
 

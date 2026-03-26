@@ -11,6 +11,18 @@ For the full Tailscale setup tutorial, firewall guidance, verification steps, an
 - `frontend` binds to `127.0.0.1:3000` on the host.
 - Remote access is provided through Tailscale Serve so the app stays private to your tailnet.
 
+### Deployment topology
+
+```mermaid
+flowchart LR
+    RD[Remote device] --> TS[Tailscale Serve]
+    TS --> FE[frontend :3000]
+    FE --> BE[backend :8000]
+    BE --> DB[(Postgres)]
+    BE --> DATA[(app_data)]
+    BE --> CACHE[(asr_model_cache)]
+```
+
 ## Prerequisites
 
 - Docker Engine with the Compose plugin installed on the lab machine
@@ -145,6 +157,17 @@ Important:
 
 ### What to restart when code changes
 
+```mermaid
+flowchart TD
+    CH[You changed something] --> Q{What changed?}
+    Q -->|Frontend only| F[docker compose up --build -d frontend]
+    Q -->|Backend only| B[docker compose up --build -d backend]
+    Q -->|Both| FB[docker compose up --build -d]
+    Q -->|Env / Docker / config| FULL[docker compose down -> docker compose up --build -d]
+    Q -->|Schema risk| BACKUP[Back up DB first]
+    BACKUP --> B
+```
+
 Frontend only:
 
 ```bash
@@ -186,6 +209,16 @@ docker compose up --build -d
 If the browser still shows the old frontend after a frontend deploy, do a hard refresh.
 
 ### Database and schema changes
+
+```mermaid
+flowchart TD
+    M[Model or schema change] --> S{Existing table changed?}
+    S -->|No, only new tables| SAFE[Rebuild backend]
+    S -->|Yes| SQL[Add explicit upgrade SQL in bootstrap.py]
+    SQL --> BK[Take backup]
+    BK --> RB[Rebuild backend]
+    RB --> VERIFY[Verify app + data]
+```
 
 This repo currently creates missing tables on backend startup and runs explicit schema upgrade SQL from [backend/app/db/bootstrap.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/db/bootstrap.py).
 
