@@ -1,5 +1,7 @@
 # trace_itself
 
+![Status](https://img.shields.io/badge/Status-Active-success?logo=github) ![Python Version](https://img.shields.io/badge/Python-3.12-blue?logo=python) ![ASR Engine](https://img.shields.io/badge/ASR-faster--whisper-orange) ![UI](https://img.shields.io/badge/UI-Next.js-000000?logo=nextdotjs) ![VAD](https://img.shields.io/badge/VAD-Silero-success) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 `trace_itself` is a private, self-hosted execution dashboard for long-horizon learning and project management. It stays intentionally narrow, but it now supports multiple private user accounts with isolated data.
 
 Maintained by Jason Chia-Sheng Lin, PhD student at Institute of Biophotonics, NYCU. Feel free to contact me.
@@ -9,14 +11,28 @@ It now has two main user-facing functions:
 - Progress tracking for projects, milestones, tasks, and daily logs
 - Private audio workflows: ASR transcripts and meeting notes per user
 
+## Current highlights
+
+- One private app with two clear workspaces: project tracing and audio work
+- Live Breeze ASR on the lab server with timestamped streaming transcript lines
+- Saved live transcripts with MP3 playback and TXT export
+- Per-user transcript history, meeting notes, minutes, summary, and action items
+- Admin control for users, access groups, providers, usage policy, and device limits
+- 5-minute idle logout with a visible countdown that pauses during active audio work
+- Read-only Updates feed with version tags such as `v1.1.0`
+- CUDA-ready local ASR path for the RTX 5080 lab machine
+
 ## MVP scope
 
 - Multi-user account login with per-user private data
 - Admin-managed user accounts and password resets
-- Admin control panel for access groups, provider storage, and feature permissions
+- Admin user deletion controls except self-delete
+- Admin control panel for access groups, provider storage, feature permissions, and usage policy
 - Temporary account lockout after repeated failed login attempts
+- Per-user concurrent device/session limits with admin control
+- 5-minute idle timeout with a visible countdown
 - Projects, milestones, tasks, and daily logs
-- Private ASR with live streaming, saved audio, and per-user transcript history
+- Private audio workspace with live streaming, saved audio, transcript TXT export, and per-user history
 - Meeting records with transcript, minutes, summary, and action items
 - Shared product updates log for fixes, builds, and release notes
 - Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
@@ -30,9 +46,11 @@ It now has two main user-facing functions:
 - Frontend: Next.js + React
 - Backend: FastAPI + SQLAlchemy
 - Database: PostgreSQL 16
-- ASR engine: local Breeze ASR 25 via faster-whisper with rolling live-stream decode
+- ASR engine: local Breeze ASR 25 via faster-whisper with rolling live-stream decode on CUDA
+- Live speech gating: Silero VAD-backed commit logic plus browser-side noise handling
 - Meeting summarizer: Gemini 3.1 Flash-Lite API
 - Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
+- Session controls: concurrent-device limits plus idle timeout with active-work pause
 - Secrets vault: encrypted provider API key storage in Postgres
 - Deployment: Docker Compose with a Next.js standalone frontend container
 - Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
@@ -87,6 +105,8 @@ Why this shape:
 │   ├── Dockerfile
 │   ├── next.config.mjs
 │   └── package.json
+├── scripts/
+│   └── verify_cuda_asr.sh
 ├── .env.example
 ├── docker-compose.yml
 └── README.md
@@ -120,6 +140,8 @@ flowchart TB
 
     DOCS --> DEPLOY[deployment.md]
     DOCS --> TAILSCALE[tailscale.md]
+    R --> S[scripts]
+    S --> VERIFY[verify_cuda_asr.sh]
 ```
 
 ## Quick start
@@ -235,18 +257,16 @@ The backend auto-creates the MVP tables on startup and bootstraps the initial ad
 flowchart LR
     L[Login] --> H[Home / Dashboard]
     H --> PT[Project tracer]
-    H --> ASR[ASR]
-    H --> MT[Meetings]
+    H --> AW[Audio workspace]
     H --> CT[Control]
     H --> UP[Updates]
 
     PT --> P1[Projects / Milestones / Tasks / Daily logs]
-    ASR --> A1[Live stream or upload]
-    A1 --> A2[Transcript saved]
-    MT --> M1[Audio]
-    M1 --> M2[Transcript]
-    M2 --> M3[Minutes / Summary / To-do]
-    CT --> C1[Users / Groups / Providers / Policy]
+    AW --> A1[Live stream or upload]
+    A1 --> A2[Transcript lines]
+    A2 --> A3[Saved transcript MP3 TXT]
+    A2 --> A4[Minutes / Summary / To-do]
+    CT --> C1[Users / Groups / Providers / Policy / Devices]
 ```
 
 ### Change and release workflow
@@ -265,15 +285,18 @@ Notes for the versioned updates log:
 
 - The `Updates` page is read-only for signed-in users.
 - Release entries are source-controlled in [backend/app/core/product_update_catalog.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/core/product_update_catalog.py).
-- When you ship a new page or feature change, add a new catalog entry with the new date and a version label such as `v1.0.55`, then rebuild the backend.
+- When you ship a new page or feature change, add a new catalog entry with the new date and a version label such as `v1.1.0`, then rebuild the backend.
 - On startup, the backend syncs that catalog into the database so the `Updates` page and dashboard stay current.
 
 Notes for ASR:
 
 - The first transcription request downloads the ASR model into the Docker volume `asr_model_cache`.
 - The live ASR path streams normalized mic audio in small chunks instead of waiting for a full upload.
+- Live transcript lines keep timestamps and stay visible during the same session instead of being replaced.
 - The browser capture path applies echo cancellation, noise suppression, adaptive loudness control, and a speech-friendly compressed recording for storage.
 - Uploaded or recorded audio is stored in the Docker volume `app_data`, and transcript/meeting metadata is stored in Postgres.
+- When a live session is saved, the original raw recording is converted to MP3, the raw file is removed, and the saved record can be replayed in the app.
+- Saved live transcripts can also be downloaded as `.txt`.
 - Supported upload formats include common file types such as `wav`, `mp3`, `m4a`, `ogg`, `flac`, and `webm`.
 - In-browser recordings use speech-optimized compressed audio so meeting capture stays storage-friendly.
 - Users only see ASR providers that match their feature permissions.
@@ -295,6 +318,9 @@ Notes for the control plane:
 - Provider secrets are stored encrypted in the database.
 - The `Control` page is admin-only.
 - The `Policy` tab lets you cap text AI runs per 24 hours and max audio duration per file for all users.
+- Admins can delete other users, but cannot delete their own account.
+- Each user has an admin-set concurrent device limit. The default is 2 active devices.
+- The sidebar shows a visible idle-timeout clock, and audio work resets and pauses that timer.
 
 ## Local development
 
