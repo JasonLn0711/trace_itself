@@ -4,6 +4,19 @@ This guide assumes you want a private-first deployment on a lab machine that you
 
 For the full Tailscale setup tutorial, firewall guidance, verification steps, and troubleshooting, use [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md). This page focuses on the deployment flow for `trace_itself` itself.
 
+## What you are deploying
+
+You are not deploying a generic to-do app.
+
+The deployed system includes:
+
+- the mission-control dashboard
+- execution intelligence endpoints for next actions, stagnation, reality gap, weekly review, activity feed, and timeline
+- the project tracer surface for projects, milestones, tasks, and daily logs
+- the optional audio workspace for local ASR and meeting notes
+
+The command-center logic is computed inside the existing FastAPI backend. There is no separate worker tier or analytics service in the MVP, which keeps deployment and recovery simple.
+
 ## Deployment model
 
 - `db` stays on the internal Docker network only.

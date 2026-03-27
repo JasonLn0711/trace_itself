@@ -3,10 +3,17 @@ import type {
   AccessGroupInput,
   AIProvider,
   AIProviderInput,
+  AuditEvent,
   AsrTranscript,
   AsrTranscriptSummary,
   LiveAsrSessionSnapshot,
   DailyLog,
+  DashboardActivityFeed,
+  DashboardNextActions,
+  DashboardRealityGap,
+  DashboardStagnation,
+  DashboardTimeline,
+  DashboardWeeklyReview,
   DashboardSummary,
   MeetingRecord,
   MeetingRecordSummary,
@@ -363,6 +370,24 @@ export const meetingsApi = {
 export const dashboardApi = {
   summary() {
     return request<DashboardSummary>('/dashboard/summary');
+  },
+  nextActions() {
+    return request<DashboardNextActions>('/dashboard/next-actions');
+  },
+  stagnation() {
+    return request<DashboardStagnation>('/dashboard/stagnation');
+  },
+  realityGap() {
+    return request<DashboardRealityGap>('/dashboard/reality-gap');
+  },
+  weeklyReview() {
+    return request<DashboardWeeklyReview>('/dashboard/weekly-review');
+  },
+  activityFeed() {
+    return request<DashboardActivityFeed>('/dashboard/activity-feed');
+  },
+  timeline() {
+    return request<DashboardTimeline>('/dashboard/timeline');
   }
 };
 
@@ -454,6 +479,18 @@ export const usagePolicyApi = {
     return request<UsagePolicy>('/usage-policy', {
       method: 'PUT',
       body
+    });
+  }
+};
+
+export const auditEventsApi = {
+  list(query?: { user_id?: number; event_type?: string; limit?: number }) {
+    return request<AuditEvent[]>(withQuery('/audit-events', query));
+  },
+  trackPageView(path: string) {
+    return request<AuditEvent>('/audit-events/page-view', {
+      method: 'POST',
+      body: { path }
     });
   }
 };

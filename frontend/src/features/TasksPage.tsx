@@ -328,7 +328,7 @@ export function TasksPage() {
         actions={
           <>
             <Link className="btn btn-primary" href="/projects">Projects</Link>
-            <Link className="btn btn-ghost" href="/daily-logs">Log</Link>
+            <Link className="btn btn-ghost" href="/daily-logs">Daily Logs</Link>
           </>
         }
         aside={

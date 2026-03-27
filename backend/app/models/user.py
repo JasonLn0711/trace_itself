@@ -41,6 +41,7 @@ class User(Base):
     asr_transcripts = relationship("AsrTranscript", back_populates="user", cascade="all, delete-orphan")
     meeting_records = relationship("MeetingRecord", back_populates="user", cascade="all, delete-orphan")
     usage_events = relationship("AIUsageEvent", back_populates="user", cascade="all, delete-orphan")
+    audit_events = relationship("AuditEvent", back_populates="user")
     product_updates = relationship("ProductUpdate", back_populates="author")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 

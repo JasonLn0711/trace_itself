@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Badge,
@@ -50,6 +50,7 @@ function projectToForm(project: Project): ProjectFormState {
 }
 
 type ViewFilter = 'active' | 'planned' | 'paused' | 'completed' | 'all';
+const EDIT_PANEL_FLASH_MS = 900;
 
 export function ProjectsPage() {
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -62,7 +63,9 @@ export function ProjectsPage() {
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [viewFilter, setViewFilter] = useState<ViewFilter>('active');
+  const [editPanelFlashing, setEditPanelFlashing] = useState(false);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
+  const editPanelFlashTimeoutRef = useRef<number | null>(null);
 
   async function loadProjects() {
     const items = await projectsApi.list();
@@ -94,6 +97,29 @@ export function ProjectsPage() {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (editPanelFlashTimeoutRef.current !== null) {
+        window.clearTimeout(editPanelFlashTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function triggerEditPanelFlash() {
+    if (editPanelFlashTimeoutRef.current !== null) {
+      window.clearTimeout(editPanelFlashTimeoutRef.current);
+    }
+
+    setEditPanelFlashing(false);
+    window.requestAnimationFrame(() => {
+      setEditPanelFlashing(true);
+      editPanelFlashTimeoutRef.current = window.setTimeout(() => {
+        setEditPanelFlashing(false);
+        editPanelFlashTimeoutRef.current = null;
+      }, EDIT_PANEL_FLASH_MS);
+    });
+  }
 
   const activeCount = projects.filter((project) => project.status === 'active').length;
   const plannedCount = projects.filter((project) => project.status === 'planned').length;
@@ -171,6 +197,7 @@ export function ProjectsPage() {
     setForm(projectToForm(project));
     setError('');
     setNotice('');
+    triggerEditPanelFlash();
   }
 
   async function removeProject(project: Project) {
@@ -234,65 +261,67 @@ export function ProjectsPage() {
       {notice ? <Notice title={notice} tone="success" /> : null}
 
       <div className="grid two">
-        <Card className="section-card">
-          <SectionHeader title={editingId ? 'Edit' : 'New'} />
-          <form className="form-grid" onSubmit={handleSubmit}>
-            <Field label="Name">
-              <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Project name" required />
-            </Field>
-            <Field label="Description">
-              <textarea
-                value={form.description}
-                onChange={(event) => setForm({ ...form, description: event.target.value })}
-                placeholder="Short note"
-              />
-            </Field>
-            <div className="form-grid cols-2">
-              <Field label="Priority">
-                <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
+        <div className={`project-editor-panel${editPanelFlashing ? ' project-editor-panel-flash' : ''}`}>
+          <Card className="section-card">
+            <SectionHeader title={editingId ? 'Edit' : 'New'} />
+            <form className="form-grid" onSubmit={handleSubmit}>
+              <Field label="Name">
+                <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Project name" required />
               </Field>
-              <Field label="Status">
-                <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
-                  <option value="planned">Planned</option>
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
-                  <option value="completed">Completed</option>
-                  <option value="archived">Archived</option>
-                </select>
+              <Field label="Description">
+                <textarea
+                  value={form.description}
+                  onChange={(event) => setForm({ ...form, description: event.target.value })}
+                  placeholder="Short note"
+                />
               </Field>
-            </div>
-            <div className="form-grid cols-2">
-              <Field label="Start date">
-                <input type="date" value={form.start_date} onChange={(event) => setForm({ ...form, start_date: event.target.value })} />
-              </Field>
-              <Field label="Target date">
-                <input type="date" value={form.target_date} onChange={(event) => setForm({ ...form, target_date: event.target.value })} />
-              </Field>
-            </div>
-            <div className="helper-row">
-              <Button type="submit" disabled={saving}>
-                {saving ? 'Saving...' : editingId ? 'Update project' : 'Create project'}
-              </Button>
-              {editingId ? (
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => {
-                    setEditingId(null);
-                    setForm(defaultProjectForm());
-                  }}
-                >
-                  Cancel edit
+              <div className="form-grid cols-2">
+                <Field label="Priority">
+                  <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </Field>
+                <Field label="Status">
+                  <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+                    <option value="planned">Planned</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="completed">Completed</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="form-grid cols-2">
+                <Field label="Start date">
+                  <input type="date" value={form.start_date} onChange={(event) => setForm({ ...form, start_date: event.target.value })} />
+                </Field>
+                <Field label="Target date">
+                  <input type="date" value={form.target_date} onChange={(event) => setForm({ ...form, target_date: event.target.value })} />
+                </Field>
+              </div>
+              <div className="helper-row">
+                <Button type="submit" disabled={saving}>
+                  {saving ? 'Saving...' : editingId ? 'Update project' : 'Create project'}
                 </Button>
-              ) : null}
-            </div>
-          </form>
-        </Card>
+                {editingId ? (
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => {
+                      setEditingId(null);
+                      setForm(defaultProjectForm());
+                    }}
+                  >
+                    Cancel edit
+                  </Button>
+                ) : null}
+              </div>
+            </form>
+          </Card>
+        </div>
 
         <Card className="section-card">
           <SectionHeader title="List" />
@@ -311,7 +340,7 @@ export function ProjectsPage() {
             {visibleProjects.length ? (
               visibleProjects.map((project) => (
                 <div key={project.id} className="list-row">
-                  <div className="list-row-main">
+                  <Link className="list-row-main list-row-link" href={`/projects/${project.id}`} aria-label={`Open project ${project.name}`}>
                     <div className="list-row-header">
                       <h3 className="list-row-title line-clamp-1">{project.name}</h3>
                       <div className="list-row-meta">
@@ -325,7 +354,7 @@ export function ProjectsPage() {
                     <div className="list-row-copy line-clamp-1">
                       {project.description || 'No note'} · Start {formatDate(project.start_date)}
                     </div>
-                  </div>
+                  </Link>
                   <div className="list-row-actions">
                     <Link className="btn btn-primary" href={`/projects/${project.id}`}>
                       Open

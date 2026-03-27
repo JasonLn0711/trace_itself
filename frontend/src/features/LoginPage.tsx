@@ -1,12 +1,28 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '../state/AuthContext';
 import { BrandMark } from '../components/BrandMark';
-import { Button, Card, Field, Notice } from '../components/Primitives';
+import { Card } from '../components/Primitives';
+import { PublicAuthCard } from '../components/PublicAuthCard';
 import { resolvePostLoginPath } from '../lib/access';
 import { extractApiErrorMessage } from '../lib/api';
+import { useAuth } from '../state/AuthContext';
+
+const valueHighlights = [
+  {
+    title: 'Track missions',
+    detail: 'Organize long-horizon projects, milestones, and near-term priorities in one execution system.'
+  },
+  {
+    title: 'Detect drift',
+    detail: 'Spot overdue work, stalled tracks, and timelines at risk before they quietly slip.'
+  },
+  {
+    title: 'Review execution',
+    detail: 'Use daily logs and weekly review loops to compare intent with actual output.'
+  }
+];
 
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
@@ -19,11 +35,9 @@ export function LoginPage() {
   const { authenticated, loading, login, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [supportNotice, setSupportNotice] = useState('');
   const nextPath = safeRedirectPath(searchParams?.get('next') ?? null);
   const logoutReason = searchParams?.get('reason') ?? '';
 
@@ -35,12 +49,14 @@ export function LoginPage() {
 
   if (loading) {
     return (
-      <div className="login-shell">
-        <Card className="login-card">
-          <div className="spinner" />
-          <h1 className="login-title">trace_itself</h1>
-          <p className="muted">Checking session.</p>
-        </Card>
+      <div className="auth-entry-shell">
+        <div className="auth-entry-grid auth-entry-grid-loading">
+          <Card className="public-auth-card auth-loading-card">
+            <div className="spinner" />
+            <h1 className="login-title">trace_itself</h1>
+            <p className="muted">Checking your session.</p>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -49,12 +65,11 @@ export function LoginPage() {
     return null;
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleEmailLogin(identifier: string, password: string) {
     setSubmitting(true);
     setError('');
     try {
-      const nextUser = await login(username, password);
+      const nextUser = await login(identifier, password);
       router.replace(resolvePostLoginPath(nextUser, nextPath));
     } catch (err) {
       setError(extractApiErrorMessage(err) || 'Could not sign in');
@@ -63,68 +78,85 @@ export function LoginPage() {
     }
   }
 
+  function handleSupportAction(action: 'privacy' | 'terms' | 'contact' | 'waitlist') {
+    switch (action) {
+      case 'privacy':
+        setSupportNotice('Privacy and data-handling details will ship as dedicated public pages when open access begins.');
+        return;
+      case 'terms':
+        setSupportNotice('Formal product terms are not published yet during private testing, but public onboarding will add them here.');
+        return;
+      case 'contact':
+        setSupportNotice('For now, contact the person who issued your private-testing access.');
+        return;
+      case 'waitlist':
+        setSupportNotice('Request-access and waitlist flows will be added when the product opens beyond private testing.');
+        return;
+    }
+  }
+
   return (
-    <div className="login-shell">
-      <Card className="login-card login-surface">
-        <div className="login-brand-stack">
-          <div className="login-brand-mark" aria-hidden="true">
-            <BrandMark />
+    <div className="auth-entry-shell">
+      <div className="auth-entry-grid">
+        <section className="auth-entry-intro auth-entry-intro-primary">
+          <div className="auth-stage-chip">Private Beta</div>
+
+          <div className="auth-brand-row">
+            <div className="auth-brand-mark" aria-hidden="true">
+              <BrandMark />
+            </div>
+            <div className="auth-brand-copy">
+              <h1 className="auth-brand-title">trace_itself</h1>
+              <p className="auth-brand-positioning">Execution intelligence for long-horizon learning and project operations.</p>
+            </div>
           </div>
-          <div className="login-copy">
-            <h1 className="login-title">trace_itself</h1>
-            <p className="muted login-subtitle">Sign in</p>
+
+          <p className="auth-intro-copy">
+            A calm, product-grade entry point for a system that helps you see what matters now, what is drifting, and what actually moved.
+          </p>
+        </section>
+
+        <div className="auth-entry-side">
+          <PublicAuthCard
+            idleTimedOut={logoutReason === 'idle'}
+            error={error}
+            submitting={submitting}
+            onEmailLogin={handleEmailLogin}
+          />
+
+          {/* Keep the public auth entry focused on product-facing access. Internal/admin-only routes stay separate. */}
+          <div className="auth-support-footer">
+            <button type="button" className="auth-support-link" onClick={() => handleSupportAction('privacy')}>Privacy</button>
+            <button type="button" className="auth-support-link" onClick={() => handleSupportAction('terms')}>Terms</button>
+            <button type="button" className="auth-support-link" onClick={() => handleSupportAction('contact')}>Contact</button>
+            <button type="button" className="auth-support-link" onClick={() => handleSupportAction('waitlist')}>Request access</button>
           </div>
+
+          {supportNotice ? <p className="auth-support-note">{supportNotice}</p> : null}
         </div>
 
-        <form className="stack login-form" onSubmit={handleSubmit}>
-          <div className="login-fields">
-            <Field label="Username">
-              <input
-                type="text"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                autoComplete="username"
-                autoFocus
-                className="login-input"
-                placeholder="Username"
-                enterKeyHint="next"
-                required
-              />
-            </Field>
-            <Field label="Password">
-              <div className="password-field">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete="current-password"
-                  className="login-input password-input"
-                  placeholder="Password"
-                  enterKeyHint="go"
-                  required
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword((current) => !current)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
+        <section className="auth-entry-intro auth-entry-intro-secondary">
+          <div className="auth-highlight-list">
+            {valueHighlights.map((item) => (
+              <div key={item.title} className="auth-highlight-item">
+                <strong>{item.title}</strong>
+                <p>{item.detail}</p>
               </div>
-            </Field>
+            ))}
           </div>
 
-          {logoutReason === 'idle' && !error ? <Notice title="Session timed out" description="Sign in again." /> : null}
-          {error ? <Notice title="Sign-in failed" description={error} tone="danger" /> : null}
-
-          <Button type="submit" disabled={submitting || !username.trim() || !password}>
-            {submitting ? 'Signing in...' : 'Sign in'}
-          </Button>
-
-          <div className="login-note">Private</div>
-        </form>
-      </Card>
+          <div className="auth-context-panel">
+            <div className="auth-context-block">
+              <span className="auth-context-label">Current access</span>
+              <p>Private testing runs behind Tailscale today, with product access issued directly to invited users.</p>
+            </div>
+            <div className="auth-context-block">
+              <span className="auth-context-label">Public rollout path</span>
+              <p>This login surface is designed to expand into public multi-user auth without exposing internal or admin-only access here.</p>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

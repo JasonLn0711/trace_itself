@@ -2,6 +2,10 @@ import type { User } from '../types';
 
 export type AppFeature = 'project_tracer' | 'asr' | 'llm';
 
+export function isAdmin(user: User | null | undefined) {
+  return user?.role === 'admin';
+}
+
 export function canUseFeature(user: User | null | undefined, feature: AppFeature) {
   return Boolean(user?.capabilities?.[feature]);
 }
@@ -27,6 +31,9 @@ export function preferredRouteForUser(user: User | null | undefined) {
 export function canAccessPath(user: User | null | undefined, path: string) {
   if (path === '/' || path.startsWith('/projects') || path.startsWith('/tasks') || path.startsWith('/daily-logs')) {
     return canUseFeature(user, 'project_tracer');
+  }
+  if (path.startsWith('/users') || path.startsWith('/activity')) {
+    return isAdmin(user);
   }
   if (path.startsWith('/asr')) {
     return canUseAudioWorkspace(user);

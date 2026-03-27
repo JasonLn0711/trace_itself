@@ -4,8 +4,8 @@ import '../styles.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'trace_itself',
-  description: 'Private self-hosted progress dashboard and ASR workspace',
+  title: 'trace_itself | Personal Execution Intelligence',
+  description: 'A self-hosted personal execution intelligence system for multi-track learning and project operations.',
   icons: {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },

@@ -1,11 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandMark } from './BrandMark';
 import { Badge } from './Primitives';
 import { canUseAudioWorkspace, canUseFeature } from '../lib/access';
+import { auditEventsApi } from '../lib/api';
 import { useAuth } from '../state/AuthContext';
 
 function isActivePath(pathname: string, href: string) {
@@ -32,9 +34,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     ...(canUseAudioWorkspace(user) ? [{ to: '/meetings', label: 'Audio' }] : []),
     ...(canUseFeature(user, 'project_tracer') ? [{ to: '/projects', label: 'Projects' }, { to: '/tasks', label: 'Tasks' }] : []),
     ...(user?.role === 'admin' ? [{ to: '/users', label: 'Control' }] : []),
+    ...(user?.role === 'admin' ? [{ to: '/activity', label: 'Activity' }] : []),
     { to: '/updates', label: 'Updates' },
-    ...(canUseFeature(user, 'project_tracer') ? [{ to: '/daily-logs', label: 'Logs' }] : []),
+    ...(canUseFeature(user, 'project_tracer') ? [{ to: '/daily-logs', label: 'Daily Logs' }] : []),
   ];
+
+  useEffect(() => {
+    if (!pathname) {
+      return;
+    }
+    void auditEventsApi.trackPageView(pathname).catch(() => undefined);
+  }, [pathname]);
 
   return (
     <div className="app-shell">
@@ -45,6 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div>
             <div className="brand-title">trace_itself</div>
+            <div className="brand-caption">Execution OS</div>
           </div>
         </div>
 

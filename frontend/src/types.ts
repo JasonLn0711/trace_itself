@@ -3,6 +3,7 @@ export type PrimitivePriority = string;
 export type ProductUpdateType = 'build' | 'fix' | 'update' | 'security';
 export type AIProviderKind = 'asr' | 'llm';
 export type AIProviderDriver = 'local_breeze' | 'gemini';
+export type AuditEventType = 'login_success' | 'login_failed' | 'logout' | 'page_view';
 
 export type UserRole = 'admin' | 'member';
 
@@ -94,6 +95,19 @@ export interface ProductUpdate {
   author_display_name: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AuditEvent {
+  id: number;
+  user_id: number | null;
+  username: string | null;
+  display_name: string | null;
+  event_type: AuditEventType | string;
+  path: string | null;
+  description: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
 }
 
 export interface AsrTranscriptSummary {
@@ -264,6 +278,136 @@ export interface DashboardSummary {
   project_progress?: ProjectProgressItem[];
   task_status_breakdown?: TaskStatusBreakdownItem[];
   focus_hours_trend?: FocusHoursTrendItem[];
+}
+
+export interface DashboardTimelineMilestone {
+  id: number;
+  project_id: number;
+  title: string;
+  start_date: string;
+  due_date: string;
+  status: PrimitiveStatus;
+  progress: number;
+}
+
+export interface DashboardTimelineProject {
+  id: number;
+  name: string;
+  status: PrimitiveStatus;
+  start_date: string | null;
+  target_date: string | null;
+  milestones: DashboardTimelineMilestone[];
+}
+
+export interface DashboardTimeline {
+  today: string;
+  window_start: string;
+  window_end: string;
+  projects: DashboardTimelineProject[];
+}
+
+export interface DashboardNextActionItem {
+  action_title: string;
+  project_id: number | null;
+  project_name: string | null;
+  entity_type: string;
+  entity_id: number | null;
+  reason: string;
+  urgency_score: number;
+  due_date: string | null;
+  status: PrimitiveStatus | null;
+  route: string;
+}
+
+export interface DashboardNextActions {
+  items: DashboardNextActionItem[];
+}
+
+export interface DashboardStagnationAlert {
+  id: string;
+  category: string;
+  severity: string;
+  title: string;
+  description: string;
+  project_id: number | null;
+  project_name: string | null;
+  entity_type: string;
+  entity_id: number | null;
+  route: string;
+  due_date?: string | null;
+  last_activity_at?: string | null;
+  days_since_activity?: number | null;
+  progress?: number | null;
+}
+
+export interface DashboardProjectHealthItem {
+  project_id: number;
+  project_name: string;
+  status: PrimitiveStatus;
+  target_date: string | null;
+  completion_percent: number;
+  open_tasks: number;
+  overdue_tasks: number;
+  last_activity_at: string | null;
+  last_completion_at: string | null;
+  days_since_activity: number | null;
+  health: string;
+  note: string;
+}
+
+export interface DashboardStagnation {
+  alerts: DashboardStagnationAlert[];
+  project_health: DashboardProjectHealthItem[];
+  tracking_notes: string[];
+}
+
+export interface DashboardRealityGapTrendPoint {
+  label: string;
+  week_start: string;
+  planned_tasks: number;
+  completed_tasks: number;
+}
+
+export interface DashboardRealityGap {
+  planned_tasks_this_week: number;
+  completed_tasks_this_week: number;
+  weekly_completion_rate: number;
+  estimated_hours_this_week: number;
+  actual_hours_this_week: number;
+  overdue_ratio: number;
+  delay_rate: number;
+  trend: DashboardRealityGapTrendPoint[];
+}
+
+export interface DashboardWeeklyReview {
+  completed_tasks_this_week: number;
+  overdue_tasks: number;
+  most_active_project: string | null;
+  most_active_project_id: number | null;
+  inactive_projects: string[];
+  total_focus_hours: number;
+  focus_days_logged: number;
+  biggest_progress: string | null;
+  biggest_blocker: string | null;
+  summary_text: string;
+}
+
+export interface DashboardActivityFeedItem {
+  id: string;
+  event_type: string;
+  title: string;
+  detail: string | null;
+  entity_type: string;
+  entity_id: number | null;
+  project_id: number | null;
+  project_name: string | null;
+  changed_at: string;
+  route: string;
+  tone: string;
+}
+
+export interface DashboardActivityFeed {
+  items: DashboardActivityFeedItem[];
 }
 
 export interface ProjectProgressItem {

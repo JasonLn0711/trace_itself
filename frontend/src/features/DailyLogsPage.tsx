@@ -137,9 +137,9 @@ export function DailyLogsPage() {
 
   async function removeLog(log: DailyLog) {
     const confirmed = await confirm({
-      title: `Delete log for ${formatDate(log.log_date)}?`,
+      title: `Delete daily log for ${formatDate(log.log_date)}?`,
       description: 'This daily log entry will be removed.',
-      confirmLabel: 'Delete log'
+      confirmLabel: 'Delete daily log'
     });
     if (!confirmed) {
       return;
@@ -195,7 +195,7 @@ export function DailyLogsPage() {
         }
         aside={
           <div className="metric-strip">
-            <MetricPill label="Today log" value={todayLog ? 'Captured' : 'Missing'} tone={todayLog ? 'success' : 'warning'} />
+            <MetricPill label="Today's log" value={todayLog ? 'Captured' : 'Missing'} tone={todayLog ? 'success' : 'warning'} />
             <MetricPill label="Recent logs" value={recentLogs.length} tone="info" />
             <MetricPill label="Avg focus" value={`${focusSummary.averageHours.toFixed(1)}h`} tone="success" />
             <MetricPill label="Logs with blockers" value={blockerCount} tone={blockerCount ? 'warning' : 'neutral'} />
@@ -242,7 +242,7 @@ export function DailyLogsPage() {
             </Field>
             <div className="helper-row">
               <Button type="submit" disabled={saving}>
-                {saving ? 'Saving...' : editingId ? 'Update log' : 'Create log'}
+                {saving ? 'Saving...' : editingId ? 'Update daily log' : 'Create daily log'}
               </Button>
               {editingId ? (
                 <Button
