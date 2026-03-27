@@ -443,6 +443,7 @@ def sync_product_updates_catalog(db: Session, admin_id: int) -> None:
     items = list(db.scalars(select(ProductUpdate).order_by(ProductUpdate.id.asc())).all())
     existing_by_key = {item.entry_key: item for item in items if item.entry_key}
     legacy_by_title = {item.title: item for item in items if not item.entry_key}
+    catalog_keys = {entry.entry_key for entry in PRODUCT_UPDATE_CATALOG}
 
     dirty = False
     for entry in PRODUCT_UPDATE_CATALOG:
@@ -462,6 +463,11 @@ def sync_product_updates_catalog(db: Session, admin_id: int) -> None:
         item.is_pinned = entry.is_pinned
         item.author_user_id = admin_id
         dirty = True
+
+    for item in items:
+        if item.entry_key and item.entry_key not in catalog_keys:
+            db.delete(item)
+            dirty = True
 
     if dirty:
         db.commit()

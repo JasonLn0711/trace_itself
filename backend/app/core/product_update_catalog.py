@@ -365,4 +365,88 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="admin-session-and-user-controls",
+        version_tag="v1.1.3",
+        title="Admins can now remove users and cap active devices",
+        summary="Control now supports user deletion and per-user concurrent device limits.",
+        details=(
+            "Admins can remove other users, protect their own account from self-delete mistakes, "
+            "and set how many devices each user can keep signed in at the same time."
+        ),
+        area="admin",
+        change_type=ProductUpdateType.SECURITY,
+        changed_at=datetime.fromisoformat("2026-03-27T01:00:00+00:00"),
+        is_pinned=True,
+    ),
+    ProductUpdateCatalogEntry(
+        entry_key="simplified-access-groups",
+        version_tag="v1.1.4",
+        title="Access groups are now simpler",
+        summary="The default access model is now reduced to Full access, Projects only, and Audio workspace.",
+        details=(
+            "Default groups were cleaned up to better match the real product surface so admins can assign users "
+            "faster and with less confusion."
+        ),
+        area="admin",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T01:10:00+00:00"),
+        is_pinned=False,
+    ),
+    ProductUpdateCatalogEntry(
+        entry_key="matched-brand-icon-set",
+        version_tag="v1.1.5",
+        title="The app now has a matched icon set",
+        summary="trace_itself now uses a consistent brand icon across login, sidebar, tab icon, and install assets.",
+        details=(
+            "The old plain letter mark was replaced with a darker trace-inspired icon set so the product feels "
+            "more cohesive in the UI and browser chrome."
+        ),
+        area="frontend",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T01:20:00+00:00"),
+        is_pinned=False,
+    ),
+    ProductUpdateCatalogEntry(
+        entry_key="audio-status-layout-tightening",
+        version_tag="v1.1.6",
+        title="Audio status info is now tighter and easier to scan",
+        summary="The Audio page now uses a cleaner one-row status strip and less repeated copy.",
+        details=(
+            "The transcript flow no longer repeats the long local ASR model label in the header area, "
+            "and usage, cap, state, provider, and duration now read in one compact row."
+        ),
+        area="frontend",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T01:30:00+00:00"),
+        is_pinned=False,
+    ),
+    ProductUpdateCatalogEntry(
+        entry_key="mobile-layout-polish",
+        version_tag="v1.1.7",
+        title="Mobile layout got a dedicated polish pass",
+        summary="Small-screen pages now use tighter spacing, cleaner action groups, and more touch-friendly layout rules.",
+        details=(
+            "The mobile view now compresses cards, forms, lists, and audio controls more carefully while keeping "
+            "the desktop design unchanged."
+        ),
+        area="frontend",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T01:40:00+00:00"),
+        is_pinned=False,
+    ),
+    ProductUpdateCatalogEntry(
+        entry_key="mobile-width-fit-fix",
+        version_tag="v1.1.8",
+        title="Mobile width fit was corrected",
+        summary="Phone layouts now stay inside the viewport instead of feeling too wide.",
+        details=(
+            "We removed mobile-only width rules that could push content past the viewport and switched key phone layouts "
+            "back to wrapping and fit-width behavior without changing the desktop design."
+        ),
+        area="frontend",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-27T01:50:00+00:00"),
+        is_pinned=True,
+    ),
 )
