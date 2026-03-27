@@ -10,7 +10,7 @@ from app.models.access_group import AccessGroup
 from app.models.user import User
 from app.schemas.user import UserCreate, UserPasswordReset, UserRead, UserUpdate
 from app.services.security import hash_password
-from app.services.user_sessions import enforce_concurrent_session_limit
+from app.services.user_sessions import delete_all_user_sessions, enforce_concurrent_session_limit
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -94,6 +94,8 @@ def update_user(
             max_sessions=user.max_concurrent_sessions,
             preserve_session_token=preserve_session_token,
         )
+    if changes.get("is_active") is False:
+        delete_all_user_sessions(db, user_id=user.id)
     db.commit()
     db.refresh(user)
     return user
@@ -106,6 +108,7 @@ def reset_password(user_id: int, payload: UserPasswordReset, db: Session = Depen
     user.failed_login_attempts = 0
     user.locked_until = None
     db.add(user)
+    delete_all_user_sessions(db, user_id=user.id)
     db.commit()
     db.refresh(user)
     return user

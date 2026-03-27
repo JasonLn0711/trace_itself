@@ -49,6 +49,22 @@ def delete_user_session(db: Session, *, user_id: int | None, session_token: str 
     db.delete(session)
 
 
+def delete_all_user_sessions(
+    db: Session,
+    *,
+    user_id: int,
+    preserve_session_token: str | None = None,
+) -> int:
+    sessions = list(db.scalars(select(UserSession).where(UserSession.user_id == user_id)).all())
+    removed = 0
+    for session in sessions:
+        if preserve_session_token and session.session_token == preserve_session_token:
+            continue
+        db.delete(session)
+        removed += 1
+    return removed
+
+
 def enforce_concurrent_session_limit(
     db: Session,
     *,
@@ -89,5 +105,5 @@ def enforce_concurrent_session_limit(
     return removed
 
 
-def touch_user_session(session: UserSession) -> None:
-    session.last_seen_at = datetime.now(timezone.utc)
+def touch_user_session(session: UserSession, *, now: datetime | None = None) -> None:
+    session.last_seen_at = now or datetime.now(timezone.utc)

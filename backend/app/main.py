@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    settings.validate_runtime_security()
     init_db()
     try:
         asr_service.log_runtime_status()

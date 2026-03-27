@@ -66,6 +66,9 @@ class LiveAsrSessionManager:
         max_duration_seconds: int,
     ) -> LiveAsrSession:
         self._cleanup_expired()
+        active_sessions = sum(1 for session in self._sessions.values() if session.user_id == user_id)
+        if active_sessions >= max(1, settings.asr_live_max_sessions_per_user):
+            raise LiveAsrSessionError("Too many live ASR sessions are already open for this account.")
         now = monotonic()
         session = LiveAsrSession(
             id=uuid4().hex,
@@ -138,6 +141,11 @@ class LiveAsrSessionManager:
                 session.current_utterance_samples
                 and session.trailing_silence_seconds >= settings.asr_live_commit_silence_seconds
             ):
+                await self._commit_current_utterance(session)
+                session.state = "listening"
+                return session
+
+            if session.current_utterance_samples >= int(settings.asr_live_max_utterance_seconds * settings.asr_live_sample_rate):
                 await self._commit_current_utterance(session)
                 session.state = "listening"
                 return session

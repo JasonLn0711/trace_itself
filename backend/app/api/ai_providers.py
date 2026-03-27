@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.models.ai_provider import AIProvider
 from app.models.user import User
 from app.schemas.ai_provider import AIProviderCreate, AIProviderRead, AIProviderUpdate
+from app.services.provider_urls import ProviderUrlValidationError, normalize_provider_base_url
 from app.services.secrets import encrypt_secret, make_secret_hint
 
 router = APIRouter(prefix="/ai-providers", tags=["ai_providers"])
@@ -26,6 +27,13 @@ def validate_provider(kind: AIProviderKind, driver: AIProviderDriver) -> None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ASR currently supports only local Breeze providers.")
     if kind == AIProviderKind.LLM and driver != AIProviderDriver.GEMINI:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="LLM currently supports only Gemini providers.")
+
+
+def validate_provider_base_url(kind: AIProviderKind, driver: AIProviderDriver, base_url: str | None) -> str | None:
+    try:
+        return normalize_provider_base_url(kind=kind, driver=driver, value=base_url)
+    except ProviderUrlValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 def apply_api_key(provider: AIProvider, api_key: str | None, *, replace_only_if_present: bool) -> None:
@@ -65,7 +73,7 @@ def create_ai_provider(payload: AIProviderCreate, db: Session = Depends(get_db))
         kind=payload.kind,
         driver=payload.driver,
         model_name=payload.model_name,
-        base_url=(payload.base_url or "").strip() or None,
+        base_url=validate_provider_base_url(payload.kind, payload.driver, payload.base_url),
         description=(payload.description or "").strip() or None,
         is_active=payload.is_active,
     )
@@ -92,7 +100,7 @@ def update_ai_provider(provider_id: int, payload: AIProviderUpdate, db: Session 
         if field in changes:
             setattr(provider, field, changes[field])
     if "base_url" in changes:
-        provider.base_url = (changes["base_url"] or "").strip() or None
+        provider.base_url = validate_provider_base_url(next_kind, next_driver, changes["base_url"])
     if "description" in changes:
         provider.description = (changes["description"] or "").strip() or None
     if "api_key" in changes and (changes["api_key"] or "").strip():

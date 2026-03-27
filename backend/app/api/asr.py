@@ -24,6 +24,31 @@ router = APIRouter(prefix="/asr", tags=["asr"], dependencies=[Depends(require_as
 settings = get_settings()
 
 
+async def read_capped_request_body(request: Request, *, max_bytes: int) -> bytes:
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > max_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Live audio chunk exceeds the {settings.asr_live_max_chunk_kb} KB limit.",
+                )
+        except ValueError:
+            pass
+
+    buffer = bytearray()
+    async for chunk in request.stream():
+        if not chunk:
+            continue
+        buffer.extend(chunk)
+        if len(buffer) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Live audio chunk exceeds the {settings.asr_live_max_chunk_kb} KB limit.",
+            )
+    return bytes(buffer)
+
+
 def build_excerpt(value: str, max_length: int = 180) -> str:
     compact = " ".join(value.split()).strip()
     if len(compact) <= max_length:
@@ -190,13 +215,16 @@ def create_live_session(
     except AsrRuntimeUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     policy = get_or_create_usage_policy(db)
-    session = live_asr_service.create_session(
-        user_id=current_user.id,
-        provider_id=provider.id,
-        model_name=provider.model_name,
-        language_hint=normalize_language(payload.language),
-        max_duration_seconds=policy.max_audio_seconds_per_request,
-    )
+    try:
+        session = live_asr_service.create_session(
+            user_id=current_user.id,
+            provider_id=provider.id,
+            model_name=provider.model_name,
+            language_hint=normalize_language(payload.language),
+            max_duration_seconds=policy.max_audio_seconds_per_request,
+        )
+    except LiveAsrSessionError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     return to_live_read(live_asr_service.build_payload(session))
 
 
@@ -206,7 +234,7 @@ async def ingest_live_chunk(
     request: Request,
     current_user: User = Depends(get_current_user),
 ) -> LiveAsrSessionRead:
-    raw_chunk = await request.body()
+    raw_chunk = await read_capped_request_body(request, max_bytes=settings.asr_live_max_chunk_bytes)
     if not raw_chunk:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Audio chunk is empty.")
     try:

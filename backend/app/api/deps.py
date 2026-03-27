@@ -1,8 +1,11 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.enums import AIProviderKind, AppFeature
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.daily_log import DailyLog
 from app.models.asr_transcript import AsrTranscript
@@ -14,6 +17,8 @@ from app.models.task import Task
 from app.models.user import User
 from app.services.user_sessions import get_user_session, touch_user_session
 from app.services.feature_access import user_can_access_provider, user_has_feature
+
+settings = get_settings()
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -36,7 +41,16 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         request.session.clear()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
-    touch_user_session(auth_session)
+    now = datetime.now(timezone.utc)
+    if settings.session_idle_timeout_minutes > 0:
+        idle_cutoff = now - timedelta(minutes=settings.session_idle_timeout_minutes)
+        if auth_session.last_seen_at < idle_cutoff:
+            db.delete(auth_session)
+            db.commit()
+            request.session.clear()
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
+
+    touch_user_session(auth_session, now=now)
     db.add(auth_session)
     db.commit()
 

@@ -3,6 +3,16 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _looks_like_placeholder(value: str | None) -> bool:
+    if value is None:
+        return True
+    normalized = value.strip().lower()
+    if not normalized:
+        return True
+    placeholder_tokens = ("change-me", "placeholder", "example", "default", "in-production")
+    return any(token in normalized for token in placeholder_tokens)
+
+
 class Settings(BaseSettings):
     app_name: str = "trace_itself"
     app_env: str = "development"
@@ -16,6 +26,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://trace_itself:trace_itself@localhost:5432/trace_itself"
     session_cookie_name: str = "trace_itself_session"
     session_cookie_secure: bool = False
+    session_idle_timeout_minutes: int = 5
     credentials_secret_key: str | None = None
     default_llm_runs_per_24h: int = 3
     default_max_audio_seconds_per_request: int = 5 * 60 * 60
@@ -36,6 +47,9 @@ class Settings(BaseSettings):
     asr_live_vad_speech_pad_ms: int = 180
     asr_live_preview_beam_size: int = 1
     asr_live_final_beam_size: int = 5
+    asr_live_max_chunk_kb: int = 256
+    asr_live_max_utterance_seconds: int = 45
+    asr_live_max_sessions_per_user: int = 2
     asr_upload_dir: str = "/data/asr"
     asr_max_upload_mb: int = 512
     meeting_upload_dir: str = "/data/meetings"
@@ -60,6 +74,10 @@ class Settings(BaseSettings):
         return self.asr_max_upload_mb * 1024 * 1024
 
     @property
+    def asr_live_max_chunk_bytes(self) -> int:
+        return self.asr_live_max_chunk_kb * 1024
+
+    @property
     def asr_live_partial_interval_seconds(self) -> float:
         return self.asr_live_partial_interval_ms / 1000
 
@@ -70,6 +88,30 @@ class Settings(BaseSettings):
     @property
     def meeting_max_upload_bytes(self) -> int:
         return self.meeting_max_upload_mb * 1024 * 1024
+
+    @property
+    def is_production_like(self) -> bool:
+        return self.app_env.strip().lower() not in {"development", "dev", "local", "test"}
+
+    def validate_runtime_security(self) -> None:
+        if not self.is_production_like:
+            return
+
+        issues: list[str] = []
+        if _looks_like_placeholder(self.secret_key):
+            issues.append("SECRET_KEY must be set to a strong non-placeholder value.")
+        if _looks_like_placeholder(self.bootstrap_admin_password):
+            issues.append("INITIAL_ADMIN_PASSWORD must be set to a strong non-placeholder value.")
+        if _looks_like_placeholder(self.credentials_secret_key):
+            issues.append("CREDENTIALS_SECRET_KEY must be set to a distinct strong value in production.")
+        elif self.credentials_secret_key == self.secret_key:
+            issues.append("CREDENTIALS_SECRET_KEY must not reuse SECRET_KEY in production.")
+        if not self.session_cookie_secure:
+            issues.append("SESSION_COOKIE_SECURE must be true in production.")
+
+        if issues:
+            formatted = "\n".join(f"- {issue}" for issue in issues)
+            raise RuntimeError(f"Refusing to start with insecure production settings:\n{formatted}")
 
 
 @lru_cache

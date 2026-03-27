@@ -5,6 +5,7 @@ import requests
 
 from app.core.enums import AIProviderDriver
 from app.models.ai_provider import AIProvider
+from app.services.provider_urls import ProviderUrlValidationError, resolve_provider_base_url
 from app.services.secrets import decrypt_secret
 
 
@@ -54,7 +55,12 @@ def generate_meeting_artifacts(transcript_text: str, title: str, provider: AIPro
         "required": ["summary_text", "minutes_text", "action_items"],
     }
 
-    base_url = (provider.base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+    try:
+        base_url = resolve_provider_base_url(kind=provider.kind, driver=provider.driver, value=provider.base_url)
+    except ProviderUrlValidationError as exc:
+        raise MeetingAiError(str(exc)) from exc
+    if not base_url:
+        raise MeetingAiError("Selected LLM provider does not have a valid base URL.")
     response = requests.post(
         f"{base_url}/models/{provider.model_name}:generateContent",
         headers={
