@@ -1,11 +1,12 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Card, EmptyState, Notice, SectionHeader, Sparkline } from '../components/Primitives';
+import { Badge, Card, EmptyState, Notice, Sparkline } from '../components/Primitives';
 import { TimelineGantt } from '../components/TimelineGantt';
 import { dashboardApi, extractApiErrorMessage } from '../lib/api';
-import { formatDateTime, relativeDueLabel, todayIso } from '../lib/dates';
+import { formatDateTime, todayIso } from '../lib/dates';
 import { formatEnumLabel } from '../lib/presentation';
 import { useAuth } from '../state/AuthContext';
 import type {
@@ -21,6 +22,7 @@ import type {
 } from '../types';
 
 type DashboardTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+type DashboardGlyph = 'now' | 'alert' | 'timeline' | 'flow' | 'radar' | 'gap' | 'week' | 'overdue' | 'today' | 'tracks' | 'rate';
 
 const commandDateFormatter = new Intl.DateTimeFormat('en', {
   weekday: 'short',
@@ -109,35 +111,22 @@ function toneForSeverity(severity: string): DashboardTone {
   }
 }
 
-function toneForHealth(health: string): DashboardTone {
-  switch (health) {
-    case 'critical':
-      return 'danger';
-    case 'watch':
-      return 'warning';
-    case 'healthy':
-      return 'success';
-    default:
-      return 'neutral';
-  }
-}
-
 function eventLabel(eventType: string) {
   switch (eventType) {
     case 'task_completed':
-      return 'Completed';
+      return 'Done';
     case 'task_blocked':
-      return 'Blocked';
+      return 'Block';
     case 'task_in_progress':
-      return 'In progress';
+      return 'Move';
     case 'daily_log':
-      return 'Daily log';
+      return 'Log';
     case 'milestone_completed':
-      return 'Milestone';
+      return 'MS';
     case 'milestone_progress':
-      return 'Milestone';
+      return 'MS';
     case 'project_updated':
-      return 'Project';
+      return 'Proj';
     default:
       return formatEnumLabel(eventType);
   }
@@ -145,23 +134,54 @@ function eventLabel(eventType: string) {
 
 function idleLabel(daysSinceActivity: number | null) {
   if (daysSinceActivity === null || daysSinceActivity === undefined) {
-    return 'No activity signal';
+    return '--';
   }
   if (daysSinceActivity === 0) {
-    return 'Active today';
+    return '0d';
   }
-  if (daysSinceActivity === 1) {
-    return 'Idle 1 day';
-  }
-  return `Idle ${daysSinceActivity} days`;
+  return `${daysSinceActivity}d`;
 }
 
 function hoursDeltaLabel(realityGap: DashboardRealityGap) {
   const delta = realityGap.actual_hours_this_week - realityGap.estimated_hours_this_week;
   if (delta === 0) {
-    return 'On estimate';
+    return '0h';
   }
-  return delta > 0 ? `+${delta.toFixed(1)}h over` : `${Math.abs(delta).toFixed(1)}h under`;
+  return delta > 0 ? `+${delta.toFixed(1)}h` : `-${Math.abs(delta).toFixed(1)}h`;
+}
+
+function parseIsoDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function dueCompactLabel(value: string | null | undefined, today: string) {
+  if (!value) {
+    return '--';
+  }
+  const todayDate = parseIsoDate(today);
+  const targetDate = parseIsoDate(value);
+  const diff = Math.round((targetDate.getTime() - todayDate.getTime()) / 86400000);
+  if (diff === 0) {
+    return 'today';
+  }
+  if (diff < 0) {
+    return `${Math.abs(diff)}d late`;
+  }
+  return `${diff}d`;
+}
+
+function compactText(value: string | null | undefined, fallback: string) {
+  if (!value || !value.trim()) {
+    return fallback;
+  }
+  return value.trim();
+}
+
+function compactSentence(value: string | null | undefined, fallback: string) {
+  const source = compactText(value, fallback);
+  const firstSentence = source.split(/[.!?]\s/)[0]?.trim() || source;
+  return firstSentence.endsWith('.') ? firstSentence : firstSentence;
 }
 
 function DashboardMetric({
@@ -170,7 +190,7 @@ function DashboardMetric({
   caption,
   tone = 'neutral'
 }: {
-  label: string;
+  label: ReactNode;
   value: string | number;
   caption?: string;
   tone?: DashboardTone;
@@ -192,6 +212,112 @@ function projectProgressTone(project: DashboardProjectHealthItem): DashboardTone
     return 'warning';
   }
   return project.completion_percent >= 75 ? 'success' : 'info';
+}
+
+function Glyph({ name }: { name: DashboardGlyph }) {
+  switch (name) {
+    case 'alert':
+    case 'overdue':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M8 2.5 14 13H2L8 2.5Z" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinejoin="round" />
+          <path d="M8 6v3.2" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+          <circle cx="8" cy="11.3" r="0.75" fill="currentColor" />
+        </svg>
+      );
+    case 'timeline':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M3 4.5h10M3 8h10M3 11.5h10" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+          <circle cx="6" cy="4.5" r="1.2" fill="currentColor" />
+          <circle cx="10" cy="8" r="1.2" fill="currentColor" />
+          <circle cx="7.5" cy="11.5" r="1.2" fill="currentColor" />
+        </svg>
+      );
+    case 'flow':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M2 9h2.5l1.3-3 2.4 6 1.9-4H14" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'radar':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <circle cx="8" cy="8" r="2.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M8 8 12.2 5.8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+          <circle cx="8" cy="8" r="1" fill="currentColor" />
+        </svg>
+      );
+    case 'gap':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M3 12V7M8 12V4M13 12V9" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+          <path d="M2.5 12.5h11" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+        </svg>
+      );
+    case 'week':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <rect x="2.2" y="3" width="11.6" height="10.2" rx="2" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M2.8 6.4h10.4M5.7 2.4v2.2M10.3 2.4v2.2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+      );
+    case 'today':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="5.4" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <path d="M8 5.2v3.1l2 1.3" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'tracks':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <rect x="2.2" y="3" width="4.2" height="4.2" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <rect x="9.6" y="3" width="4.2" height="4.2" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <rect x="5.9" y="8.8" width="4.2" height="4.2" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
+        </svg>
+      );
+    case 'rate':
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M2.5 11.2 6 7.7l2.3 2.3 4-4" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M10.4 6h2v2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    case 'now':
+    default:
+      return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path d="M3 8h7.5M8 4.5 12 8l-4 3.5" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+  }
+}
+
+function PanelHeader({ icon, title, action }: { icon: DashboardGlyph; title: string; action?: ReactNode }) {
+  return (
+    <div className="panel-header">
+      <div className="panel-title">
+        <span className="panel-icon">
+          <Glyph name={icon} />
+        </span>
+        <h2>{title}</h2>
+      </div>
+      {action ? <div className="section-action">{action}</div> : null}
+    </div>
+  );
+}
+
+function MetricLabel({ icon, label }: { icon: DashboardGlyph; label: string }) {
+  return (
+    <span className="metric-label-with-icon">
+      <span className="metric-label-icon">
+        <Glyph name={icon} />
+      </span>
+      <span>{label}</span>
+    </span>
+  );
 }
 
 export function DashboardPage() {
@@ -297,8 +423,21 @@ export function DashboardPage() {
   const feedItems = activityFeed.items.slice(0, 8);
   const trendTail = realityGap.trend.slice(-4);
   const commandDate = useMemo(() => commandDateFormatter.format(new Date()), []);
+  const todayToken = useMemo(() => todayIso(), []);
   const activeTrackCount = projectHealth.length || summary.active_projects.length;
   const errorLabels = Object.keys(moduleErrors);
+  const nextStepText = latestLog?.next_step || latestLog?.summary || '';
+  const reviewRows = [
+    { label: 'Win', value: compactSentence(weeklyReview.biggest_progress, 'No clear win') },
+    { label: 'Block', value: compactSentence(weeklyReview.biggest_blocker, 'No blocker logged') },
+    {
+      label: 'Idle',
+      value: weeklyReview.inactive_projects.length ? weeklyReview.inactive_projects.slice(0, 3).join(', ') : 'Clear'
+    }
+  ];
+  const trendPercentValues = trendTail.map((point) => (
+    point.planned_tasks > 0 ? Math.round((point.completed_tasks / point.planned_tasks) * 100) : point.completed_tasks > 0 ? 100 : 0
+  ));
 
   if (loading) {
     return (
@@ -315,11 +454,11 @@ export function DashboardPage() {
     <div className="page dashboard-command-page">
       <section className="mission-header card">
         <div className="mission-header-copy">
-          <div className="mission-kicker">trace_itself / personal execution intelligence</div>
+          <div className="mission-brand-line">
+            <div className="mission-kicker">trace_itself</div>
+            <Badge tone="warning">beta</Badge>
+          </div>
           <h1>Mission Control</h1>
-          <p className="muted">
-            A self-hosted personal execution operating system for long-horizon learning, project delivery, and daily accountability.
-          </p>
         </div>
 
         <div className="mission-header-side">
@@ -332,23 +471,39 @@ export function DashboardPage() {
           </div>
 
           <div className="mission-action-row">
-            <Link className="btn btn-primary" href="/tasks">Quick Add</Link>
-            <Link className="btn btn-secondary" href="/daily-logs">Quick Log</Link>
-            <Link className="btn btn-ghost" href="/projects">Projects</Link>
+            <Link className="btn btn-primary" href="/tasks">+ Task</Link>
+            <Link className="btn btn-secondary" href="/daily-logs">+ Log</Link>
+            <Link className="btn btn-ghost" href="/projects">Tracks</Link>
           </div>
 
           <div className="dashboard-metric-grid dashboard-metric-grid-top">
-            <DashboardMetric label="Overdue" value={summary.overdue_tasks.length} tone={summary.overdue_tasks.length ? 'danger' : 'success'} />
-            <DashboardMetric label="Due today" value={summary.today_tasks.length} tone={summary.today_tasks.length ? 'warning' : 'success'} />
-            <DashboardMetric label="Active tracks" value={activeTrackCount} tone="info" />
-            <DashboardMetric label="Weekly rate" value={`${realityGap.weekly_completion_rate}%`} caption="completion" tone={realityGap.weekly_completion_rate >= 70 ? 'success' : 'warning'} />
+            <DashboardMetric
+              label={<MetricLabel icon="overdue" label="OD" />}
+              value={summary.overdue_tasks.length}
+              tone={summary.overdue_tasks.length ? 'danger' : 'success'}
+            />
+            <DashboardMetric
+              label={<MetricLabel icon="today" label="Today" />}
+              value={summary.today_tasks.length}
+              tone={summary.today_tasks.length ? 'warning' : 'success'}
+            />
+            <DashboardMetric
+              label={<MetricLabel icon="tracks" label="Tracks" />}
+              value={activeTrackCount}
+              tone="info"
+            />
+            <DashboardMetric
+              label={<MetricLabel icon="rate" label="Rate" />}
+              value={`${realityGap.weekly_completion_rate}%`}
+              tone={realityGap.weekly_completion_rate >= 70 ? 'success' : 'warning'}
+            />
           </div>
         </div>
       </section>
 
       {errorLabels.length ? (
         <Notice
-          title="Mission control is partially degraded"
+          title="Partial data"
           description={`Unavailable panels: ${errorLabels.join(', ')}`}
           tone="warning"
         />
@@ -357,77 +512,79 @@ export function DashboardPage() {
       <div className="mission-grid">
         <div className="mission-column">
           <Card className="section-card mission-panel">
-            <SectionHeader title="Now" description="What deserves immediate attention." />
+            <PanelHeader icon="now" title="Now" />
             {leadAction ? (
-              <div className="hero-action-card">
+              <div className="hero-action-card hero-action-card-compact">
                 <div className="hero-action-head">
-                  <Badge tone={toneForUrgency(leadAction.urgency_score)}>{formatEnumLabel(leadAction.entity_type)}</Badge>
-                  <span className="hero-action-score">{leadAction.urgency_score}</span>
+                  <div className="hero-action-title-row">
+                    <span className={`signal-dot signal-dot-${toneForUrgency(leadAction.urgency_score)}`} aria-hidden="true" />
+                    <h3>{leadAction.action_title}</h3>
+                  </div>
+                  <Badge tone={toneForUrgency(leadAction.urgency_score)}>{leadAction.urgency_score}</Badge>
                 </div>
-                <h3>{leadAction.action_title}</h3>
-                <p>{leadAction.reason}</p>
-                <div className="hero-action-meta">
+                <div className="hero-action-meta hero-action-meta-compact">
                   {leadAction.project_name ? <Badge tone="neutral">{leadAction.project_name}</Badge> : null}
                   {leadAction.status ? <Badge tone="neutral">{formatEnumLabel(leadAction.status)}</Badge> : null}
-                  {leadAction.due_date ? <Badge tone={toneForUrgency(leadAction.urgency_score)}>{relativeDueLabel(leadAction.due_date)}</Badge> : null}
+                  {leadAction.due_date ? <Badge tone={toneForUrgency(leadAction.urgency_score)}>{dueCompactLabel(leadAction.due_date, todayToken)}</Badge> : null}
                 </div>
-                <Link className="btn btn-primary" href={leadAction.route}>Open</Link>
+                <div className="hero-action-reason line-clamp-1">{leadAction.reason}</div>
+                <Link className="btn btn-primary hero-action-open" href={leadAction.route}>Open</Link>
               </div>
             ) : (
-              <EmptyState title="Nothing urgent" description="The next-action engine did not surface any pressing work." />
+              <EmptyState title="Clear" description="No urgent item." />
             )}
 
             {queuedActions.length ? (
-              <div className="compact-list">
+              <div className="compact-list compact-list-dense">
                 {queuedActions.map((action) => (
                   <Link key={`${action.entity_type}-${action.entity_id ?? action.action_title}`} href={action.route} className="compact-list-item">
                     <div className="compact-list-copy">
                       <strong>{action.action_title}</strong>
-                      <span>{action.reason}</span>
+                      <span>{action.project_name || formatEnumLabel(action.entity_type)}</span>
                     </div>
-                    <Badge tone={toneForUrgency(action.urgency_score)}>{action.urgency_score}</Badge>
+                    <div className="compact-list-side">
+                      {action.due_date ? <span className="compact-pill">{dueCompactLabel(action.due_date, todayToken)}</span> : null}
+                      <Badge tone={toneForUrgency(action.urgency_score)}>{action.urgency_score}</Badge>
+                    </div>
                   </Link>
                 ))}
               </div>
             ) : null}
 
-            <div className="mission-note">
-              <span className="mission-note-label">Declared next step</span>
-              <p>{latestLog?.next_step || latestLog?.summary || 'No next step recorded yet.'}</p>
-            </div>
+            {nextStepText ? (
+              <div className="mission-inline-strip">
+                <span>Next</span>
+                <strong className="line-clamp-1">{nextStepText}</strong>
+              </div>
+            ) : null}
           </Card>
 
           <Card className="section-card mission-panel">
-            <SectionHeader title="Alerts" description="Drift, risk, and stalled tracks." />
+            <PanelHeader icon="alert" title="Alerts" />
             {alertCards.length ? (
-              <div className="alert-stack">
+              <div className="signal-table">
                 {alertCards.map((alert) => (
-                  <Link key={alert.id} href={alert.route} className={`alert-card alert-card-${alert.severity}`}>
-                    <div className="alert-card-head">
-                      <Badge tone={toneForSeverity(alert.severity)}>{formatEnumLabel(alert.category)}</Badge>
-                      {alert.project_name ? <span className="muted small">{alert.project_name}</span> : null}
+                  <Link key={alert.id} href={alert.route} className="signal-row">
+                    <span className={`signal-dot signal-dot-${toneForSeverity(alert.severity)}`} aria-hidden="true" />
+                    <div className="signal-main">
+                      <strong>{alert.title}</strong>
+                      <span>{alert.project_name || formatEnumLabel(alert.category)}</span>
                     </div>
-                    <strong>{alert.title}</strong>
-                    <p>{alert.description}</p>
+                    <span className="signal-side">
+                      {alert.due_date ? dueCompactLabel(String(alert.due_date), todayToken) : alert.days_since_activity ? `${alert.days_since_activity}d` : formatEnumLabel(alert.category)}
+                    </span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <EmptyState title="No active warnings" description="No drift or milestone risk signals are firing right now." />
+              <EmptyState title="Clear" description="No active alert." />
             )}
-            {stagnation.tracking_notes.length ? (
-              <div className="mission-footnote muted small">{stagnation.tracking_notes[0]}</div>
-            ) : null}
           </Card>
         </div>
 
         <div className="mission-column mission-column-center">
           <Card className="section-card mission-panel">
-            <SectionHeader
-              title="Mission Timeline"
-              description="Strategic 60-day view of active projects and milestones."
-              action={<Link className="btn btn-ghost" href="/projects">Open</Link>}
-            />
+            <PanelHeader icon="timeline" title="Timeline" action={<Link className="btn btn-ghost" href="/projects">View</Link>} />
             {'timeline' in moduleErrors ? (
               <Notice title="Timeline unavailable" description={moduleErrors.timeline} tone="warning" />
             ) : (
@@ -436,84 +593,80 @@ export function DashboardPage() {
           </Card>
 
           <Card className="section-card mission-panel">
-            <SectionHeader title="Execution Flow" description="Recent completions, logs, and movement across the system." />
+            <PanelHeader icon="flow" title="Flow" />
             {feedItems.length ? (
-              <div className="feed-stack">
+              <div className="feed-table">
                 {feedItems.map((item: DashboardActivityFeedItem) => (
-                  <Link key={item.id} href={item.route} className={`feed-item feed-item-${item.tone}`}>
-                    <div className="feed-item-meta">
-                      <Badge tone={item.tone as DashboardTone}>{eventLabel(item.event_type)}</Badge>
-                      <span className="muted small">{formatDateTime(item.changed_at)}</span>
+                  <Link key={item.id} href={item.route} className={`feed-row feed-row-${item.tone}`}>
+                    <div className="feed-row-main">
+                      <div className="feed-row-title">
+                        <span className={`signal-dot signal-dot-${item.tone as DashboardTone}`} aria-hidden="true" />
+                        <strong>{item.title}</strong>
+                      </div>
+                      <span>{item.project_name || eventLabel(item.event_type)}</span>
                     </div>
-                    <strong>{item.title}</strong>
-                    <p>{item.detail || item.project_name || 'Execution event logged.'}</p>
+                    <span className="feed-row-time">{formatDateTime(item.changed_at)}</span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <EmptyState title="No recent execution feed" description="Recent logs and status changes will appear here." />
+              <EmptyState title="Quiet" description="No recent flow." />
             )}
           </Card>
         </div>
 
         <div className="mission-column">
           <Card className="section-card mission-panel">
-            <SectionHeader title="Project Radar" description="Which long-horizon tracks are moving and which are stuck." />
+            <PanelHeader icon="radar" title="Radar" />
             {projectHealth.length ? (
-              <div className="radar-stack">
+              <div className="radar-table">
+                <div className="data-table-head radar-table-head">
+                  <span>Track</span>
+                  <span>%</span>
+                  <span>OD</span>
+                  <span>Idle</span>
+                </div>
                 {projectHealth.map((project) => (
-                  <Link key={project.project_id} href={`/projects/${project.project_id}`} className="radar-item">
-                    <div className="radar-head">
+                  <Link key={project.project_id} href={`/projects/${project.project_id}`} className="radar-table-row">
+                    <div className="radar-track-cell">
                       <strong>{project.project_name}</strong>
-                      <Badge tone={toneForHealth(project.health)}>{project.health}</Badge>
-                    </div>
-                    <div className="radar-progress">
                       <div className="radar-progress-track">
                         <div
                           className={`radar-progress-fill radar-progress-fill-${projectProgressTone(project)}`}
                           style={{ width: `${project.completion_percent}%` }}
                         />
                       </div>
-                      <span>{project.completion_percent}%</span>
                     </div>
-                    <div className="radar-meta">
-                      <span>{project.open_tasks} open</span>
-                      <span>{project.overdue_tasks} overdue</span>
-                      <span>{idleLabel(project.days_since_activity)}</span>
-                    </div>
-                    <p>{project.note}</p>
+                    <span>{project.completion_percent}</span>
+                    <span className={`table-stat ${project.overdue_tasks ? 'table-stat-danger' : ''}`}>{project.overdue_tasks}</span>
+                    <span>{idleLabel(project.days_since_activity)}</span>
                   </Link>
                 ))}
               </div>
             ) : (
-              <EmptyState title="No project radar data" description="Active projects will appear here once tracked work exists." />
+              <EmptyState title="Empty" description="No track data." />
             )}
           </Card>
 
           <Card className="section-card mission-panel">
-            <SectionHeader title="Reality Gap" description="Where plan and execution diverge this week." />
+            <PanelHeader icon="gap" title="Gap" />
             <div className="dashboard-metric-grid">
-              <DashboardMetric label="Planned" value={realityGap.planned_tasks_this_week} tone="info" />
-              <DashboardMetric label="Completed" value={realityGap.completed_tasks_this_week} tone={realityGap.completed_tasks_this_week >= realityGap.planned_tasks_this_week ? 'success' : 'warning'} />
-              <DashboardMetric label="Delay rate" value={`${realityGap.delay_rate}%`} tone={realityGap.delay_rate >= 40 ? 'danger' : realityGap.delay_rate >= 20 ? 'warning' : 'success'} />
-              <DashboardMetric label="Overdue ratio" value={`${realityGap.overdue_ratio}%`} tone={realityGap.overdue_ratio >= 35 ? 'danger' : realityGap.overdue_ratio >= 15 ? 'warning' : 'success'} />
+              <DashboardMetric label="Plan" value={realityGap.planned_tasks_this_week} tone="info" />
+              <DashboardMetric label="Done" value={realityGap.completed_tasks_this_week} tone={realityGap.completed_tasks_this_week >= realityGap.planned_tasks_this_week ? 'success' : 'warning'} />
+              <DashboardMetric label="Slip" value={`${realityGap.delay_rate}%`} tone={realityGap.delay_rate >= 40 ? 'danger' : realityGap.delay_rate >= 20 ? 'warning' : 'success'} />
+              <DashboardMetric label="OD" value={`${realityGap.overdue_ratio}%`} tone={realityGap.overdue_ratio >= 35 ? 'danger' : realityGap.overdue_ratio >= 15 ? 'warning' : 'success'} />
             </div>
 
-            <div className="dashboard-metric-grid dashboard-metric-grid-secondary">
-              <DashboardMetric label="Estimated" value={`${realityGap.estimated_hours_this_week.toFixed(1)}h`} caption="planned hours" tone="neutral" />
-              <DashboardMetric label="Actual" value={`${realityGap.actual_hours_this_week.toFixed(1)}h`} caption={hoursDeltaLabel(realityGap)} tone="neutral" />
-            </div>
-
-            <div className="trend-strip">
-              {trendTail.length ? (
-                trendTail.map((point) => (
-                  <div key={point.week_start} className="trend-chip">
-                    <span>{point.label}</span>
-                    <strong>{point.completed_tasks}/{point.planned_tasks}</strong>
-                  </div>
-                ))
+            <div className="reality-strip">
+              <div className="reality-strip-metrics">
+                <span>Est {realityGap.estimated_hours_this_week.toFixed(1)}h</span>
+                <span>Act {realityGap.actual_hours_this_week.toFixed(1)}h</span>
+                <strong>{hoursDeltaLabel(realityGap)}</strong>
+              </div>
+              {trendPercentValues.length ? (
+                <Sparkline values={trendPercentValues} colorClass={realityGap.delay_rate >= 35 ? 'warning' : 'success'} />
               ) : (
-                <div className="muted small">Weekly trend will appear once tasks carry due dates and completions.</div>
+                <div className="muted small">No trend</div>
               )}
             </div>
           </Card>
@@ -521,35 +674,30 @@ export function DashboardPage() {
       </div>
 
       <Card className="section-card mission-panel weekly-review-panel">
-        <SectionHeader title="Weekly Command Review" description="Operational summary of this week’s execution state." />
+        <PanelHeader icon="week" title="Week" />
         <div className="dashboard-metric-grid weekly-review-metrics">
-          <DashboardMetric label="Completed" value={weeklyReview.completed_tasks_this_week} tone="success" />
-          <DashboardMetric label="Overdue" value={weeklyReview.overdue_tasks} tone={weeklyReview.overdue_tasks ? 'danger' : 'success'} />
-          <DashboardMetric label="Focus" value={`${weeklyReview.total_focus_hours.toFixed(1)}h`} caption={`${weeklyReview.focus_days_logged} logs`} tone="info" />
-          <DashboardMetric label="Most active" value={weeklyReview.most_active_project || 'None'} tone="neutral" />
+          <DashboardMetric label="Done" value={weeklyReview.completed_tasks_this_week} tone="success" />
+          <DashboardMetric label="OD" value={weeklyReview.overdue_tasks} tone={weeklyReview.overdue_tasks ? 'danger' : 'success'} />
+          <DashboardMetric label="Focus" value={`${weeklyReview.total_focus_hours.toFixed(1)}h`} tone="info" />
+          <DashboardMetric label="Track" value={weeklyReview.most_active_project || 'None'} tone="neutral" />
         </div>
 
-        <div className="weekly-review-grid">
-          <div className="weekly-review-summary">
-            <p>{weeklyReview.summary_text}</p>
+        <div className="weekly-review-grid weekly-review-grid-compact">
+          <div className="weekly-review-summary weekly-review-summary-compact">
             {summary.focus_hours_trend?.length ? (
               <Sparkline values={summary.focus_hours_trend.map((point) => point.total_focus_hours)} colorClass="success" />
-            ) : null}
+            ) : (
+              <div className="muted small">No focus trend</div>
+            )}
           </div>
 
-          <div className="weekly-review-notes">
-            <div className="weekly-review-note">
-              <span className="weekly-review-label">Biggest progress</span>
-              <strong>{weeklyReview.biggest_progress || 'No standout progress captured yet.'}</strong>
-            </div>
-            <div className="weekly-review-note">
-              <span className="weekly-review-label">Biggest blocker</span>
-              <strong>{weeklyReview.biggest_blocker || 'No explicit blocker recorded this week.'}</strong>
-            </div>
-            <div className="weekly-review-note">
-              <span className="weekly-review-label">Inactive tracks</span>
-              <strong>{weeklyReview.inactive_projects.length ? weeklyReview.inactive_projects.join(', ') : 'None flagged.'}</strong>
-            </div>
+          <div className="weekly-review-notes weekly-review-notes-compact">
+            {reviewRows.map((item) => (
+              <div key={item.label} className="weekly-review-note weekly-review-note-compact">
+                <span className="weekly-review-label">{item.label}</span>
+                <strong className="line-clamp-1">{item.value}</strong>
+              </div>
+            ))}
           </div>
         </div>
       </Card>
