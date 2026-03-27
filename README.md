@@ -290,7 +290,7 @@ Notes for meeting records:
 
 Notes for the control plane:
 
-- Feature access is grouped through admin-managed access groups such as `Full access`, `Projects only`, or `Meetings`.
+- Feature access is grouped through admin-managed access groups such as `Full access`, `Projects only`, or `Audio workspace`.
 - A user can only see and use pages that match their group's capabilities.
 - Provider secrets are stored encrypted in the database.
 - The `Control` page is admin-only.

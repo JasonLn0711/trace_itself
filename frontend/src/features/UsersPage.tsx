@@ -152,6 +152,10 @@ function policyToForm(snapshot: UsagePolicySnapshot): PolicyFormState {
   };
 }
 
+function preferredAccessGroupId(groups: AccessGroup[]) {
+  return groups.find((group) => group.name === 'Full access')?.id ?? groups[0]?.id ?? null;
+}
+
 export function UsersPage() {
   const { user: currentUser } = useAuth();
   const [tab, setTab] = useState<AdminTab>('users');
@@ -191,7 +195,7 @@ export function UsersPage() {
     setEditProviderForms(Object.fromEntries(nextProviders.map((provider) => [provider.id, providerToEdit(provider)])));
     setCreateUserForm((current) => ({
       ...current,
-      access_group_id: current.access_group_id ?? nextGroups[0]?.id ?? null
+      access_group_id: current.access_group_id ?? preferredAccessGroupId(nextGroups)
     }));
   }
 
@@ -219,7 +223,7 @@ export function UsersPage() {
         setEditProviderForms(Object.fromEntries(nextProviders.map((provider) => [provider.id, providerToEdit(provider)])));
         setCreateUserForm((current) => ({
           ...current,
-          access_group_id: current.access_group_id ?? nextGroups[0]?.id ?? null
+          access_group_id: current.access_group_id ?? preferredAccessGroupId(nextGroups)
         }));
       } catch (err) {
         if (alive) {

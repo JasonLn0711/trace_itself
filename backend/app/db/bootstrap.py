@@ -1,4 +1,4 @@
-from sqlalchemy import select, text
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -317,35 +317,51 @@ def ensure_default_access_groups(db: Session) -> AccessGroup:
             "can_use_llm": False,
         },
         {
-            "name": "ASR only",
-            "description": "Standalone transcription only.",
-            "can_use_project_tracer": False,
-            "can_use_asr": True,
-            "can_use_llm": False,
-        },
-        {
-            "name": "Meetings",
-            "description": "Meeting notes with ASR and LLM.",
+            "name": "Audio workspace",
+            "description": "Transcript and meeting notes.",
             "can_use_project_tracer": False,
             "can_use_asr": True,
             "can_use_llm": True,
         },
     ]
 
-    created = False
+    dirty = False
     for seed in seed_groups:
-        if seed["name"] in existing_by_name:
+        group = existing_by_name.get(seed["name"])
+        if group is None:
+            db.add(AccessGroup(**seed))
+            dirty = True
             continue
-        group = AccessGroup(**seed)
-        db.add(group)
-        created = True
 
-    if created:
+        for field, value in seed.items():
+            if getattr(group, field) != value:
+                setattr(group, field, value)
+                dirty = True
+
+    if dirty:
         db.commit()
 
     full_access = db.scalar(select(AccessGroup).where(AccessGroup.name == "Full access"))
     if full_access is None:
         raise RuntimeError("Full access group is missing after bootstrap.")
+
+    audio_workspace = db.scalar(select(AccessGroup).where(AccessGroup.name == "Audio workspace"))
+    if audio_workspace is None:
+        raise RuntimeError("Audio workspace group is missing after bootstrap.")
+
+    legacy_group_names = ("ASR only", "Meetings")
+    legacy_groups = list(db.scalars(select(AccessGroup).where(AccessGroup.name.in_(legacy_group_names))).all())
+    if legacy_groups:
+        legacy_group_ids = [group.id for group in legacy_groups]
+        db.execute(
+            update(User)
+            .where(User.access_group_id.in_(legacy_group_ids))
+            .values(access_group_id=audio_workspace.id)
+        )
+        for group in legacy_groups:
+            db.delete(group)
+        db.commit()
+
     return full_access
 
 
