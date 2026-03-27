@@ -1572,9 +1572,39 @@ a.card.entity {
 }
 
 @media (max-width: 640px) {
+  body {
+    min-width: 0;
+  }
+
   .app-shell {
     padding: 10px;
     gap: 10px;
+  }
+
+  .app-shell,
+  .sidebar,
+  .content,
+  .page,
+  .card,
+  .page-intro,
+  .page-intro-copy,
+  .page-intro-aside,
+  .section-card,
+  .metric-strip,
+  .segmented-control,
+  .capture-strip,
+  .list-row,
+  .list-row-main,
+  .list-row-side,
+  .toolbar,
+  .toolbar-row,
+  .form-grid,
+  .helper-row,
+  .live-asr-panel,
+  .audio-capture,
+  .transcript-surface {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .sidebar {
@@ -1591,16 +1621,15 @@ a.card.entity {
   }
 
   .nav {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: thin;
   }
 
   .nav a {
-    flex: none;
-    white-space: nowrap;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
     padding: 10px 12px;
   }
 
@@ -1661,22 +1690,25 @@ a.card.entity {
   }
 
   .metric-strip,
-  .segmented-control,
-  .capture-strip {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: thin;
+  .segmented-control {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .metric-pill {
-    flex: 0 0 152px;
-    min-width: 152px;
+    min-width: 0;
   }
 
   .metric-pill strong {
     font-size: 0.95rem;
+  }
+
+  .capture-strip {
+    display: flex;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 8px;
   }
 
   .section-header {
@@ -1692,8 +1724,10 @@ a.card.entity {
   }
 
   .segment {
-    flex: none;
-    white-space: nowrap;
+    min-width: 0;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
   }
 
   .entity,
@@ -1761,6 +1795,11 @@ a.card.entity {
     min-width: 0;
   }
 
+  .capture-pill,
+  .badge {
+    max-width: 100%;
+  }
+
   .audio-capture-preview {
     gap: 8px;
   }
@@ -1797,6 +1836,16 @@ a.card.entity {
     padding: 8px;
   }
 
+  .nav,
+  .metric-strip,
+  .segmented-control,
+  .list-row-actions,
+  .live-asr-actions,
+  .audio-capture-actions,
+  .form-grid .helper-row {
+    grid-template-columns: 1fr;
+  }
+
   .sidebar,
   .page-intro,
   .section-card {
@@ -1811,20 +1860,9 @@ a.card.entity {
     grid-template-columns: 1fr;
   }
 
-  .metric-pill {
-    flex-basis: calc(100vw - 44px);
-    min-width: calc(100vw - 44px);
-  }
-
-  .live-asr-actions,
-  .audio-capture-actions,
-  .list-row-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .form-grid .helper-row {
-    grid-template-columns: 1fr;
+  .capture-strip {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .login-shell {
