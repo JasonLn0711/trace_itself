@@ -38,11 +38,29 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE daily_logs ADD COLUMN IF NOT EXISTS user_id INTEGER"))
     connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_group_id INTEGER"))
     connection.execute(text("ALTER TABLE daily_logs DROP CONSTRAINT IF EXISTS daily_logs_log_date_key"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS max_concurrent_sessions INTEGER"))
+    connection.execute(text("ALTER TABLE users ALTER COLUMN max_concurrent_sessions SET DEFAULT 2"))
+    connection.execute(text("UPDATE users SET max_concurrent_sessions = 2 WHERE max_concurrent_sessions IS NULL OR max_concurrent_sessions < 1"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_storage_path VARCHAR(255)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_mime_type VARCHAR(120)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS capture_mode VARCHAR(32)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS transcript_entries_json TEXT"))
     connection.execute(text("UPDATE asr_transcripts SET capture_mode = 'file' WHERE capture_mode IS NULL"))
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                session_token VARCHAR(64) NOT NULL,
+                user_agent VARCHAR(255) NULL,
+                ip_address VARCHAR(64) NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            )
+            """
+        )
+    )
     connection.execute(
         text(
             """
@@ -124,6 +142,8 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_tasks_user_id ON tasks (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_daily_logs_user_id ON daily_logs (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_users_access_group_id ON users (access_group_id)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_user_sessions_user_id ON user_sessions (user_id)"))
+    connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_user_sessions_session_token ON user_sessions (session_token)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_area ON product_updates (area)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_change_type ON product_updates (change_type)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_product_updates_changed_at ON product_updates (changed_at)"))
@@ -468,3 +488,4 @@ def finalize_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE milestones ALTER COLUMN user_id SET NOT NULL"))
     connection.execute(text("ALTER TABLE tasks ALTER COLUMN user_id SET NOT NULL"))
     connection.execute(text("ALTER TABLE daily_logs ALTER COLUMN user_id SET NOT NULL"))
+    connection.execute(text("ALTER TABLE users ALTER COLUMN max_concurrent_sessions SET NOT NULL"))

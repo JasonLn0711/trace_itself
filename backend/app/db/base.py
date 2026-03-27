@@ -10,6 +10,7 @@ from app.models.product_update import ProductUpdate
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
+from app.models.user_session import UserSession
 from app.models.usage_policy import UsagePolicy
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "AIUsageEvent",
     "AIProvider",
     "User",
+    "UserSession",
     "Project",
     "Milestone",
     "Task",

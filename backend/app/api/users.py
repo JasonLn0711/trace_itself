@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user, require_admin
 from app.core.enums import UserRole
@@ -10,6 +10,7 @@ from app.models.access_group import AccessGroup
 from app.models.user import User
 from app.schemas.user import UserCreate, UserPasswordReset, UserRead, UserUpdate
 from app.services.security import hash_password
+from app.services.user_sessions import enforce_concurrent_session_limit
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -33,7 +34,11 @@ def resolve_access_group_id(group_id: int | None, db: Session) -> int | None:
 
 @router.get("", response_model=list[UserRead], dependencies=[Depends(require_admin)])
 def list_users(db: Session = Depends(get_db)) -> list[User]:
-    stmt = select(User).order_by(User.role.asc(), User.username.asc())
+    stmt = (
+        select(User)
+        .options(selectinload(User.access_group), selectinload(User.sessions))
+        .order_by(User.role.asc(), User.username.asc())
+    )
     return list(db.scalars(stmt).all())
 
 
@@ -45,6 +50,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
         password_hash=hash_password(payload.password),
         role=payload.role,
         access_group_id=resolve_access_group_id(payload.access_group_id, db),
+        max_concurrent_sessions=payload.max_concurrent_sessions,
         is_active=payload.is_active,
     )
     db.add(user)
@@ -61,6 +67,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
 def update_user(
     user_id: int,
     payload: UserUpdate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> User:
@@ -79,6 +86,14 @@ def update_user(
         setattr(user, field, value)
 
     db.add(user)
+    if "max_concurrent_sessions" in changes:
+        preserve_session_token = request.session.get("session_token") if user.id == current_user.id else None
+        enforce_concurrent_session_limit(
+            db,
+            user_id=user.id,
+            max_sessions=user.max_concurrent_sessions,
+            preserve_session_token=preserve_session_token,
+        )
     db.commit()
     db.refresh(user)
     return user

@@ -12,6 +12,7 @@ from app.models.meeting_record import MeetingRecord
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
+from app.services.user_sessions import get_user_session, touch_user_session
 from app.services.feature_access import user_can_access_provider, user_has_feature
 
 
@@ -20,7 +21,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
     user_id = request.session.get("user_id")
-    if user_id is None:
+    session_token = request.session.get("session_token")
+    if user_id is None or not session_token:
         request.session.clear()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
@@ -28,6 +30,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if not user or not user.is_active:
         request.session.clear()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+
+    auth_session = get_user_session(db, user_id=user.id, session_token=session_token)
+    if auth_session is None:
+        request.session.clear()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+
+    touch_user_session(auth_session)
+    db.add(auth_session)
+    db.commit()
 
     return user
 

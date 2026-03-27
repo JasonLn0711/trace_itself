@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import AuthStatus, LoginRequest
 from app.services.security import normalize_username, verify_password
+from app.services.user_sessions import create_user_session, delete_user_session, enforce_concurrent_session_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -17,6 +18,8 @@ settings = get_settings()
 
 @router.post("/login", response_model=AuthStatus)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> AuthStatus:
+    previous_user_id = request.session.get("user_id")
+    previous_session_token = request.session.get("session_token")
     username = normalize_username(payload.username)
     user = db.scalar(select(User).where(User.username == username))
     invalid_credentials = HTTPException(
@@ -57,9 +60,25 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         db.commit()
         raise invalid_credentials
 
+    delete_user_session(db, user_id=previous_user_id, session_token=previous_session_token)
+
+    auth_session = create_user_session(
+        db,
+        user_id=user.id,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+    )
+    enforce_concurrent_session_limit(
+        db,
+        user_id=user.id,
+        max_sessions=user.max_concurrent_sessions,
+        preserve_session_token=auth_session.session_token,
+    )
+
     request.session.clear()
     request.session["authenticated"] = True
     request.session["user_id"] = user.id
+    request.session["session_token"] = auth_session.session_token
 
     user.failed_login_attempts = 0
     user.locked_until = None
@@ -71,7 +90,17 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 
 @router.post("/logout", response_model=AuthStatus)
-def logout(request: Request, response: Response) -> AuthStatus:
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> AuthStatus:
+    delete_user_session(
+        db=db,
+        user_id=request.session.get("user_id"),
+        session_token=request.session.get("session_token"),
+    )
+    db.commit()
     request.session.clear()
     response.delete_cookie(settings.session_cookie_name)
     return AuthStatus(authenticated=False, user=None)

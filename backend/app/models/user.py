@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import UserRole
@@ -20,6 +20,7 @@ class User(Base):
         nullable=False,
     )
     access_group_id: Mapped[int | None] = mapped_column(ForeignKey("access_groups.id", ondelete="SET NULL"), index=True)
+    max_concurrent_sessions: Mapped[int] = mapped_column(Integer, default=2, server_default="2", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -41,6 +42,7 @@ class User(Base):
     meeting_records = relationship("MeetingRecord", back_populates="user", cascade="all, delete-orphan")
     usage_events = relationship("AIUsageEvent", back_populates="user", cascade="all, delete-orphan")
     product_updates = relationship("ProductUpdate", back_populates="author")
+    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def access_group_name(self) -> str | None:
@@ -62,3 +64,7 @@ class User(Base):
             "asr": bool(group and group.can_use_asr),
             "llm": bool(group and group.can_use_llm),
         }
+
+    @property
+    def active_session_count(self) -> int:
+        return len(self.sessions or [])

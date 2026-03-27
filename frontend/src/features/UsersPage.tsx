@@ -26,6 +26,7 @@ type UserFormState = {
   display_name: string;
   role: 'admin' | 'member';
   access_group_id: number | null;
+  max_concurrent_sessions: number;
   is_active: boolean;
   password: string;
 };
@@ -34,6 +35,7 @@ type UserEditState = {
   display_name: string;
   role: 'admin' | 'member';
   access_group_id: number | null;
+  max_concurrent_sessions: number;
   is_active: boolean;
   password: string;
 };
@@ -67,6 +69,7 @@ const emptyUserForm = (): UserFormState => ({
   display_name: '',
   role: 'member',
   access_group_id: null,
+  max_concurrent_sessions: 2,
   is_active: true,
   password: ''
 });
@@ -95,6 +98,7 @@ function userToEdit(user: User): UserEditState {
     display_name: user.display_name ?? '',
     role: user.role,
     access_group_id: user.access_group_id,
+    max_concurrent_sessions: user.max_concurrent_sessions,
     is_active: user.is_active,
     password: ''
   };
@@ -269,6 +273,7 @@ export function UsersPage() {
         display_name: form.display_name,
         role: form.role,
         access_group_id: form.access_group_id,
+        max_concurrent_sessions: form.max_concurrent_sessions,
         is_active: form.is_active
       });
       if (form.password.trim()) {
@@ -515,6 +520,23 @@ export function UsersPage() {
                     <option value="false">inactive</option>
                   </select>
                 </Field>
+                <Field label="Devices">
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={createUserForm.max_concurrent_sessions}
+                    onChange={(event) =>
+                      setCreateUserForm({
+                        ...createUserForm,
+                        max_concurrent_sessions: Math.min(10, Math.max(1, Number(event.target.value) || 1))
+                      })
+                    }
+                    required
+                  />
+                </Field>
+              </div>
+              <div className="form-grid cols-2">
                 <Field label="Password">
                   <input type="password" value={createUserForm.password} onChange={(event) => setCreateUserForm({ ...createUserForm, password: event.target.value })} required />
                 </Field>
@@ -548,6 +570,9 @@ export function UsersPage() {
                           @{user.username} · {user.last_login_at ? `last ${formatDateTime(user.last_login_at)}` : 'never logged in'}
                         </div>
                         <div className="list-row-copy line-clamp-1">
+                          Devices {user.active_session_count} / {user.max_concurrent_sessions}
+                        </div>
+                        <div className="list-row-copy line-clamp-1">
                           {user.capabilities.project_tracer ? 'Projects' : 'No projects'} · {user.capabilities.asr ? 'ASR' : 'No ASR'} · {user.capabilities.llm ? 'LLM' : 'No LLM'}
                         </div>
                         <div className="form-grid cols-2">
@@ -574,6 +599,25 @@ export function UsersPage() {
                               <option value="admin">admin</option>
                             </select>
                           </Field>
+                          <Field label="Devices">
+                            <input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={form.max_concurrent_sessions}
+                              onChange={(event) =>
+                                setEditUserForms({
+                                  ...editUserForms,
+                                  [user.id]: {
+                                    ...form,
+                                    max_concurrent_sessions: Math.min(10, Math.max(1, Number(event.target.value) || 1))
+                                  }
+                                })
+                              }
+                            />
+                          </Field>
+                        </div>
+                        <div className="form-grid cols-2">
                           <Field label="State">
                             <select value={String(form.is_active)} onChange={(event) => setEditUserForms({ ...editUserForms, [user.id]: { ...form, is_active: event.target.value === 'true' } })}>
                               <option value="true">active</option>

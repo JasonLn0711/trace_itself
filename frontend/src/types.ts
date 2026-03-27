@@ -69,6 +69,8 @@ export interface User {
   role: UserRole;
   access_group_id: number | null;
   access_group_name: string | null;
+  max_concurrent_sessions: number;
+  active_session_count: number;
   capabilities: UserCapabilities;
   is_active: boolean;
   failed_login_attempts: number;
@@ -293,6 +295,7 @@ export interface UserCreateInput {
   display_name: string;
   role: UserRole;
   access_group_id?: number | null;
+  max_concurrent_sessions: number;
   is_active: boolean;
   password: string;
 }
@@ -301,6 +304,7 @@ export interface UserUpdateInput {
   display_name?: string;
   role?: UserRole;
   access_group_id?: number | null;
+  max_concurrent_sessions?: number;
   is_active?: boolean;
 }
 

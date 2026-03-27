@@ -14,6 +14,7 @@ class UserBase(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
     role: UserRole = UserRole.MEMBER
     access_group_id: int | None = None
+    max_concurrent_sessions: int = Field(default=2, ge=1, le=10)
     is_active: bool = True
 
     @field_validator("username")
@@ -30,6 +31,7 @@ class UserUpdate(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
     role: UserRole | None = None
     access_group_id: int | None = None
+    max_concurrent_sessions: int | None = Field(default=None, ge=1, le=10)
     is_active: bool | None = None
 
 
@@ -52,6 +54,8 @@ class UserRead(BaseModel):
     role: UserRole
     access_group_id: int | None
     access_group_name: str | None
+    max_concurrent_sessions: int
+    active_session_count: int
     capabilities: UserCapabilitiesRead
     is_active: bool
     failed_login_attempts: int
