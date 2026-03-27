@@ -281,4 +281,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="cuda-asr-verification-helper",
+        version_tag="v1.0.67",
+        title="CUDA ASR verification helper",
+        summary="The repo now includes a one-step script to verify GPU ASR on the lab machine.",
+        details=(
+            "The new helper checks host GPU visibility, Docker GPU access, the backend CTranslate2 CUDA runtime, "
+            "and a short Breeze ASR transcription probe so GPU bring-up on the RTX 5080 is easier to confirm."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=False,
+    ),
 )

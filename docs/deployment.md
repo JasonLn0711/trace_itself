@@ -93,6 +93,15 @@ sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
 
+If Docker still cannot see the GPU after that, the most useful quick checks are:
+
+```bash
+docker info --format '{{json .Runtimes}} {{json .DefaultRuntime}}'
+docker run --rm --gpus all alpine:3.21 true
+```
+
+If the second command fails with `no known GPU vendor found`, Docker still is not wired to the NVIDIA runtime.
+
 Recommended CUDA startup:
 
 ```bash
@@ -122,6 +131,12 @@ import ctranslate2
 print("cuda_count", ctranslate2.get_cuda_device_count())
 print("cuda_compute_types", ctranslate2.get_supported_compute_types("cuda"))
 PY
+```
+
+Full end-to-end CUDA verification:
+
+```bash
+./scripts/verify_cuda_asr.sh
 ```
 
 ASR notes:

@@ -169,6 +169,17 @@ flowchart TB
    sudo systemctl restart docker
    ```
 
+   If Docker still does not see the GPU, these are the failure signs to look for:
+
+   - `docker info` only shows `runc` and no NVIDIA runtime/toolkit integration
+   - `docker run --rm --gpus all alpine:3.21 true` fails with `no known GPU vendor found`
+
+   After the toolkit install, you can prove the app is really using the RTX 5080 and transcribing with:
+
+   ```bash
+   ./scripts/verify_cuda_asr.sh
+   ```
+
 4. Start the stack:
 
    Recommended for CUDA ASR on the lab machine:
@@ -212,6 +223,7 @@ The backend auto-creates the MVP tables on startup and bootstraps the initial ad
 - If the NVIDIA runtime is missing, ASR and Meetings return a clear `503` instead of crashing the backend.
 - `ASR_COMPUTE_TYPE=float16` is the recommended fast path.
 - If you need lower VRAM use, try `ASR_COMPUTE_TYPE=int8_float16`.
+- `scripts/verify_cuda_asr.sh` does a host GPU check, a Docker GPU probe, a CTranslate2 CUDA check, and a real short transcription probe.
 
 ## Core workflows
 
