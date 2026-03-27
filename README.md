@@ -22,6 +22,8 @@ Latest deployed updates are listed here so reviewers can immediately see what ch
   Reframed the login page as a real product entry point for private testing, with future-ready Google, GitHub, and Email auth options and cleaner mobile-to-desktop behavior.
 - `Portfolio-Ready Product Framing`
   Upgraded the README and architecture docs so the project presents as a serious personal execution system rather than a generic task tracker.
+- `Long Live Recording Stability`
+  Fixed `Live ASR error: Internal Server Error` on longer live recordings by streaming the final multipart upload through the Next.js proxy instead of reparsing the full file in memory first.
 
 ### Deployed 2026-03-26
 
@@ -95,6 +97,21 @@ Private audio workflows with:
 - transcript storage
 - meeting notes
 - summaries and action items
+
+## Live ASR Long Recording Fix
+
+Long live sessions could fail when saving the take after recording for an extended period, even though live chunk transcription itself was still working.
+
+- `Symptom`
+  Users could record for a long live session, stop normally, and then hit `Live ASR error: Internal Server Error` during the final save step.
+- `What actually failed`
+  The fragile part was not the PCM chunk streaming into the backend. The failure happened later, when the browser-uploaded recording was sent to the live-session `persist` endpoint.
+- `Root cause`
+  Most `/api/*` traffic is sent to FastAPI through a plain Next.js rewrite, but the live-session endpoints use a custom route handler. That proxy was calling `request.formData()` before forwarding the request, which forced Next.js to parse and buffer the full multipart body again. Longer recordings made that extra parse much more likely to fail.
+- `How it was fixed`
+  The proxy now forwards the original multipart request body as a stream, preserves the incoming `content-type` boundary and `content-length`, and uses `duplex: 'half'` so Node can pass the upload through to FastAPI without rebuilding the whole form in memory first.
+- `Why this fix is targeted`
+  The bug was isolated to the live-session save path because it was the one audio flow using the custom Next.js proxy instead of the simpler rewrite path.
 
 ## Architecture
 
