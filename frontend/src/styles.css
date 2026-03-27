@@ -707,6 +707,23 @@ a.card.entity {
   background: linear-gradient(145deg, #c54a4a, #a23939);
 }
 
+.btn-save-action {
+  color: white;
+  background: linear-gradient(145deg, #205f4f, #17473b);
+  border: 1px solid rgba(129, 198, 178, 0.26);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.22);
+}
+
+.btn-save-action:hover {
+  background: linear-gradient(145deg, #256d5b, #1b5546);
+}
+
+.btn-save-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: none;
+}
+
 .toolbar {
   display: grid;
   gap: 10px;

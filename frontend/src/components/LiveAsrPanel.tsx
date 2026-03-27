@@ -537,11 +537,15 @@ export function LiveAsrPanel({
         <Button disabled={!supported || !providerId || state !== 'idle'} onClick={() => void startLive()}>
           Start live
         </Button>
-        <Button variant="secondary" disabled={state !== 'live' && state !== 'connecting'} onClick={() => void stopLive()}>
+        <Button
+          variant={state === 'live' || state === 'connecting' || state === 'stopping' ? 'danger' : 'secondary'}
+          disabled={state !== 'live' && state !== 'connecting'}
+          onClick={() => void stopLive()}
+        >
           Stop
         </Button>
         <Button variant="ghost" disabled={state === 'saving' || (!sessionIdRef.current && !pendingSave)} onClick={() => void discardLive()}>
-          Clear
+          Reset
         </Button>
         {pendingSave ? (
           <Button variant="secondary" disabled={state === 'saving'} onClick={() => void persistPendingLiveTake()}>

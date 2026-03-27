@@ -68,6 +68,28 @@ function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefine
   return (value || '').toLowerCase() === 'live' ? 'Live' : 'File';
 }
 
+function SaveMarkIcon() {
+  return (
+    <svg className="btn-save-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M3 2.5A1.5 1.5 0 0 1 4.5 1h5.379c.398 0 .78.158 1.06.44l1.621 1.62c.281.282.44.664.44 1.061V13.5A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5v-11Zm1.5-.5a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5H5V10.5A1.5 1.5 0 0 1 6.5 9h3A1.5 1.5 0 0 1 11 10.5V14h.5a.5.5 0 0 0 .5-.5V4.121a.5.5 0 0 0-.146-.353l-1.621-1.621A.5.5 0 0 0 9.879 2H9v2.25A.75.75 0 0 1 8.25 5h-2.5A.75.75 0 0 1 5 4.25V2h-.5Zm1.5 0v2h2V2H6Zm.5 8a.5.5 0 0 0-.5.5V14h4v-3.5a.5.5 0 0 0-.5-.5h-3Z"
+      />
+    </svg>
+  );
+}
+
+function AudioMarkIcon() {
+  return (
+    <svg className="btn-save-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M10.5 1.5a.5.5 0 0 1 .639-.48l.5.143A2.5 2.5 0 0 1 13.5 3.57v6.805a2.25 2.25 0 1 1-1-1.873V5.244L7 6.618v5.757a2.25 2.25 0 1 1-1-1.873V4.5a.5.5 0 0 1 .379-.485l4.121-1.03V1.5Zm2 2.07a1.5 1.5 0 0 0-1.118-1.45l-.382-.109v4.943l1.5-.375V3.57ZM6 11.625a1.25 1.25 0 1 0 .001 2.499A1.25 1.25 0 0 0 6 11.625Zm6.5 0a1.25 1.25 0 1 0 .001 2.499 1.25 1.25 0 0 0-.001-2.499Z"
+      />
+    </svg>
+  );
+}
+
 export function MeetingsPage() {
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const { resetIdleTimeout, user } = useAuth();
@@ -757,11 +779,13 @@ export function MeetingsPage() {
                 <Badge tone="neutral">{formatDuration(selectedTranscript.duration_seconds)}</Badge>
                 <Badge tone="neutral">{formatBytes(selectedTranscript.file_size_bytes)}</Badge>
                 <Badge tone="info">{selectedTranscript.model_name}</Badge>
-                <a className="btn btn-ghost" href={asrApi.audioUrl(selectedTranscript.id)}>
-                  Audio
+                <a className="btn btn-save-action" href={asrApi.audioUrl(selectedTranscript.id)} download>
+                  <AudioMarkIcon />
+                  Save audio
                 </a>
-                <a className="btn btn-ghost" href={asrApi.textUrl(selectedTranscript.id)}>
-                  TXT
+                <a className="btn btn-save-action" href={asrApi.textUrl(selectedTranscript.id)} download>
+                  <SaveMarkIcon />
+                  Save transcript
                 </a>
               </div>
               <audio className="audio-player" controls preload="none" src={asrApi.audioUrl(selectedTranscript.id)} />
@@ -792,8 +816,9 @@ export function MeetingsPage() {
               <Badge tone="info">{selectedMeeting.asr_model_name}</Badge>
               <Badge tone="warning">{selectedMeeting.llm_model_name}</Badge>
               <Badge tone="warning">{actionItemCount(selectedMeeting.action_items_text)} to-do</Badge>
-              <a className="btn btn-ghost" href={meetingsApi.audioUrl(selectedMeeting.id)}>
-                Audio
+              <a className="btn btn-save-action" href={meetingsApi.audioUrl(selectedMeeting.id)} download>
+                <AudioMarkIcon />
+                Save audio
               </a>
             </div>
             <audio className="audio-player" controls preload="none" src={meetingsApi.audioUrl(selectedMeeting.id)} />

@@ -199,7 +199,7 @@ export function AudioCapturePanel({
         </Button>
         {file ? (
           <Button variant="ghost" disabled={disabled || isRecording} onClick={clearSelection}>
-            Clear
+            Reset
           </Button>
         ) : null}
         <input
