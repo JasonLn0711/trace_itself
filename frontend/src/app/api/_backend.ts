@@ -42,14 +42,32 @@ export async function proxyApiRequest(
     }
     body = await request.arrayBuffer();
   } else if (bodyKind === 'formData') {
-    body = await request.formData();
+    const contentType = request.headers.get('content-type');
+    if (contentType) {
+      headers.set('content-type', contentType);
+    }
+    const contentLength = request.headers.get('content-length');
+    if (contentLength) {
+      headers.set('content-length', contentLength);
+    }
+    body = request.body ?? undefined;
   }
 
-  const response = await fetch(`${apiProxyTarget}/api${path}`, {
-    method: request.method,
-    headers,
-    body
-  });
+  const response = await fetch(
+    `${apiProxyTarget}/api${path}`,
+    bodyKind === 'formData'
+      ? ({
+          method: request.method,
+          headers,
+          body,
+          duplex: 'half',
+        } as RequestInit)
+      : {
+          method: request.method,
+          headers,
+          body,
+        }
+  );
 
   return new Response(response.body, {
     status: response.status,
