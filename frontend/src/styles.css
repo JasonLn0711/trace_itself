@@ -1520,7 +1520,8 @@ a.card.entity {
 
 @media (max-width: 820px) {
   .app-shell {
-    padding: 16px;
+    padding: 14px;
+    gap: 14px;
   }
 
   .page-header,
@@ -1561,10 +1562,281 @@ a.card.entity {
 
   .list-row-side {
     justify-items: start;
+    width: 100%;
   }
 
   .login-surface {
     width: min(100%, 410px);
     padding: 30px 22px 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .sidebar {
+    padding: 12px;
+  }
+
+  .brand {
+    margin-bottom: 12px;
+    gap: 10px;
+  }
+
+  .brand-title {
+    font-size: 0.95rem;
+  }
+
+  .nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .nav a {
+    flex: none;
+    white-space: nowrap;
+    padding: 10px 12px;
+  }
+
+  .account-card,
+  .sidebar-logout {
+    margin-top: 12px;
+  }
+
+  .session-clock {
+    grid-template-columns: auto 1fr auto;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .session-clock-label,
+  .session-clock-state {
+    font-size: 0.7rem;
+  }
+
+  .session-clock strong {
+    font-size: 0.95rem;
+  }
+
+  .page {
+    gap: 12px;
+  }
+
+  .page-intro,
+  .section-card {
+    padding: 12px;
+  }
+
+  .page-intro {
+    gap: 12px;
+  }
+
+  .page-intro h1 {
+    font-size: 1.6rem;
+  }
+
+  .page-intro-copy p {
+    max-width: none;
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .hero-actions > * {
+    min-width: 0;
+  }
+
+  .hero-actions .btn,
+  .hero-actions a.btn {
+    width: 100%;
+  }
+
+  .metric-strip,
+  .segmented-control,
+  .capture-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+
+  .metric-pill {
+    flex: 0 0 152px;
+    min-width: 152px;
+  }
+
+  .metric-pill strong {
+    font-size: 0.95rem;
+  }
+
+  .section-header {
+    gap: 10px;
+  }
+
+  .section-header h2 {
+    font-size: 1.05rem;
+  }
+
+  .toolbar-row .field {
+    flex-basis: 100%;
+  }
+
+  .segment {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .entity,
+  .list-row,
+  .note-surface,
+  .todo-item,
+  .transcript-body {
+    padding: 12px;
+  }
+
+  .list-row {
+    gap: 10px;
+  }
+
+  .list-row-header,
+  .list-row-meta {
+    align-items: flex-start;
+  }
+
+  .list-row-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .list-row-actions .btn {
+    min-width: 0;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .form-grid {
+    gap: 10px;
+  }
+
+  .form-grid .helper-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .form-grid .helper-row .btn {
+    width: 100%;
+  }
+
+  .field input,
+  .field textarea,
+  .field select {
+    padding: 12px;
+  }
+
+  .field textarea {
+    min-height: 96px;
+  }
+
+  .live-asr-actions,
+  .audio-capture-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live-asr-actions .btn,
+  .audio-capture-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .audio-capture-preview {
+    gap: 8px;
+  }
+
+  .audio-player {
+    min-height: 38px;
+  }
+
+  .transcript-body {
+    font-size: 0.88rem;
+    max-height: 340px;
+  }
+
+  .live-transcript-surface .transcript-body {
+    min-height: 180px;
+    max-height: 280px;
+  }
+
+  .timeline-item {
+    padding-left: 16px;
+  }
+
+  .timeline-date {
+    white-space: normal;
+  }
+
+  .mini-item {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-shell {
+    padding: 8px;
+  }
+
+  .sidebar,
+  .page-intro,
+  .section-card {
+    padding: 10px;
+  }
+
+  .page-intro h1 {
+    font-size: 1.45rem;
+  }
+
+  .hero-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-pill {
+    flex-basis: calc(100vw - 44px);
+    min-width: calc(100vw - 44px);
+  }
+
+  .live-asr-actions,
+  .audio-capture-actions,
+  .list-row-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .helper-row {
+    grid-template-columns: 1fr;
+  }
+
+  .login-shell {
+    padding: 14px;
+  }
+
+  .login-surface {
+    padding: 24px 18px 20px;
+  }
+
+  .password-toggle {
+    right: 10px;
+    padding: 7px 10px;
   }
 }
