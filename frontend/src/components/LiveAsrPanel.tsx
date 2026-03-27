@@ -74,6 +74,19 @@ function mergeByteChunks(chunks: Uint8Array[]) {
   return merged;
 }
 
+function formatTranscriptTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '--:--:--';
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).format(date);
+}
+
 export function LiveAsrPanel({
   providerId,
   providerLabel,
@@ -454,6 +467,17 @@ export function LiveAsrPanel({
 
   const durationCaption = snapshot ? formatDuration(snapshot.duration_seconds) : '0s';
   const meterPercent = Math.round((snapshot?.level ?? 0) * 100);
+  const transcriptEntries = useMemo(() => {
+    if (!snapshot) {
+      return [];
+    }
+    const items = [...snapshot.entries];
+    if (snapshot.partial_entry?.text?.trim()) {
+      return [snapshot.partial_entry, ...items];
+    }
+    return items;
+  }, [snapshot]);
+  const partialEntryId = snapshot?.partial_entry?.id ?? null;
 
   return (
     <div className="live-asr-panel">
@@ -501,9 +525,23 @@ export function LiveAsrPanel({
       <div className="transcript-surface live-transcript-surface">
         <div className="detail-row">
           <Badge tone={state === 'live' ? 'success' : 'neutral'}>{liveLabel}</Badge>
-          <Badge tone="info">Streaming</Badge>
+          <Badge tone="info">{transcriptEntries.length ? `${transcriptEntries.length} saved line${transcriptEntries.length === 1 ? '' : 's'}` : 'Streaming'}</Badge>
         </div>
-        <pre className="transcript-body">{snapshot?.preview_text || 'Start live to see words appear here.'}</pre>
+        <div className="transcript-body live-transcript-log" role="log" aria-live="polite">
+          {transcriptEntries.length ? (
+            transcriptEntries.map((entry) => (
+              <div
+                key={`${entry.id}-${entry.recorded_at}`}
+                className={`live-transcript-entry ${entry.id === partialEntryId ? 'is-live' : ''}`.trim()}
+              >
+                <span className="live-transcript-time">[{formatTranscriptTimestamp(entry.recorded_at)}]</span>
+                <span className="live-transcript-text">{entry.text}</span>
+              </div>
+            ))
+          ) : (
+            <div className="live-transcript-empty">Start live to see timestamped transcript lines.</div>
+          )}
+        </div>
       </div>
     </div>
   );

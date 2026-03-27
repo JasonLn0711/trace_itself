@@ -122,6 +122,12 @@ export interface AsrTranscript {
   updated_at: string;
 }
 
+export interface LiveAsrTranscriptEntry {
+  id: string;
+  recorded_at: string;
+  text: string;
+}
+
 export interface LiveAsrSessionSnapshot {
   session_id: string;
   state: string;
@@ -131,6 +137,8 @@ export interface LiveAsrSessionSnapshot {
   committed_text: string;
   partial_text: string;
   preview_text: string;
+  entries: LiveAsrTranscriptEntry[];
+  partial_entry: LiveAsrTranscriptEntry | null;
   model_name: string;
   final_ready: boolean;
 }

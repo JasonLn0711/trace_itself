@@ -64,7 +64,7 @@ def normalize_language(raw_language: str | None) -> str | None:
     return normalized_language
 
 
-def to_live_read(payload: dict[str, str | float | bool | None]) -> LiveAsrSessionRead:
+def to_live_read(payload: dict[str, object]) -> LiveAsrSessionRead:
     return LiveAsrSessionRead.model_validate(payload)
 
 

@@ -267,4 +267,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=False,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-asr-timestamped-lines",
+        version_tag="v1.0.66",
+        title="Timestamped live transcript lines",
+        summary="Live ASR now keeps each timestamped utterance in a running on-screen transcript log.",
+        details=(
+            "The live transcription view now preserves each recognized segment instead of replacing one preview block, "
+            "shows a timestamp ahead of each line, and keeps the newest line at the top while the session is active."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

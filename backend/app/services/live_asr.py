@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from time import monotonic
 from uuid import uuid4
 
@@ -14,6 +15,13 @@ settings = get_settings()
 
 class LiveAsrSessionError(RuntimeError):
     pass
+
+
+@dataclass(slots=True)
+class LiveTranscriptEntry:
+    id: str
+    recorded_at: datetime
+    text: str
 
 
 @dataclass(slots=True)
@@ -34,9 +42,11 @@ class LiveAsrSession:
     total_samples: int = 0
     current_utterance_chunks: list[np.ndarray] = field(default_factory=list)
     current_utterance_samples: int = 0
+    current_utterance_started_at: datetime | None = None
     trailing_silence_seconds: float = 0.0
     last_partial_at: float = 0.0
     smoothed_gain: float = 1.0
+    entries: list[LiveTranscriptEntry] = field(default_factory=list)
     finalized: bool = False
     persisted: bool = False
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
@@ -105,13 +115,18 @@ class LiveAsrSessionManager:
             if (session.total_samples / settings.asr_live_sample_rate) > session.max_duration_seconds:
                 raise LiveAsrSessionError("Live stream reached the audio cap for one session.")
 
+            now_utc = datetime.now(timezone.utc)
             has_speech = self._has_speech(prepared)
             if has_speech:
+                if session.current_utterance_samples == 0:
+                    session.current_utterance_started_at = now_utc
                 session.current_utterance_chunks.append(prepared)
                 session.current_utterance_samples += prepared.size
                 session.trailing_silence_seconds = 0.0
                 session.state = "speech"
             elif session.current_utterance_samples:
+                if session.current_utterance_started_at is None:
+                    session.current_utterance_started_at = now_utc
                 session.current_utterance_chunks.append(prepared)
                 session.current_utterance_samples += prepared.size
                 session.trailing_silence_seconds += prepared.size / settings.asr_live_sample_rate
@@ -207,10 +222,19 @@ class LiveAsrSessionManager:
         if result and result.text:
             session.committed_text = self._append_text(session.committed_text, result.text)
             session.detected_language = result.language or session.detected_language
+            session.entries.insert(
+                0,
+                LiveTranscriptEntry(
+                    id=uuid4().hex,
+                    recorded_at=session.current_utterance_started_at or datetime.now(timezone.utc),
+                    text=result.text.strip(),
+                ),
+            )
 
         session.partial_text = ""
         session.current_utterance_chunks.clear()
         session.current_utterance_samples = 0
+        session.current_utterance_started_at = None
         session.trailing_silence_seconds = 0.0
         session.last_partial_at = monotonic()
 
@@ -332,7 +356,15 @@ class LiveAsrSessionManager:
             "speech_pad_ms": settings.asr_live_vad_speech_pad_ms,
         }
 
-    def build_payload(self, session: LiveAsrSession) -> dict[str, str | float | bool | None]:
+    def build_payload(self, session: LiveAsrSession) -> dict[str, object]:
+        partial_entry = None
+        if session.partial_text.strip():
+            partial_entry = {
+                "id": f"partial-{session.id}",
+                "recorded_at": (session.current_utterance_started_at or datetime.now(timezone.utc)).isoformat(),
+                "text": session.partial_text.strip(),
+            }
+
         return {
             "session_id": session.id,
             "state": session.state,
@@ -342,6 +374,15 @@ class LiveAsrSessionManager:
             "committed_text": session.committed_text,
             "partial_text": session.partial_text,
             "preview_text": self._preview_text(session),
+            "entries": [
+                {
+                    "id": entry.id,
+                    "recorded_at": entry.recorded_at.isoformat(),
+                    "text": entry.text,
+                }
+                for entry in session.entries
+            ],
+            "partial_entry": partial_entry,
             "model_name": session.model_name,
             "final_ready": session.finalized,
         }

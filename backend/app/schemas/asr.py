@@ -40,6 +40,12 @@ class LiveAsrSessionCreate(BaseModel):
     language: str | None = None
 
 
+class LiveAsrTranscriptEntryRead(BaseModel):
+    id: str
+    recorded_at: datetime
+    text: str
+
+
 class LiveAsrSessionRead(BaseModel):
     session_id: str
     state: str
@@ -49,5 +55,7 @@ class LiveAsrSessionRead(BaseModel):
     committed_text: str
     partial_text: str
     preview_text: str
+    entries: list[LiveAsrTranscriptEntryRead]
+    partial_entry: LiveAsrTranscriptEntryRead | None = None
     model_name: str
     final_ready: bool

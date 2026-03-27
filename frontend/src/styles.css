@@ -1433,6 +1433,42 @@ a.card.entity {
   overflow: auto;
 }
 
+.live-transcript-log {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.live-transcript-entry {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.live-transcript-entry:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.live-transcript-entry.is-live {
+  color: var(--accent);
+}
+
+.live-transcript-time {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.live-transcript-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.live-transcript-empty {
+  color: var(--muted);
+}
+
 .live-transcript-surface .transcript-body {
   min-height: 220px;
   max-height: 360px;
