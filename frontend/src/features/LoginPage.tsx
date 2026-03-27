@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { BrandMark } from '../components/BrandMark';
 import { Card } from '../components/Primitives';
 import { PublicAuthCard } from '../components/PublicAuthCard';
 import { resolvePostLoginPath } from '../lib/access';
@@ -68,16 +69,26 @@ export function LoginPage() {
     <div className="auth-entry-shell">
       <div className="auth-entry-grid">
         <section className="auth-entry-intro auth-identity-panel">
-          <div className="auth-identity-title-block">
-            <p className="auth-identity-kicker">Private workspace</p>
-            <h1 className="auth-brand-title">trace_itself</h1>
-            <p className="auth-identity-description">Execution intelligence for research, project planning, and meeting memory.</p>
+          <div className="auth-identity-hero">
+            <div className="auth-identity-icon-shell" aria-hidden="true">
+              <BrandMark className="auth-identity-icon" />
+            </div>
+            <div className="auth-identity-title-block">
+              <p className="auth-identity-kicker">Mission control</p>
+              <h1 className="auth-brand-title">trace_itself</h1>
+              <p className="auth-identity-description">A focused workspace for research, planning, and execution.</p>
+              <div className="auth-identity-tags" aria-label="Product focus">
+                <span>Research</span>
+                <span>Plan</span>
+                <span>Ship</span>
+              </div>
+            </div>
           </div>
           <div className="auth-identity-meta auth-identity-footer">
-            <p className="auth-identity-signature">PhD student Jason Chia-Sheng Lin, NYCU</p>
+            <p className="auth-identity-signature">Jason Chia-Sheng Lin · PhD student, NYCU</p>
             <div className="auth-identity-meta-row">
               <span>{APP_VERSION}</span>
-              <span>Copyright {currentYear} Jason Chia-Sheng Lin</span>
+              <span>© {currentYear}</span>
             </div>
           </div>
         </section>

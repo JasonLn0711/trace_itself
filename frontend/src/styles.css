@@ -1140,8 +1140,36 @@ a.card.entity {
   flex-direction: column;
   justify-content: space-between;
   gap: 28px;
-  max-width: 22rem;
-  min-height: 320px;
+  max-width: 24rem;
+  min-height: 340px;
+}
+
+.auth-identity-hero {
+  display: grid;
+  gap: 18px;
+}
+
+.auth-identity-icon-shell {
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  border-radius: 30px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
+    rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.auth-identity-icon {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.24));
 }
 
 .auth-identity-meta p {
@@ -1165,9 +1193,26 @@ a.card.entity {
 .auth-identity-description {
   margin: 0;
   max-width: 22rem;
-  color: #c7d3de;
+  color: #d2dbe4;
   font-size: 0.98rem;
-  line-height: 1.55;
+  line-height: 1.5;
+}
+
+.auth-identity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-identity-tags span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #d7e0e9;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .auth-identity-meta {
@@ -1180,12 +1225,12 @@ a.card.entity {
 
 .auth-identity-footer {
   margin-top: auto;
-  padding-top: 14px;
+  padding-top: 16px;
   border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .auth-identity-signature {
-  color: #d5dee8;
+  color: #dde5ee;
   font-size: 0.92rem;
 }
 
@@ -3457,6 +3502,16 @@ a.card.entity {
     font-size: 0.92rem;
   }
 
+  .auth-identity-tags span {
+    font-size: 0.74rem;
+  }
+
+  .auth-identity-icon-shell {
+    width: 84px;
+    height: 84px;
+    border-radius: 26px;
+  }
+
   .public-auth-card {
     gap: 10px;
     padding: 14px 14px 12px;
@@ -3891,12 +3946,32 @@ a.card.entity {
     min-height: auto;
   }
 
+  .auth-identity-hero {
+    gap: 14px;
+  }
+
+  .auth-identity-icon-shell {
+    width: 76px;
+    height: 76px;
+    border-radius: 24px;
+    padding: 11px;
+  }
+
   .auth-identity-meta {
     font-size: 0.76rem;
   }
 
   .auth-identity-description {
     font-size: 0.86rem;
+  }
+
+  .auth-identity-tags {
+    gap: 6px;
+  }
+
+  .auth-identity-tags span {
+    padding: 5px 9px;
+    font-size: 0.7rem;
   }
 
   .auth-identity-signature,
