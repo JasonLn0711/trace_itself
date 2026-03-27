@@ -122,22 +122,13 @@ export function TimelineGantt({ timeline }: { timeline: DashboardTimeline }) {
 
   return (
     <div className="gantt-shell">
-      <div className="gantt-toolbar">
-        <div className="gantt-legend" aria-hidden="true">
-          <span className="gantt-legend-item"><i className="gantt-swatch gantt-swatch-planned" />Not started</span>
-          <span className="gantt-legend-item"><i className="gantt-swatch gantt-swatch-active" />In progress</span>
-          <span className="gantt-legend-item"><i className="gantt-swatch gantt-swatch-completed" />Completed</span>
-          <span className="gantt-legend-item"><i className="gantt-swatch gantt-swatch-overdue" />Overdue</span>
-          <span className="gantt-legend-item"><i className="gantt-swatch gantt-swatch-target" />Target date</span>
-        </div>
-        <div className="muted small">
-          {formatDate(timeline.window_start)} to {formatDate(timeline.window_end)}
-        </div>
+      <div className="gantt-range muted small">
+        {formatDate(timeline.window_start)} - {formatDate(timeline.window_end)}
       </div>
 
       <div className="gantt-board" role="img" aria-label="Mini gantt timeline for active projects and milestones">
         <div className="gantt-axis">
-          <div className="gantt-axis-label">Project</div>
+          <div className="gantt-axis-label" aria-hidden="true" />
           <div className="gantt-axis-track">
             {tickOffsets.map((offset) => {
               const tickDate = addDays(timeline.window_start, offset);
@@ -166,12 +157,6 @@ export function TimelineGantt({ timeline }: { timeline: DashboardTimeline }) {
             <div key={project.id} className="gantt-row">
               <div className="gantt-row-label">
                 <div className="gantt-row-title">{project.name}</div>
-                <div className="gantt-row-meta">
-                  <span>
-                    {project.milestones.length} milestone{project.milestones.length === 1 ? '' : 's'}
-                  </span>
-                  <span>{project.target_date ? `Target ${formatDate(project.target_date)}` : 'No target date'}</span>
-                </div>
               </div>
 
               <div className="gantt-track">
@@ -210,8 +195,6 @@ export function TimelineGantt({ timeline }: { timeline: DashboardTimeline }) {
                     </div>
                   );
                 })}
-
-                {!project.milestones.length ? <div className="gantt-empty muted small">No milestones in this 60-day view.</div> : null}
               </div>
             </div>
           );

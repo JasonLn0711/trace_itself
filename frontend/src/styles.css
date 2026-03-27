@@ -1530,29 +1530,12 @@ a.card.entity {
 
 .gantt-shell {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
-.gantt-toolbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.gantt-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-}
-
-.gantt-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+.gantt-range {
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
@@ -1585,18 +1568,18 @@ a.card.entity {
 
 .gantt-board {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .gantt-axis,
 .gantt-row {
   display: grid;
-  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(120px, 170px) minmax(0, 1fr);
+  gap: 12px;
 }
 
 .gantt-axis-label {
-  padding-top: 10px;
+  padding-top: 0;
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 800;
@@ -1606,7 +1589,7 @@ a.card.entity {
 
 .gantt-axis-track {
   position: relative;
-  min-height: 34px;
+  min-height: 30px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -1627,39 +1610,32 @@ a.card.entity {
 .gantt-axis-tick::after {
   content: '';
   position: absolute;
-  top: 18px;
+  top: 16px;
   left: 50%;
   width: 1px;
-  height: 10px;
+  height: 8px;
   background: var(--line);
 }
 
 .gantt-row-label {
   display: grid;
-  gap: 4px;
+  gap: 0;
   align-content: start;
-  padding-top: 8px;
+  padding-top: 7px;
 }
 
 .gantt-row-title {
-  font-size: 0.94rem;
+  font-size: 0.9rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-}
-
-.gantt-row-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  color: var(--muted);
-  font-size: 0.8rem;
+  line-height: 1.2;
 }
 
 .gantt-track {
   position: relative;
-  min-height: 54px;
+  min-height: 46px;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid var(--line);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
@@ -1708,8 +1684,8 @@ a.card.entity {
 
 .gantt-target-marker {
   position: absolute;
-  top: 8px;
-  bottom: 8px;
+  top: 6px;
+  bottom: 6px;
   width: 2px;
   transform: translateX(-50%);
   border-left: 2px dashed rgba(244, 197, 111, 0.84);
@@ -1718,25 +1694,25 @@ a.card.entity {
 
 .gantt-bar {
   position: absolute;
-  top: 12px;
+  top: 11px;
   z-index: 2;
-  height: 28px;
+  height: 24px;
   display: flex;
   align-items: center;
-  padding: 0 10px;
-  border-radius: 10px;
+  padding: 0 8px;
+  border-radius: 8px;
   border: 1px solid transparent;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.16);
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 .gantt-bar span {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: -0.01em;
 }
@@ -1780,11 +1756,233 @@ a.card.entity {
 }
 
 .gantt-empty-state {
-  min-height: 140px;
+  min-height: 120px;
 }
 
 .dashboard-command-page {
   gap: 14px;
+}
+
+.dashboard-command-page-compact {
+  gap: 12px;
+}
+
+.dashboard-ops-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dashboard-ops-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dashboard-ops-copy h1 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-ops-copy span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.dashboard-ops-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-compact-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.command-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.command-panel-timeline,
+.command-panel-recent {
+  grid-column: 1 / -1;
+}
+
+.command-task-list,
+.recent-feed-list {
+  display: grid;
+  gap: 8px;
+}
+
+.command-task-row,
+.recent-feed-row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.command-task-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.recent-feed-row {
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.command-task-row:hover,
+.recent-feed-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(148, 163, 184, 0.26);
+}
+
+.command-task-main,
+.recent-feed-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.command-task-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.command-task-title,
+.recent-feed-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-task-project {
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.command-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.command-chip-info {
+  color: #ccecff;
+  background: rgba(110, 172, 255, 0.16);
+}
+
+.command-chip-warning {
+  color: #ffe7ba;
+  background: rgba(244, 197, 111, 0.16);
+}
+
+.command-chip-danger {
+  color: #ffe1e1;
+  background: rgba(255, 142, 142, 0.18);
+}
+
+.command-chip-muted {
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.command-empty {
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.alert-counter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.alert-counter {
+  display: grid;
+  gap: 4px;
+  padding: 12px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+}
+
+.alert-counter strong {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.alert-counter span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.alert-counter-danger strong {
+  color: var(--danger);
+}
+
+.alert-counter-warning strong {
+  color: var(--warning);
+}
+
+.alert-counter-info strong {
+  color: #93cbff;
+}
+
+.alert-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.recent-feed-time {
+  color: var(--muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
 }
 
 .mission-header {
@@ -2863,6 +3061,10 @@ a.card.entity {
     grid-template-columns: 1fr;
   }
 
+  .dashboard-compact-grid {
+    grid-template-columns: 1fr;
+  }
+
   .auth-entry-grid {
     grid-template-columns: 1fr;
     gap: 14px;
@@ -2925,6 +3127,11 @@ a.card.entity {
   .auth-entry-shell {
     padding: 14px;
     align-items: start;
+  }
+
+  .dashboard-ops-bar {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .auth-entry-grid {
@@ -3006,6 +3213,24 @@ a.card.entity {
     height: 42px;
   }
 
+  .dashboard-command-page-compact {
+    gap: 10px;
+  }
+
+  .dashboard-ops-copy h1 {
+    font-size: 0.96rem;
+  }
+
+  .dashboard-ops-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-ops-actions .btn {
+    justify-content: center;
+  }
+
   .auth-brand-positioning {
     font-size: 0.9rem;
   }
@@ -3039,6 +3264,45 @@ a.card.entity {
 
   .auth-option-list-secondary {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .command-task-row {
+    padding: 9px 10px;
+    gap: 8px;
+  }
+
+  .command-task-project {
+    display: none;
+  }
+
+  .command-task-meta {
+    gap: 4px;
+  }
+
+  .command-chip {
+    padding: 3px 6px;
+    font-size: 0.66rem;
+  }
+
+  .alert-counter-grid {
+    gap: 6px;
+  }
+
+  .alert-counter {
+    padding: 10px 8px;
+  }
+
+  .alert-counter strong {
+    font-size: 1.12rem;
+  }
+
+  .recent-feed-row {
+    grid-template-columns: 70px minmax(0, 1fr);
+    padding: 9px 10px;
+  }
+
+  .recent-feed-time {
+    font-size: 0.7rem;
   }
 
   .auth-support-footer {
