@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
@@ -30,6 +31,7 @@ def build_excerpt(value: str, max_length: int = 180) -> str:
 
 
 def to_summary(transcript: AsrTranscript) -> AsrTranscriptSummary:
+    parsed_entries = parse_transcript_entries(transcript.transcript_entries_json)
     return AsrTranscriptSummary(
         id=transcript.id,
         title=transcript.title,
@@ -39,6 +41,8 @@ def to_summary(transcript: AsrTranscript) -> AsrTranscriptSummary:
         duration_seconds=transcript.duration_seconds,
         file_size_bytes=transcript.file_size_bytes,
         model_name=transcript.model_name,
+        capture_mode=normalize_capture_mode(transcript.capture_mode),
+        live_entry_count=len(parsed_entries),
         excerpt=build_excerpt(transcript.transcript_text),
         created_at=transcript.created_at,
         updated_at=transcript.updated_at,
@@ -46,7 +50,21 @@ def to_summary(transcript: AsrTranscript) -> AsrTranscriptSummary:
 
 
 def to_read(transcript: AsrTranscript) -> AsrTranscriptRead:
-    return AsrTranscriptRead.model_validate(transcript)
+    return AsrTranscriptRead(
+        id=transcript.id,
+        title=transcript.title,
+        original_filename=transcript.original_filename,
+        audio_mime_type=transcript.audio_mime_type,
+        language=transcript.language,
+        duration_seconds=transcript.duration_seconds,
+        file_size_bytes=transcript.file_size_bytes,
+        model_name=transcript.model_name,
+        capture_mode=normalize_capture_mode(transcript.capture_mode),
+        transcript_text=transcript.transcript_text,
+        transcript_entries=parse_transcript_entries(transcript.transcript_entries_json),
+        created_at=transcript.created_at,
+        updated_at=transcript.updated_at,
+    )
 
 
 def normalize_title(raw_title: str | None, original_filename: str) -> str:
@@ -62,6 +80,47 @@ def normalize_language(raw_language: str | None) -> str | None:
     if normalized_language == "auto":
         normalized_language = None
     return normalized_language
+
+
+def normalize_capture_mode(raw_capture_mode: str | None) -> str:
+    normalized = (raw_capture_mode or "").strip().lower()
+    if normalized in {"live", "file"}:
+        return normalized
+    return "file"
+
+
+def serialize_live_entries(entries: list[dict[str, str]]) -> str | None:
+    if not entries:
+        return None
+    return json.dumps(entries, separators=(",", ":"))
+
+
+def parse_transcript_entries(value: str | None) -> list[dict[str, str]]:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    normalized: list[dict[str, str]] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        entry_id = str(item.get("id", "")).strip()
+        recorded_at = str(item.get("recorded_at", "")).strip()
+        text = str(item.get("text", "")).strip()
+        if not entry_id or not recorded_at or not text:
+            continue
+        normalized.append(
+            {
+                "id": entry_id,
+                "recorded_at": recorded_at,
+                "text": text,
+            }
+        )
+    return normalized
 
 
 def to_live_read(payload: dict[str, object]) -> LiveAsrSessionRead:
@@ -199,7 +258,9 @@ async def persist_live_session(
         duration_seconds=probed_duration_seconds,
         file_size_bytes=stored_audio.file_size_bytes,
         model_name=session.model_name,
+        capture_mode="live",
         transcript_text=session.committed_text,
+        transcript_entries_json=serialize_live_entries(live_asr_service.serialize_entries(session.entries)),
     )
     db.add(transcript)
     record_usage_event(
@@ -279,7 +340,9 @@ async def transcribe_audio(
         duration_seconds=result.duration_seconds or probed_duration_seconds,
         file_size_bytes=stored_audio.file_size_bytes,
         model_name=result.model_name,
+        capture_mode="file",
         transcript_text=result.text,
+        transcript_entries_json=None,
     )
     db.add(transcript)
     record_usage_event(

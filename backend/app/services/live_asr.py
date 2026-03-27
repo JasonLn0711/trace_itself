@@ -375,17 +375,24 @@ class LiveAsrSessionManager:
             "partial_text": session.partial_text,
             "preview_text": self._preview_text(session),
             "entries": [
-                {
-                    "id": entry.id,
-                    "recorded_at": entry.recorded_at.isoformat(),
-                    "text": entry.text,
-                }
-                for entry in session.entries
+                item
+                for item in self.serialize_entries(session.entries)
             ],
             "partial_entry": partial_entry,
             "model_name": session.model_name,
             "final_ready": session.finalized,
         }
+
+    @staticmethod
+    def serialize_entries(entries: list[LiveTranscriptEntry]) -> list[dict[str, str]]:
+        return [
+            {
+                "id": entry.id,
+                "recorded_at": entry.recorded_at.isoformat(),
+                "text": entry.text,
+            }
+            for entry in entries
+        ]
 
 
 service = LiveAsrSessionManager()

@@ -309,4 +309,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="saved-live-transcript-history",
+        version_tag="v1.0.69",
+        title="Saved live transcripts now keep line history",
+        summary="Live ASR saves the timestamped transcript lines users saw during streaming.",
+        details=(
+            "Saved live takes now keep their timestamped line entries instead of flattening everything into one text block, "
+            "and the Audio workspace shows each signed-in user their own saved transcript history more clearly."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

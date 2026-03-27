@@ -14,6 +14,8 @@ class AsrTranscriptSummary(BaseModel):
     duration_seconds: float | None
     file_size_bytes: int
     model_name: str
+    capture_mode: str
+    live_entry_count: int
     excerpt: str
     created_at: datetime
     updated_at: datetime
@@ -30,7 +32,9 @@ class AsrTranscriptRead(BaseModel):
     duration_seconds: float | None
     file_size_bytes: int
     model_name: str
+    capture_mode: str
     transcript_text: str
+    transcript_entries: list["LiveAsrTranscriptEntryRead"]
     created_at: datetime
     updated_at: datetime
 
@@ -59,3 +63,6 @@ class LiveAsrSessionRead(BaseModel):
     partial_entry: LiveAsrTranscriptEntryRead | None = None
     model_name: str
     final_ready: bool
+
+
+AsrTranscriptRead.model_rebuild()

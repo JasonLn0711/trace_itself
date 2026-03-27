@@ -103,6 +103,8 @@ export interface AsrTranscriptSummary {
   duration_seconds: number | null;
   file_size_bytes: number;
   model_name: string;
+  capture_mode: 'live' | 'file';
+  live_entry_count: number;
   excerpt: string;
   created_at: string;
   updated_at: string;
@@ -117,7 +119,9 @@ export interface AsrTranscript {
   duration_seconds: number | null;
   file_size_bytes: number;
   model_name: string;
+  capture_mode: 'live' | 'file';
   transcript_text: string;
+  transcript_entries: LiveAsrTranscriptEntry[];
   created_at: string;
   updated_at: string;
 }

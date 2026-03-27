@@ -16,7 +16,7 @@ import {
 } from '../components/Primitives';
 import { aiProvidersApi, asrApi, extractApiErrorMessage, meetingsApi, usagePolicyApi } from '../lib/api';
 import { canUseMeetingNotes } from '../lib/access';
-import { formatDateTime } from '../lib/dates';
+import { formatDateTime, formatTimeOfDay } from '../lib/dates';
 import { actionItemCount, formatBytes, formatDuration } from '../lib/media';
 import { useAuth } from '../state/AuthContext';
 import type {
@@ -61,6 +61,10 @@ function languageLabel(value: string | null | undefined) {
     return 'auto';
   }
   return LANGUAGE_OPTIONS.find((option) => option.value === normalized)?.label ?? normalized;
+}
+
+function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefined) {
+  return (value || '').toLowerCase() === 'live' ? 'Live' : 'File';
 }
 
 export function MeetingsPage() {
@@ -112,7 +116,7 @@ export function MeetingsPage() {
           nextMeetingEntries,
           nextLlmProviders
         ] = await Promise.all([
-          asrApi.list({ limit: 24 }),
+          asrApi.list({ limit: 100 }),
           aiProvidersApi.list({ kind: 'asr' }),
           usagePolicyApi.get(),
           notesEnabled ? meetingsApi.list({ limit: 24 }) : Promise.resolve([] as MeetingRecordSummary[]),
@@ -170,7 +174,7 @@ export function MeetingsPage() {
     (policySnapshot?.usage.llm_runs_remaining ?? 1) > 0;
 
   async function loadTranscriptEntries(targetId?: number | null) {
-    const items = await asrApi.list({ limit: 24 });
+    const items = await asrApi.list({ limit: 100 });
     setTranscriptEntries(items);
     const nextSelectedId = targetId ?? items[0]?.id ?? null;
     setSelectedTranscriptId(nextSelectedId);
@@ -618,7 +622,7 @@ export function MeetingsPage() {
         </Card>
 
         <Card className="section-card">
-          <SectionHeader title={workspaceMode === 'transcript' ? 'Transcripts' : 'Meetings'} />
+          <SectionHeader title={workspaceMode === 'transcript' ? 'Your transcripts' : 'Your meetings'} />
           <div className="list-table">
             {workspaceMode === 'transcript' ? (
               transcriptEntries.length ? (
@@ -631,8 +635,14 @@ export function MeetingsPage() {
                           <Badge tone={selectedTranscriptId === entry.id ? 'info' : 'neutral'}>
                             {selectedTranscriptId === entry.id ? 'Open' : 'Saved'}
                           </Badge>
+                          <Badge tone={entry.capture_mode === 'live' ? 'success' : 'neutral'}>
+                            {transcriptSourceLabel(entry.capture_mode)}
+                          </Badge>
                           <Badge tone="neutral">{languageLabel(entry.language)}</Badge>
                           <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
+                          {entry.capture_mode === 'live' && entry.live_entry_count ? (
+                            <Badge tone="neutral">{entry.live_entry_count} lines</Badge>
+                          ) : null}
                         </div>
                       </div>
                       <div className="list-row-copy line-clamp-1">{entry.excerpt || 'No transcript text.'}</div>
@@ -725,6 +735,9 @@ export function MeetingsPage() {
           ) : selectedTranscript ? (
             <div className="transcript-surface">
               <div className="detail-row">
+                <Badge tone={selectedTranscript.capture_mode === 'live' ? 'success' : 'neutral'}>
+                  {transcriptSourceLabel(selectedTranscript.capture_mode)}
+                </Badge>
                 <Badge tone="neutral">{languageLabel(selectedTranscript.language)}</Badge>
                 <Badge tone="neutral">{formatDuration(selectedTranscript.duration_seconds)}</Badge>
                 <Badge tone="neutral">{formatBytes(selectedTranscript.file_size_bytes)}</Badge>
@@ -734,7 +747,18 @@ export function MeetingsPage() {
                 </a>
               </div>
               <audio className="audio-player" controls preload="none" src={asrApi.audioUrl(selectedTranscript.id)} />
-              <pre className="transcript-body">{selectedTranscript.transcript_text}</pre>
+              {selectedTranscript.transcript_entries.length ? (
+                <div className="transcript-body live-transcript-log">
+                  {selectedTranscript.transcript_entries.map((entry) => (
+                    <div key={`${entry.id}-${entry.recorded_at}`} className="live-transcript-entry">
+                      <span className="live-transcript-time">[{formatTimeOfDay(entry.recorded_at)}]</span>
+                      <span className="live-transcript-text">{entry.text}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <pre className="transcript-body">{selectedTranscript.transcript_text}</pre>
+              )}
             </div>
           ) : (
             <EmptyState title="No transcript selected" description="Pick one from the list." />

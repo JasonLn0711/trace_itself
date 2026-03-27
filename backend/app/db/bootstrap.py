@@ -40,6 +40,9 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE daily_logs DROP CONSTRAINT IF EXISTS daily_logs_log_date_key"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_storage_path VARCHAR(255)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_mime_type VARCHAR(120)"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS capture_mode VARCHAR(32)"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS transcript_entries_json TEXT"))
+    connection.execute(text("UPDATE asr_transcripts SET capture_mode = 'file' WHERE capture_mode IS NULL"))
     connection.execute(
         text(
             """
@@ -54,7 +57,9 @@ def apply_schema_upgrades(connection) -> None:
                 duration_seconds DOUBLE PRECISION NULL,
                 file_size_bytes BIGINT NOT NULL,
                 model_name VARCHAR(120) NOT NULL,
+                capture_mode VARCHAR(32) NOT NULL DEFAULT 'file',
                 transcript_text TEXT NOT NULL,
+                transcript_entries_json TEXT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )

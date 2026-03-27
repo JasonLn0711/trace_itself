@@ -19,7 +19,9 @@ class AsrTranscript(Base):
     duration_seconds: Mapped[float | None] = mapped_column(Float)
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    capture_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="file", server_default="file")
     transcript_text: Mapped[str] = mapped_column(Text, nullable=False)
+    transcript_entries_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
