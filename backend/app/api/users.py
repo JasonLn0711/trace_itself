@@ -105,3 +105,17 @@ def unlock_user(user_id: int, db: Session = Depends(get_db)) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
+def delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    user = get_user_for_admin_or_404(user_id, db)
+    if user.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your own account.")
+
+    db.delete(user)
+    db.commit()

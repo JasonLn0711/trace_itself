@@ -16,6 +16,7 @@ import {
 import { accessGroupsApi, aiProvidersApi, extractApiErrorMessage, usagePolicyApi, usersApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import { formatDuration } from '../lib/media';
+import { useAuth } from '../state/AuthContext';
 import type { AccessGroup, AIProvider, AIProviderDriver, AIProviderKind, UsagePolicySnapshot, User } from '../types';
 
 type AdminTab = 'users' | 'groups' | 'providers' | 'policy';
@@ -148,6 +149,7 @@ function policyToForm(snapshot: UsagePolicySnapshot): PolicyFormState {
 }
 
 export function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [tab, setTab] = useState<AdminTab>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [groups, setGroups] = useState<AccessGroup[]>([]);
@@ -288,6 +290,21 @@ export function UsersPage() {
       await usersApi.unlock(userId);
       await loadAll();
       setNotice('User unlocked.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    }
+  }
+
+  async function handleDeleteUser(userId: number, displayName: string) {
+    if (!window.confirm(`Delete user "${displayName}"?`)) {
+      return;
+    }
+    setError('');
+    setNotice('');
+    try {
+      await usersApi.remove(userId);
+      await loadAll();
+      setNotice('User deleted.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     }
@@ -515,6 +532,7 @@ export function UsersPage() {
                 users.map((user) => {
                   const form = editUserForms[user.id] ?? userToEdit(user);
                   const locked = Boolean(user.locked_until);
+                  const canDeleteUser = currentUser?.id !== user.id;
                   return (
                     <div key={user.id} className="list-row">
                       <div className="list-row-main">
@@ -586,7 +604,13 @@ export function UsersPage() {
                               Unlock
                             </Button>
                           ) : null}
+                          {canDeleteUser ? (
+                            <Button variant="danger" onClick={() => void handleDeleteUser(user.id, user.display_name || user.username)}>
+                              Delete
+                            </Button>
+                          ) : null}
                         </div>
+                        {!canDeleteUser ? <div className="muted small">Current admin</div> : null}
                       </div>
                     </div>
                   );

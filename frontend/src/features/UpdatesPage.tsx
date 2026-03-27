@@ -150,9 +150,7 @@ export function UpdatesPage() {
                     </div>
                   </div>
                   <div className="list-row-copy line-clamp-1">{entry.summary}</div>
-                  <div className="list-row-copy line-clamp-1">
-                    {formatDateTime(entry.changed_at)} · {entry.author_display_name || 'System'}
-                  </div>
+                  <div className="list-row-copy line-clamp-1">Updater · {entry.author_display_name || 'System'}</div>
                   {entry.details ? <div className="list-row-copy line-clamp-2">{entry.details}</div> : null}
                 </div>
                 <div className="list-row-side">

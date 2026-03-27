@@ -392,6 +392,11 @@ export const usersApi = {
     return request<User>(`/users/${id}/unlock`, {
       method: 'POST'
     });
+  },
+  remove(id: number) {
+    return request<void>(`/users/${id}`, {
+      method: 'DELETE'
+    });
   }
 };
 
