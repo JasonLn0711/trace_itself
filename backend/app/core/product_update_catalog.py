@@ -325,7 +325,7 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
     ),
     ProductUpdateCatalogEntry(
         entry_key="audio-timeout-reset-freeze",
-        version_tag="v1.0.70",
+        version_tag="v1.1.0",
         title="Audio work now resets and pauses the idle timeout",
         summary="Starting live audio, recording, or transcript processing now resets the timeout clock and freezes it at full time.",
         details=(
