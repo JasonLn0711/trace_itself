@@ -464,4 +464,19 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T02:00:00+00:00"),
         is_pinned=False,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="security-hardening-pass",
+        version_tag="v1.1.10",
+        title="Security hardening pass",
+        summary="Sessions, live ASR, provider URLs, and production startup checks now have stronger backend guardrails.",
+        details=(
+            "Password resets now revoke active sessions, the backend enforces idle session expiry, live ASR rejects "
+            "oversized chunks and bounds uninterrupted utterances, Gemini providers are limited to the official "
+            "Google API host, and production startup now fails closed if secrets or cookie settings are unsafe."
+        ),
+        area="security",
+        change_type=ProductUpdateType.SECURITY,
+        changed_at=datetime.fromisoformat("2026-03-27T02:10:00+00:00"),
+        is_pinned=True,
+    ),
 )

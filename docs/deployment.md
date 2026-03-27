@@ -53,6 +53,7 @@ cp .env.example .env
 
 Then change these values:
 
+- `APP_ENV=production` for real deployments so the backend enforces production-only security checks
 - `POSTGRES_PASSWORD` to a strong database password
 - `SECRET_KEY` to a long random secret
 - `CREDENTIALS_SECRET_KEY` to a second long random secret for encrypting stored provider API keys
@@ -68,6 +69,14 @@ Use these security settings:
 
 - For local-only testing on the lab machine: `SESSION_COOKIE_SECURE=false`
 - For real remote access over Tailscale HTTPS: `SESSION_COOKIE_SECURE=true`
+- Keep `SESSION_IDLE_TIMEOUT_MINUTES=5` unless you intentionally want a different backend-enforced idle timeout
+
+The backend now refuses to start in production when any of these are still unsafe:
+
+- `SECRET_KEY` is still a placeholder
+- `INITIAL_ADMIN_PASSWORD` is still a placeholder
+- `CREDENTIALS_SECRET_KEY` is missing or reuses `SECRET_KEY`
+- `SESSION_COOKIE_SECURE=false`
 
 Optional ASR tuning:
 
@@ -77,6 +86,9 @@ Optional ASR tuning:
 - `ASR_LIVE_PARTIAL_INTERVAL_MS=1500` for the live partial refresh cadence
 - `ASR_LIVE_COMMIT_SILENCE_MS=1200` for the pause length that commits a live utterance
 - `ASR_LIVE_MAX_WINDOW_SECONDS=18` for the rolling live decode window
+- `ASR_LIVE_MAX_CHUNK_KB=256` for the maximum accepted live audio chunk size
+- `ASR_LIVE_MAX_UTTERANCE_SECONDS=45` for the longest uninterrupted live utterance buffered before a forced commit
+- `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of open live ASR sessions per account
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
 - `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
@@ -89,6 +101,12 @@ After first login, use the `Control` page to:
 - store ASR and LLM provider settings
 - enable or disable providers for the user-facing selectors
 - set the shared text/audio budget policy
+
+Security notes:
+
+- password resets now revoke all existing sessions for that account
+- the backend now enforces the idle timeout, not just the frontend
+- Gemini provider URLs are restricted to the official Google API host instead of arbitrary outbound URLs
 
 ## Start the app
 
@@ -162,10 +180,11 @@ ASR notes:
 - That first ASR run can take longer than normal, depending on your network and chosen model.
 - After the model is cached, later transcriptions are much faster.
 - If CUDA is configured but unavailable, the backend stays up and the ASR endpoints return `503` with a clear fix message.
+- Live ASR now rejects oversized chunks, limits open sessions per user, and force-commits long uninterrupted utterances to keep memory bounded.
 - The live ASR page streams mic audio in small normalized chunks and still stores a compact Opus/WebM recording when the take is saved.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
-- Provider API secrets are stored encrypted in Postgres.
+- Provider API secrets are stored encrypted in Postgres, and production deployments must now use a dedicated `CREDENTIALS_SECRET_KEY`.
 - The default policy is 3 LLM text runs per user per rolling 24 hours and 5 hours max audio per file.
 
 ## Private remote access with Tailscale Serve

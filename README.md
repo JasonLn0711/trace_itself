@@ -12,6 +12,8 @@ Latest deployed updates are listed here so reviewers can immediately see what ch
 
 ### Deployed 2026-03-27
 
+- `Security Hardening Pass`
+  Added backend-enforced idle session expiry, password-reset session revocation, bounded live-ASR chunk and utterance handling, stricter Gemini provider URL validation, and safer production startup checks for secrets and secure cookies.
 - `Mission Control Dashboard`
   Rebuilt the dashboard into a high-signal command center with `Now`, `Alerts`, `Mission Timeline`, `Execution Flow`, `Project Radar`, `Reality Gap`, and `Weekly Command Review`.
 - `Dashboard Intelligence APIs`
@@ -113,6 +115,25 @@ Long live sessions could fail when saving the take after recording for an extend
 - `Why this fix is targeted`
   The bug was isolated to the live-session save path because it was the one audio flow using the custom Next.js proxy instead of the simpler rewrite path.
 
+## Security Hardening
+
+This repo now includes a focused backend hardening pass for the highest-risk items found in review:
+
+- password resets revoke every existing session for that account
+- the backend enforces the idle session timeout instead of relying only on the frontend countdown
+- production startup now fails closed if placeholder secrets are still present, `CREDENTIALS_SECRET_KEY` is missing, or `SESSION_COOKIE_SECURE` is left off
+- live ASR chunks are size-limited and long uninterrupted utterances are force-committed so one session cannot grow unbounded in memory
+- Gemini provider URLs are restricted to the official Google Generative Language API host instead of allowing arbitrary outbound URLs
+- backend dependency pins were updated for the reported FastAPI/Starlette, Requests, Cryptography, and multipart advisories
+
+New security-related environment settings:
+
+- `APP_ENV`
+- `SESSION_IDLE_TIMEOUT_MINUTES`
+- `ASR_LIVE_MAX_CHUNK_KB`
+- `ASR_LIVE_MAX_UTTERANCE_SECONDS`
+- `ASR_LIVE_MAX_SESSIONS_PER_USER`
+
 ## Architecture
 
 - `Frontend`
@@ -198,11 +219,17 @@ cp .env.example .env
 
 Set at least:
 
+- `APP_ENV` with `development` locally and `production` for real deployment
 - `POSTGRES_PASSWORD`
 - `SECRET_KEY`
 - `CREDENTIALS_SECRET_KEY`
 - `INITIAL_ADMIN_USERNAME`
 - `INITIAL_ADMIN_PASSWORD`
+
+For remote/private deployment over HTTPS, also set:
+
+- `SESSION_COOKIE_SECURE=true`
+- `SESSION_IDLE_TIMEOUT_MINUTES=5`
 
 ### 2. Start the stack
 
@@ -249,6 +276,7 @@ For real deployment details, use:
 
 Recommended posture:
 
+- `APP_ENV=production` on real deployments
 - frontend bound to `127.0.0.1:3000`
 - backend bound to `127.0.0.1:8000`
 - database only on Docker internal network
