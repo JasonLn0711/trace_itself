@@ -337,4 +337,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=False,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-save-duration-fix",
+        version_tag="v1.1.1",
+        title="Live transcript saves no longer fail on browser audio duration metadata",
+        summary="Stopping live ASR now saves the transcript using tracked stream duration instead of fragile container metadata.",
+        details=(
+            "The live-save path now trusts the streamed session duration first, so browser-recorded WebM or similar uploads "
+            "no longer fail with 'Audio duration could not be read' before the saved transcript reaches the transcript list."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

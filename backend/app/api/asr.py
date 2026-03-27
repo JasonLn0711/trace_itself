@@ -240,10 +240,12 @@ async def persist_live_session(
         max_bytes=settings.asr_max_upload_bytes,
         prefix=f"asr-live-{current_user.id}",
     )
+    captured_duration_seconds = round(session.total_samples / settings.asr_live_sample_rate, 3)
     try:
         policy = get_or_create_usage_policy(db)
-        probed_duration_seconds = probe_audio_duration_seconds(stored_audio.storage_path)
-        ensure_audio_duration_allowed(probed_duration_seconds, policy)
+        if captured_duration_seconds <= 0:
+            captured_duration_seconds = probe_audio_duration_seconds(stored_audio.storage_path)
+        ensure_audio_duration_allowed(captured_duration_seconds, policy)
     except HTTPException:
         delete_audio_file(stored_audio.storage_path)
         raise
@@ -255,7 +257,7 @@ async def persist_live_session(
         audio_storage_path=stored_audio.relative_storage_path,
         audio_mime_type=stored_audio.mime_type,
         language=session.detected_language or session.language_hint,
-        duration_seconds=probed_duration_seconds,
+        duration_seconds=captured_duration_seconds,
         file_size_bytes=stored_audio.file_size_bytes,
         model_name=session.model_name,
         capture_mode="live",
@@ -269,7 +271,7 @@ async def persist_live_session(
         provider_id=session.provider_id,
         kind=UsageEventKind.ASR_AUDIO,
         source="asr_live_stream",
-        duration_seconds=probed_duration_seconds,
+        duration_seconds=captured_duration_seconds,
     )
     db.commit()
     db.refresh(transcript)
