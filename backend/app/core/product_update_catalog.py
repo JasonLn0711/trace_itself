@@ -295,4 +295,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=False,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="cuda-default-compose-startup",
+        version_tag="v1.0.68",
+        title="Default Docker startup now keeps CUDA ASR attached",
+        summary="The standard docker compose startup path now requests the NVIDIA GPU for the backend.",
+        details=(
+            "The main docker-compose file now carries the backend GPU request directly, so the usual "
+            "docker compose up --build -d command keeps Breeze ASR on the RTX 5080 without requiring a separate overlay command."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

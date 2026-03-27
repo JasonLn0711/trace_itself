@@ -53,7 +53,7 @@ class AsrService:
         except Exception as exc:
             raise AsrRuntimeUnavailableError(
                 "CUDA ASR is configured but Docker cannot access the NVIDIA runtime. "
-                "Install NVIDIA Container Toolkit and start the backend with docker-compose.cuda.yml."
+                "Install NVIDIA Container Toolkit and restart the stack with docker compose up --build -d."
             ) from exc
 
         if cuda_count < 1:

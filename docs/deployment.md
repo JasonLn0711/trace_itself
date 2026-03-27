@@ -102,18 +102,18 @@ docker run --rm --gpus all alpine:3.21 true
 
 If the second command fails with `no known GPU vendor found`, Docker still is not wired to the NVIDIA runtime.
 
-Recommended CUDA startup:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.cuda.yml up --build -d
-docker compose ps
-```
-
-Temporary CPU-only fallback:
+Recommended startup on the NVIDIA lab machine:
 
 ```bash
 docker compose up --build -d
 docker compose ps
+```
+
+The main `docker-compose.yml` now requests the NVIDIA GPU for the backend by default. If you intentionally need CPU-only fallback, temporarily set:
+
+```env
+ASR_DEVICE=cpu
+ASR_COMPUTE_TYPE=float32
 ```
 
 Local checks on the server:
@@ -143,7 +143,8 @@ ASR notes:
 
 - The first transcription request downloads the Breeze ASR model into the Docker volume `asr_model_cache`.
 - The backend image now includes the CUDA user-space libraries faster-whisper expects for GPU inference.
-- `docker-compose.cuda.yml` is the overlay that exposes the NVIDIA GPU to the backend container.
+- The main `docker-compose.yml` now exposes the NVIDIA GPU to the backend container on the lab machine.
+- `docker-compose.cuda.yml` is kept only as a backward-compatible overlay for older commands.
 - The first live ASR chunk can also trigger that model warm-up, so the very first live response may be slower.
 - That first ASR run can take longer than normal, depending on your network and chosen model.
 - After the model is cached, later transcriptions are much faster.

@@ -182,16 +182,17 @@ flowchart TB
 
 4. Start the stack:
 
-   Recommended for CUDA ASR on the lab machine:
-
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.cuda.yml up --build -d
-   ```
-
-   Temporary CPU-only fallback:
+   Recommended on the NVIDIA lab machine:
 
    ```bash
    docker compose up --build -d
+   ```
+
+   The main `docker-compose.yml` now requests the NVIDIA GPU for the backend by default. If you intentionally need CPU-only fallback, temporarily switch `.env` back to:
+
+   ```env
+   ASR_DEVICE=cpu
+   ASR_COMPUTE_TYPE=float32
    ```
 
 5. Open the app locally:
@@ -218,12 +219,13 @@ The backend auto-creates the MVP tables on startup and bootstraps the initial ad
 
 ## CUDA ASR notes
 
-- `docker-compose.cuda.yml` is the GPU overlay for the backend.
+- The main `docker-compose.yml` now keeps the backend on the NVIDIA GPU by default on the lab machine.
 - Breeze ASR now expects CUDA through Docker, not CPU-only inference, when `ASR_DEVICE=cuda`.
 - If the NVIDIA runtime is missing, ASR and Meetings return a clear `503` instead of crashing the backend.
 - `ASR_COMPUTE_TYPE=float16` is the recommended fast path.
 - If you need lower VRAM use, try `ASR_COMPUTE_TYPE=int8_float16`.
 - `scripts/verify_cuda_asr.sh` does a host GPU check, a Docker GPU probe, a CTranslate2 CUDA check, and a real short transcription probe.
+- `docker-compose.cuda.yml` is kept only as a backward-compatible overlay for older commands.
 
 ## Core workflows
 
