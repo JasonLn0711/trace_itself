@@ -15,6 +15,7 @@ import {
   ProgressBar,
   SectionHeader
 } from '../components/Primitives';
+import { useConfirmationDialog } from '../components/ConfirmationDialog';
 import { extractApiErrorMessage, milestonesApi, projectsApi, tasksApi } from '../lib/api';
 import { clampPercent, formatDate, relativeDueLabel } from '../lib/dates';
 import {
@@ -113,6 +114,7 @@ function taskToPayload(task: Task, status = task.status) {
 }
 
 export function ProjectDetailPage({ projectId }: { projectId: number }) {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -323,7 +325,12 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
   }
 
   async function removeMilestone(milestone: Milestone) {
-    if (!window.confirm(`Delete milestone "${milestone.title}"?`)) {
+    const confirmed = await confirm({
+      title: `Delete milestone "${milestone.title}"?`,
+      description: 'This milestone and its related task links will be removed.',
+      confirmLabel: 'Delete milestone'
+    });
+    if (!confirmed) {
       return;
     }
     setError('');
@@ -342,7 +349,12 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
   }
 
   async function removeTask(task: Task) {
-    if (!window.confirm(`Delete task "${task.title}"?`)) {
+    const confirmed = await confirm({
+      title: `Delete task "${task.title}"?`,
+      description: 'This task will be removed from the project.',
+      confirmLabel: 'Delete task'
+    });
+    if (!confirmed) {
       return;
     }
     setError('');
@@ -401,6 +413,7 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
 
   return (
     <div className="page">
+      {confirmationDialog}
       <PageIntro
         title={project.name}
         description={project.description || undefined}

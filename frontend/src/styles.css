@@ -826,6 +826,62 @@ a.card.entity {
   align-self: center;
 }
 
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 8, 14, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.confirm-dialog {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: rgba(16, 23, 32, 0.98);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.42);
+}
+
+.confirm-dialog-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.confirm-dialog-copy h2,
+.confirm-dialog-copy p {
+  margin: 0;
+}
+
+.confirm-dialog-copy h2 {
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.confirm-dialog-copy p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.confirm-dialog-danger {
+  border-color: rgba(255, 142, 142, 0.2);
+}
+
+.confirm-dialog-warning {
+  border-color: rgba(244, 197, 111, 0.2);
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .callout-neutral,
 .notice-neutral {
   color: var(--text);
@@ -1338,9 +1394,9 @@ a.card.entity {
   flex: none;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--muted);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #c7ccd2;
+  color: #0d1117;
   font-size: 0.8rem;
   font-weight: 800;
   white-space: nowrap;

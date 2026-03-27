@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AudioCapturePanel } from '../components/AudioCapturePanel';
+import { useConfirmationDialog } from '../components/ConfirmationDialog';
 import { LiveAsrPanel } from '../components/LiveAsrPanel';
 import {
   Badge,
@@ -68,6 +69,7 @@ function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefine
 }
 
 export function MeetingsPage() {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const { resetIdleTimeout, user } = useAuth();
   const notesEnabled = canUseMeetingNotes(user);
 
@@ -97,7 +99,8 @@ export function MeetingsPage() {
   const [deletingMeetingId, setDeletingMeetingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const activeAsrProviderLabel = asrProviders.find((provider) => provider.id === asrProviderId)?.name ?? asrProviders[0]?.name ?? 'ASR';
+  const activeAsrProviderLabel = (asrProviders.find((provider) => provider.id === asrProviderId)?.name ?? asrProviders[0]?.name ?? 'ASR')
+    .replace(/^Local Breeze ASR$/i, 'Local ASR');
 
   useEffect(() => {
     if (!notesEnabled && workspaceMode === 'meeting') {
@@ -318,7 +321,12 @@ export function MeetingsPage() {
   }
 
   async function handleDeleteTranscript(id: number) {
-    if (!window.confirm('Delete this transcript?')) {
+    const confirmed = await confirm({
+      title: 'Delete this transcript?',
+      description: 'The saved transcript and its audio file will be removed.',
+      confirmLabel: 'Delete transcript'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -337,7 +345,12 @@ export function MeetingsPage() {
   }
 
   async function handleDeleteMeeting(id: number) {
-    if (!window.confirm('Delete this meeting record?')) {
+    const confirmed = await confirm({
+      title: 'Delete this meeting record?',
+      description: 'The transcript, notes, summary, and saved audio will be removed.',
+      confirmLabel: 'Delete notes'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -423,6 +436,7 @@ export function MeetingsPage() {
 
   return (
     <div className="page">
+      {confirmationDialog}
       <PageIntro
         title="Audio"
         description={notesEnabled ? 'Transcript or notes.' : 'Transcript.'}
@@ -479,7 +493,7 @@ export function MeetingsPage() {
       <div className="grid two">
         <Card className="section-card">
           <SectionHeader
-            title={workspaceMode === 'transcript' ? 'New transcript' : 'New notes'}
+            title={workspaceMode === 'transcript' ? 'New Recording...' : 'New notes'}
             description={workspaceMode === 'transcript' ? undefined : 'Audio to summary, minutes, and to-do.'}
           />
 

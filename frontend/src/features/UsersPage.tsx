@@ -13,6 +13,7 @@ import {
   SectionHeader,
   SegmentedControl
 } from '../components/Primitives';
+import { useConfirmationDialog } from '../components/ConfirmationDialog';
 import { accessGroupsApi, aiProvidersApi, extractApiErrorMessage, usagePolicyApi, usersApi } from '../lib/api';
 import { formatDateTime } from '../lib/dates';
 import { formatDuration } from '../lib/media';
@@ -157,6 +158,7 @@ function preferredAccessGroupId(groups: AccessGroup[]) {
 }
 
 export function UsersPage() {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const { user: currentUser } = useAuth();
   const [tab, setTab] = useState<AdminTab>('users');
   const [users, setUsers] = useState<User[]>([]);
@@ -305,7 +307,12 @@ export function UsersPage() {
   }
 
   async function handleDeleteUser(userId: number, displayName: string) {
-    if (!window.confirm(`Delete user "${displayName}"?`)) {
+    const confirmed = await confirm({
+      title: `Delete user "${displayName}"?`,
+      description: 'This user account and its private data will be removed.',
+      confirmLabel: 'Delete user'
+    });
+    if (!confirmed) {
       return;
     }
     setError('');
@@ -356,7 +363,13 @@ export function UsersPage() {
   }
 
   async function handleDeleteGroup(groupId: number) {
-    if (!window.confirm('Delete this access group?')) {
+    const confirmed = await confirm({
+      title: 'Delete this access group?',
+      description: 'Users assigned here may lose feature access until you reassign them.',
+      confirmLabel: 'Delete group',
+      tone: 'warning'
+    });
+    if (!confirmed) {
       return;
     }
     setError('');
@@ -407,7 +420,13 @@ export function UsersPage() {
   }
 
   async function handleDeleteProvider(providerId: number) {
-    if (!window.confirm('Delete this AI provider?')) {
+    const confirmed = await confirm({
+      title: 'Delete this AI provider?',
+      description: 'Pages using this provider will no longer be able to select it.',
+      confirmLabel: 'Delete provider',
+      tone: 'warning'
+    });
+    if (!confirmed) {
       return;
     }
     setError('');
@@ -455,6 +474,7 @@ export function UsersPage() {
 
   return (
     <div className="page">
+      {confirmationDialog}
       <PageIntro
         title="Control"
         description="Users, groups, providers, policy."

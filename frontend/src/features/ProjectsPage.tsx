@@ -14,6 +14,7 @@ import {
   SectionHeader,
   SegmentedControl
 } from '../components/Primitives';
+import { useConfirmationDialog } from '../components/ConfirmationDialog';
 import { extractApiErrorMessage, projectsApi } from '../lib/api';
 import { formatDate } from '../lib/dates';
 import { formatEnumLabel, toneForPriority, toneForProjectStatus } from '../lib/presentation';
@@ -51,6 +52,7 @@ function projectToForm(project: Project): ProjectFormState {
 type ViewFilter = 'active' | 'planned' | 'paused' | 'completed' | 'all';
 
 export function ProjectsPage() {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<ProjectFormState>(defaultProjectForm());
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -172,7 +174,11 @@ export function ProjectsPage() {
   }
 
   async function removeProject(project: Project) {
-    const confirmed = window.confirm(`Delete project "${project.name}" and its milestones/tasks?`);
+    const confirmed = await confirm({
+      title: `Delete "${project.name}"?`,
+      description: 'This removes the project and its milestones and tasks.',
+      confirmLabel: 'Delete project'
+    });
     if (!confirmed) {
       return;
     }
@@ -205,6 +211,7 @@ export function ProjectsPage() {
 
   return (
     <div className="page">
+      {confirmationDialog}
       <PageIntro
         title="Projects"
         actions={

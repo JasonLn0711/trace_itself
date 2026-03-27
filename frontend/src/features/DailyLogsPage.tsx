@@ -12,6 +12,7 @@ import {
   PageIntro,
   SectionHeader
 } from '../components/Primitives';
+import { useConfirmationDialog } from '../components/ConfirmationDialog';
 import { dailyLogsApi, extractApiErrorMessage } from '../lib/api';
 import { formatDate, formatDateTime, todayIso } from '../lib/dates';
 import { summarizeFocus } from '../lib/presentation';
@@ -46,6 +47,7 @@ function logToForm(log: DailyLog): DailyLogFormState {
 }
 
 export function DailyLogsPage() {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [form, setForm] = useState<DailyLogFormState>(emptyLogForm());
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -134,7 +136,12 @@ export function DailyLogsPage() {
   }
 
   async function removeLog(log: DailyLog) {
-    if (!window.confirm(`Delete the daily log for ${formatDate(log.log_date)}?`)) {
+    const confirmed = await confirm({
+      title: `Delete log for ${formatDate(log.log_date)}?`,
+      description: 'This daily log entry will be removed.',
+      confirmLabel: 'Delete log'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -166,6 +173,7 @@ export function DailyLogsPage() {
 
   return (
     <div className="page">
+      {confirmationDialog}
       <PageIntro
         title="Daily Logs"
         actions={

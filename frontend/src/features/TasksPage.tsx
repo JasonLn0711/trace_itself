@@ -14,6 +14,7 @@ import {
   SectionHeader,
   SegmentedControl
 } from '../components/Primitives';
+import { useConfirmationDialog } from '../components/ConfirmationDialog';
 import { extractApiErrorMessage, milestonesApi, projectsApi, tasksApi } from '../lib/api';
 import { formatDate, relativeDueLabel } from '../lib/dates';
 import {
@@ -84,6 +85,7 @@ function taskToPayload(task: Task, status = task.status) {
 type QueueFilter = 'attention' | 'in_progress' | 'blocked' | 'done' | 'all';
 
 export function TasksPage() {
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [projects, setProjects] = useState<Project[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -266,7 +268,12 @@ export function TasksPage() {
   }
 
   async function removeTask(task: Task) {
-    if (!window.confirm(`Delete task "${task.title}"?`)) {
+    const confirmed = await confirm({
+      title: `Delete "${task.title}"?`,
+      description: 'This task will be removed from your queue.',
+      confirmLabel: 'Delete task'
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -315,6 +322,7 @@ export function TasksPage() {
 
   return (
     <div className="page">
+      {confirmationDialog}
       <PageIntro
         title="Tasks"
         actions={
