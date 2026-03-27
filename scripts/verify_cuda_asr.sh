@@ -7,7 +7,8 @@ cd "$ROOT_DIR"
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.cuda.yml)
 
 echo "== Host GPU =="
-nvidia-smi --query-gpu=name,driver_version,cuda_version,memory.total --format=csv,noheader
+nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
+nvidia-smi | sed -n '1,8p'
 
 echo
 echo "== Docker runtimes =="
