@@ -21,6 +21,7 @@ type LiveAsrPanelProps = {
   providerLabel: string;
   language: string;
   title: string;
+  usageAudioSeconds: number | null;
   maxDurationSeconds: number | null;
   onSaved: (transcript: AsrTranscript) => Promise<void> | void;
   onNotice: (message: string) => void;
@@ -106,6 +107,7 @@ export function LiveAsrPanel({
   providerLabel,
   language,
   title,
+  usageAudioSeconds,
   maxDurationSeconds,
   onSaved,
   onNotice,
@@ -510,7 +512,9 @@ export function LiveAsrPanel({
 
   return (
     <div className="live-asr-panel">
-      <div className="detail-row">
+      <div className="capture-strip">
+        <span className="capture-pill">Used {formatDuration(usageAudioSeconds)}</span>
+        {maxDurationSeconds ? <span className="capture-pill">Max {formatDuration(maxDurationSeconds)}</span> : null}
         <span className={`capture-pill ${state === 'live' ? 'live' : snapshot?.final_ready ? 'ready' : ''}`}>{liveLabel}</span>
         <span className="capture-pill">{providerLabel}</span>
         <span className="capture-pill">{durationCaption}</span>

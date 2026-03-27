@@ -1335,6 +1335,7 @@ a.card.entity {
 .capture-pill {
   display: inline-flex;
   align-items: center;
+  flex: none;
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -1342,6 +1343,7 @@ a.card.entity {
   color: var(--muted);
   font-size: 0.8rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .capture-pill.live {
@@ -1354,6 +1356,16 @@ a.card.entity {
   color: var(--success);
   border-color: rgba(119, 217, 163, 0.22);
   background: rgba(119, 217, 163, 0.1);
+}
+
+.capture-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
 }
 
 .audio-capture-preview {

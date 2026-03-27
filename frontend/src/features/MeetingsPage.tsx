@@ -97,6 +97,7 @@ export function MeetingsPage() {
   const [deletingMeetingId, setDeletingMeetingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const activeAsrProviderLabel = asrProviders.find((provider) => provider.id === asrProviderId)?.name ?? asrProviders[0]?.name ?? 'ASR';
 
   useEffect(() => {
     if (!notesEnabled && workspaceMode === 'meeting') {
@@ -479,7 +480,7 @@ export function MeetingsPage() {
         <Card className="section-card">
           <SectionHeader
             title={workspaceMode === 'transcript' ? 'New transcript' : 'New notes'}
-            description={workspaceMode === 'transcript' ? 'Live or file.' : 'Audio to summary, minutes, and to-do.'}
+            description={workspaceMode === 'transcript' ? undefined : 'Audio to summary, minutes, and to-do.'}
           />
 
           {workspaceMode === 'transcript' ? (
@@ -520,22 +521,15 @@ export function MeetingsPage() {
                     ))}
                   </select>
                 </label>
-              ) : (
-                <div className="list-row-copy">
-                  {asrProviders[0] ? `${asrProviders[0].name} · ${asrProviders[0].model_name}` : 'No ASR provider.'}
-                </div>
-              )}
-              <div className="detail-row">
-                <span className="capture-pill">Used {formatDuration(policySnapshot?.usage.audio_seconds_last_24h ?? null)}</span>
-                <span className="capture-pill">Max {formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)}</span>
-              </div>
+              ) : null}
 
               {transcriptInputMode === 'live' ? (
                 <LiveAsrPanel
                   providerId={asrProviderId}
-                  providerLabel={asrProviders.find((provider) => provider.id === asrProviderId)?.name ?? asrProviders[0]?.name ?? 'ASR'}
+                  providerLabel={activeAsrProviderLabel}
                   language={language}
                   title={title}
+                  usageAudioSeconds={policySnapshot?.usage.audio_seconds_last_24h ?? null}
                   maxDurationSeconds={policySnapshot?.policy.max_audio_seconds_per_request ?? null}
                   onSaved={handleLiveSaved}
                   onNotice={(message) => {
@@ -549,6 +543,11 @@ export function MeetingsPage() {
                 />
               ) : (
                 <form className="form-grid" onSubmit={handleTranscriptSubmit}>
+                  <div className="capture-strip">
+                    <span className="capture-pill">Used {formatDuration(policySnapshot?.usage.audio_seconds_last_24h ?? null)}</span>
+                    <span className="capture-pill">Max {formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)}</span>
+                    <span className="capture-pill">{activeAsrProviderLabel}</span>
+                  </div>
                   <AudioCapturePanel file={file} onChange={setFile} filenameBase="audio" disabled={submittingTranscript} />
                   <Button type="submit" disabled={submittingTranscript || !file || !asrProviders.length}>
                     {submittingTranscript ? 'Saving...' : 'Save transcript'}
