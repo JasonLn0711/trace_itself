@@ -69,14 +69,16 @@ export function LoginPage() {
       <div className="auth-entry-grid">
         <section className="auth-entry-intro auth-identity-panel">
           <div className="auth-identity-title-block">
+            <p className="auth-identity-kicker">Private workspace</p>
             <h1 className="auth-brand-title">trace_itself</h1>
+            <p className="auth-identity-description">Execution intelligence for research, project planning, and meeting memory.</p>
           </div>
           <div className="auth-identity-meta auth-identity-footer">
-            <p>PhD student Jason Chia-Sheng Lin</p>
-            <p>NYCU</p>
-            <p>trace_itself</p>
-            <p>Version {APP_VERSION}</p>
-            <p>Copyright {currentYear} Jason Chia-Sheng Lin</p>
+            <p className="auth-identity-signature">PhD student Jason Chia-Sheng Lin, NYCU</p>
+            <div className="auth-identity-meta-row">
+              <span>{APP_VERSION}</span>
+              <span>Copyright {currentYear} Jason Chia-Sheng Lin</span>
+            </div>
           </div>
         </section>
 
