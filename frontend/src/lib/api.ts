@@ -258,6 +258,9 @@ export const asrApi = {
   audioUrl(id: number) {
     return `${API_BASE}/asr/transcripts/${id}/audio`;
   },
+  textUrl(id: number) {
+    return `${API_BASE}/asr/transcripts/${id}/text`;
+  },
   transcribe(input: { file: File; title?: string; language?: string; provider_id?: number | null }) {
     const formData = new FormData();
     formData.append('file', input.file);

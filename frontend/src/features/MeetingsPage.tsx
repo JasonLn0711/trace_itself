@@ -747,6 +747,9 @@ export function MeetingsPage() {
                 <a className="btn btn-ghost" href={asrApi.audioUrl(selectedTranscript.id)}>
                   Audio
                 </a>
+                <a className="btn btn-ghost" href={asrApi.textUrl(selectedTranscript.id)}>
+                  TXT
+                </a>
               </div>
               <audio className="audio-player" controls preload="none" src={asrApi.audioUrl(selectedTranscript.id)} />
               {selectedTranscript.transcript_entries.length ? (

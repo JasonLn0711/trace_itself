@@ -1,8 +1,9 @@
 import json
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -89,6 +90,12 @@ def normalize_capture_mode(raw_capture_mode: str | None) -> str:
     return "file"
 
 
+def build_download_filename(stem: str | None, suffix: str) -> str:
+    candidate = (stem or "").strip() or "transcript"
+    safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", candidate).strip("._-")
+    return f"{safe_stem or 'transcript'}.{suffix}"
+
+
 def serialize_live_entries(entries: list[dict[str, str]]) -> str | None:
     if not entries:
         return None
@@ -135,6 +142,15 @@ def download_audio(transcript: AsrTranscript = Depends(get_asr_transcript_or_404
     if not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found.")
     return FileResponse(path, media_type=transcript.audio_mime_type, filename=transcript.original_filename)
+
+
+@router.get("/transcripts/{transcript_id}/text")
+def download_transcript_text(transcript: AsrTranscript = Depends(get_asr_transcript_or_404)) -> PlainTextResponse:
+    filename = build_download_filename(transcript.title, "txt")
+    return PlainTextResponse(
+        transcript.transcript_text,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/transcripts", response_model=list[AsrTranscriptSummary])

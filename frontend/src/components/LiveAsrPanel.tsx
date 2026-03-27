@@ -54,13 +54,27 @@ function getRecordingPreset(): RecordingPreset | null {
   return null;
 }
 
-function buildRecordedFile(blob: Blob, preset: RecordingPreset | null) {
-  const extension = preset?.extension ?? 'webm';
-  const mimeType = blob.type || preset?.mimeType || 'audio/webm';
-  return new File([blob], `asr-live-${Date.now()}.${extension}`, {
-    type: mimeType,
-    lastModified: Date.now()
-  });
+function padTwo(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function formatLiveTitlePrefix(value: Date) {
+  return `${padTwo(value.getFullYear() % 100)}${padTwo(value.getMonth() + 1)}${padTwo(value.getDate())}_${padTwo(value.getHours())}${padTwo(value.getMinutes())}`;
+}
+
+function normalizeTitleSlug(value: string) {
+  const ascii = value.normalize('NFKD').replace(/[^\x00-\x7F]/g, '');
+  const compact = ascii
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_');
+  return compact || 'record';
+}
+
+function buildLiveTranscriptName(startedAt: Date | null, rawTitle: string) {
+  const baseDate = startedAt ?? new Date();
+  return `${formatLiveTitlePrefix(baseDate)}_${normalizeTitleSlug(rawTitle)}`.slice(0, 200);
 }
 
 function mergeByteChunks(chunks: Uint8Array[]) {
@@ -114,6 +128,8 @@ export function LiveAsrPanel({
   const sessionIdRef = useRef<string | null>(null);
   const recordedFileRef = useRef<File | null>(null);
   const pendingPersistRef = useRef<{ sessionId: string; file: File } | null>(null);
+  const startedAtRef = useRef<Date | null>(null);
+  const titleRef = useRef(title);
 
   const preset = useMemo(() => getRecordingPreset(), []);
   const supported =
@@ -128,6 +144,10 @@ export function LiveAsrPanel({
       void teardownPipeline();
     };
   }, []);
+
+  useEffect(() => {
+    titleRef.current = title;
+  }, [title]);
 
   useEffect(() => {
     const active = state !== 'idle';
@@ -155,6 +175,7 @@ export function LiveAsrPanel({
 
     setLocalError('');
     resetIdleTimeout();
+    startedAtRef.current = new Date();
     setSnapshot(null);
     pendingPersistRef.current = null;
     setPendingSave(false);
@@ -265,7 +286,13 @@ export function LiveAsrPanel({
         const blob = new Blob(recorderChunksRef.current, {
           type: preset?.mimeType || mediaRecorder.mimeType || 'audio/webm'
         });
-        const file = blob.size ? buildRecordedFile(blob, preset) : null;
+        const generatedName = buildLiveTranscriptName(startedAtRef.current, titleRef.current);
+        const file = blob.size
+          ? new File([blob], `${generatedName}.${preset?.extension ?? 'webm'}`, {
+              type: blob.type || preset?.mimeType || 'audio/webm',
+              lastModified: Date.now()
+            })
+          : null;
         recordedFileRef.current = file;
         recorderStopResolverRef.current?.(file);
       });
@@ -401,7 +428,7 @@ export function LiveAsrPanel({
       const transcript = await asrApi.persistLiveSession({
         session_id: pending.sessionId,
         file: pending.file,
-        title
+        title: buildLiveTranscriptName(startedAtRef.current, titleRef.current)
       });
       pendingPersistRef.current = null;
       setPendingSave(false);
@@ -461,6 +488,7 @@ export function LiveAsrPanel({
     recorderChunksRef.current = [];
     pendingFinalizeRef.current = false;
     pendingPersistRef.current = null;
+    startedAtRef.current = null;
     setPendingSave(false);
     setSnapshot(null);
     setState('idle');

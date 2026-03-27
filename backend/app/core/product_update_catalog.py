@@ -351,4 +351,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-txt-export-and-naming",
+        version_tag="v1.1.2",
+        title="Live transcripts now export as .txt with start-time names",
+        summary="Saved live transcripts can now be downloaded as text files and use a start-time-based naming pattern.",
+        details=(
+            "Live transcript saves now use names such as 260322_1350_record or 260322_1350_the_title_you_set, "
+            "based on the local browser start time, and the transcript viewer now exposes a TXT download action."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )
