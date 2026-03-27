@@ -15,7 +15,7 @@ from app.models.asr_transcript import AsrTranscript
 from app.models.user import User
 from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary, LiveAsrSessionCreate, LiveAsrSessionRead
 from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
-from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file, transcode_audio_to_mp3
+from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
 from app.services.live_asr import LiveAsrSessionError, service as live_asr_service
 from app.services.usage_policy import ensure_audio_duration_allowed, get_or_create_usage_policy, record_usage_event
 from app.core.enums import UsageEventKind
@@ -250,23 +250,12 @@ async def persist_live_session(
     if not session.committed_text.strip():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No speech was captured in this live session.")
 
-    uploaded_audio = save_upload_file(
+    stored_audio = save_upload_file(
         file,
         storage_root=Path(settings.asr_upload_dir),
         max_bytes=settings.asr_max_upload_bytes,
-        prefix=f"asr-live-raw-{current_user.id}",
+        prefix=f"asr-live-{current_user.id}",
     )
-    transcript_title = normalize_title(title, uploaded_audio.original_filename)
-    try:
-        stored_audio = transcode_audio_to_mp3(
-            uploaded_audio,
-            storage_root=Path(settings.asr_upload_dir),
-            prefix=f"asr-live-{current_user.id}",
-            target_stem=transcript_title,
-        )
-    except HTTPException:
-        delete_audio_file(uploaded_audio.storage_path)
-        raise
     captured_duration_seconds = round(session.total_samples / settings.asr_live_sample_rate, 3)
     try:
         policy = get_or_create_usage_policy(db)
@@ -279,7 +268,7 @@ async def persist_live_session(
 
     transcript = AsrTranscript(
         user_id=current_user.id,
-        title=transcript_title,
+        title=normalize_title(title, stored_audio.original_filename),
         original_filename=stored_audio.original_filename,
         audio_storage_path=stored_audio.relative_storage_path,
         audio_mime_type=stored_audio.mime_type,

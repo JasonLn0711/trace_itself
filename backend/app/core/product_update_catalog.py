@@ -365,18 +365,4 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
-    ProductUpdateCatalogEntry(
-        entry_key="live-audio-mp3-save",
-        version_tag="v1.1.3",
-        title="Saved live audio now converts to MP3",
-        summary="Stopping a live ASR session now keeps a replayable MP3 instead of the original browser recording container.",
-        details=(
-            "The live-save path now transcodes the recorded upload to MP3 on the server, stores the MP3 as the canonical audio file, "
-            "and removes the original uploaded WebM or similar source file after conversion succeeds."
-        ),
-        area="asr",
-        change_type=ProductUpdateType.UPDATE,
-        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
-        is_pinned=True,
-    ),
 )

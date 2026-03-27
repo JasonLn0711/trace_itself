@@ -1,5 +1,4 @@
 import mimetypes
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,12 +51,6 @@ def resolve_audio_mime_type(filename: str, content_type: str | None) -> str | No
     return guessed
 
 
-def sanitize_audio_stem(value: str | None) -> str:
-    candidate = (value or "").strip() or "audio"
-    safe_value = re.sub(r"[^A-Za-z0-9._-]+", "_", candidate).strip("._-")
-    return (safe_value or "audio")[:200]
-
-
 def save_upload_file(
     upload: UploadFile,
     *,
@@ -102,51 +95,6 @@ def save_upload_file(
         storage_path=storage_path,
         relative_storage_path=storage_name,
     )
-
-
-def transcode_audio_to_mp3(
-    source_audio: StoredAudio,
-    *,
-    storage_root: Path,
-    prefix: str,
-    target_stem: str | None = None,
-) -> StoredAudio:
-    storage_root.mkdir(parents=True, exist_ok=True)
-    safe_stem = sanitize_audio_stem(target_stem or Path(source_audio.original_filename).stem)
-    storage_name = f"{prefix}-{uuid4().hex}.mp3"
-    storage_path = storage_root / storage_name
-
-    command = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(source_audio.storage_path),
-        "-vn",
-        "-codec:a",
-        "libmp3lame",
-        "-q:a",
-        "2",
-        str(storage_path),
-    ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    if result.returncode != 0 or not storage_path.exists():
-        storage_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Audio could not be converted to mp3.")
-
-    file_size_bytes = storage_path.stat().st_size
-    if file_size_bytes <= 0:
-        storage_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Converted mp3 audio is empty.")
-
-    delete_audio_file(source_audio.storage_path)
-    return StoredAudio(
-        original_filename=f"{safe_stem}.mp3",
-        mime_type=AUDIO_MIME_BY_EXTENSION[".mp3"],
-        file_size_bytes=file_size_bytes,
-        storage_path=storage_path,
-        relative_storage_path=storage_name,
-    )
-
 
 def probe_audio_duration_seconds(source_path: Path) -> float:
     command = [
