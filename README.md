@@ -2,82 +2,137 @@
 
 ![Status](https://img.shields.io/badge/Status-Active-success?logo=github) ![Python Version](https://img.shields.io/badge/Python-3.12-blue?logo=python) ![ASR Engine](https://img.shields.io/badge/ASR-faster--whisper-orange) ![UI](https://img.shields.io/badge/UI-Next.js-000000?logo=nextdotjs) ![VAD](https://img.shields.io/badge/VAD-Silero-success) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-`trace_itself` is a private, self-hosted execution dashboard for long-horizon learning and project management. It stays intentionally narrow, but it now supports multiple private user accounts with isolated data.
+`trace_itself` is a private operating surface for real work.
+
+This is not a generic productivity app. It is a self-hosted execution dashboard for long-horizon learning, project delivery, daily accountability, and private audio workflows. The goal is simple: know what matters, know what is late, know what happened today, and move faster without leaking your data.
 
 Maintained by Jason Chia-Sheng Lin, PhD student at Institute of Biophotonics, NYCU. Feel free to contact me.
 
-It now has two main user-facing functions:
+## Mission
 
-- Progress tracking for projects, milestones, tasks, and daily logs
-- Private audio workflows: ASR transcripts and meeting notes per user
+Build a system that answers four questions with minimal friction:
 
-## Current highlights
+- What am I working on?
+- What is overdue?
+- What did I do today?
+- What should happen next?
 
-- One private app with two clear workspaces: project tracing and audio work
-- Live Breeze ASR on the lab server with timestamped streaming transcript lines
-- Saved live transcripts with MP3 playback and TXT export
-- Per-user transcript history, meeting notes, minutes, summary, and action items
-- Admin control for users, access groups, providers, usage policy, and device limits
-- 5-minute idle logout with a visible countdown that pauses during active audio work
-- Read-only Updates feed with version tags such as `v1.1.0`
-- CUDA-ready local ASR path for the RTX 5080 lab machine
+And do it with a private-first architecture that can run on one lab machine, stay understandable, and scale in capability without collapsing into complexity.
 
-## MVP scope
+## Product Surface
 
-- Multi-user account login with per-user private data
-- Admin-managed user accounts and password resets
-- Admin user deletion controls except self-delete
-- Admin control panel for access groups, provider storage, feature permissions, and usage policy
-- Temporary account lockout after repeated failed login attempts
-- Per-user concurrent device/session limits with admin control
-- 5-minute idle timeout with a visible countdown
-- Projects, milestones, tasks, and daily logs
-- Private audio workspace with live streaming, saved audio, transcript TXT export, and per-user history
-- Meeting records with transcript, minutes, summary, and action items
-- Shared product updates log for fixes, builds, and release notes
-- Dashboard for active work, today tasks, overdue tasks, upcoming milestones, recent logs, and lightweight progress visuals
-- FastAPI backend with PostgreSQL
-- Next.js frontend with App Router
-- Docker Compose deployment with localhost-only exposure by default
-- Tailscale-first private remote access tutorial for lab-server deployment
+Today the product has two primary workspaces:
 
-## Architecture
+- `Project tracer`
+  Projects, milestones, tasks, dashboard views, and daily logs
+- `Audio workspace`
+  Live or file-based transcription, saved transcript history, meeting notes, summaries, and action items
 
-- Frontend: Next.js + React
-- Backend: FastAPI + SQLAlchemy
-- Database: PostgreSQL 16
-- ASR engine: local Breeze ASR 25 via faster-whisper with rolling live-stream decode on CUDA
-- Live speech gating: Silero VAD-backed commit logic plus browser-side noise handling
-- Meeting summarizer: Gemini 3.1 Flash-Lite API
-- Auth: username/password login with hashed passwords, signed session cookies, and temporary lockouts
-- Session controls: concurrent-device limits plus idle timeout with active-work pause
-- Secrets vault: encrypted provider API key storage in Postgres
-- Deployment: Docker Compose with a Next.js standalone frontend container
-- Remote access: keep services local to the host and expose the frontend through a private network tool such as Tailscale
+The system also includes:
 
-### System map
+- multi-user accounts with private per-user data
+- admin control for groups, providers, policy, and device limits
+- a read-only updates feed with versioned release history
+- private remote access through Tailscale-first deployment
+
+## First-Principles Design
+
+- Private by default
+  The app binds to localhost. Postgres is never published. Remote access is expected to run through a private network layer such as Tailscale.
+- Narrow scope beats fake completeness
+  Every feature must help with execution, clarity, or safety.
+- One machine, real output
+  Local ASR runs on the lab server. Audio stays local unless you explicitly enable an external LLM provider for summaries.
+- Clear systems win
+  The repo should stay legible. The deployment path should stay boring. The recovery path should stay obvious.
+- Human factors matter
+  The UI is designed to reduce scanning cost, shorten the path to action, and keep the signal visible.
+
+## Current Capabilities
+
+- private user accounts with isolated data
+- admin-managed users, access groups, AI providers, and budget policy
+- temporary lockout after repeated failed logins
+- per-user concurrent device limits
+- 5-minute idle timeout with visible countdown and audio-work pause
+- dashboard for active work, overdue tasks, today tasks, milestones, logs, and updates
+- CRUD for projects, milestones, tasks, and daily logs
+- local Breeze ASR 25 via faster-whisper on CUDA
+- live streaming ASR with rolling transcript lines and timestamps
+- saved transcript history with audio playback and TXT export
+- meeting workflow with transcript, minutes, summary, and action items
+- read-only updates feed backed by source-controlled release entries
+
+## Architecture At A Glance
+
+- `Frontend`
+  Next.js App Router + React
+- `Backend`
+  FastAPI + SQLAlchemy
+- `Database`
+  PostgreSQL 16
+- `Local ASR`
+  SoybeanMilk/faster-whisper-Breeze-ASR-25
+- `Speech gating`
+  Silero-backed live segmentation with browser-side noise handling
+- `Meeting summarizer`
+  Gemini 3.1 Flash-Lite API
+- `Secrets`
+  encrypted provider key storage in Postgres
+- `Deployment`
+  Docker Compose on a lab machine
+- `Remote access`
+  Tailscale Serve over private HTTPS
+
+## System Topology
 
 ```mermaid
 flowchart LR
-    U[User Device] --> T[Tailscale / Private HTTPS]
-    T --> F[Next.js Frontend]
-    F --> A[FastAPI Backend]
-    A --> P[(PostgreSQL)]
-    A --> D[(app_data volume)]
-    A --> C[(asr_model_cache)]
-    A --> G[Gemini API]
+    U[User device] --> TS[Tailscale private HTTPS]
+    TS --> FE[Next.js frontend]
+    FE --> BE[FastAPI backend]
+    BE --> DB[(PostgreSQL)]
+    BE --> DATA[(app_data)]
+    BE --> CACHE[(asr_model_cache)]
+    BE --> GPU[RTX 5080 / CUDA]
+    BE --> GEM[Gemini API]
 ```
 
 Why this shape:
 
-- Next.js gives us file-based routing, a cleaner production runtime, and an easier path to future server-side optimization without changing the product model.
-- FastAPI + SQLAlchemy gives us typed APIs and a clean data layer without extra framework weight.
-- Local ASR keeps transcription on the lab machine instead of shipping audio to a third-party ASR service.
-- Meeting summaries build on the saved transcript, so the raw workflow stays private-first and only the transcript text is sent to Gemini when you enable that feature.
-- Postgres stays on the internal Docker network and is never published.
-- The frontend and backend bind to `127.0.0.1` on the host so the default posture is private-first.
+- the frontend and backend stay local to the host
+- the database stays internal-only
+- ASR runs on your own machine
+- the only external AI path is optional meeting summarization
+- the operational model stays simple enough to debug at 2 AM
 
-## Repo layout
+## Product Flow
+
+```mermaid
+flowchart TD
+    LOGIN[Sign in] --> HOME[Dashboard]
+    HOME --> TRACK[Project tracer]
+    HOME --> AUDIO[Audio workspace]
+    HOME --> CTRL[Control]
+    HOME --> UPDATES[Updates]
+
+    TRACK --> PROJECTS[Projects]
+    TRACK --> TASKS[Tasks]
+    TRACK --> LOGS[Daily logs]
+
+    AUDIO --> LIVE[Live stream]
+    AUDIO --> FILE[Audio file]
+    LIVE --> TRANSCRIPT[Transcript history]
+    FILE --> TRANSCRIPT
+    TRANSCRIPT --> NOTES[Minutes summary actions]
+
+    CTRL --> USERS[Users]
+    CTRL --> GROUPS[Groups]
+    CTRL --> PROVIDERS[Providers]
+    CTRL --> POLICY[Policy]
+```
+
+## Repo Layout
 
 ```text
 .
@@ -96,6 +151,7 @@ Why this shape:
 │   ├── deployment.md
 │   └── tailscale.md
 ├── frontend/
+│   ├── public/
 │   ├── src/
 │   │   ├── app/
 │   │   ├── components/
@@ -112,217 +168,313 @@ Why this shape:
 └── README.md
 ```
 
-### Repo structure map
+## Repo Structure Map
 
 ```mermaid
 flowchart TB
-    R[trace_itself]
-    R --> B[backend]
-    R --> FE[frontend]
-    R --> DOCS[docs]
-    R --> ENV[.env.example]
-    R --> DC[docker-compose.yml]
+    ROOT[trace_itself]
+    ROOT --> FRONTEND[frontend]
+    ROOT --> BACKEND[backend]
+    ROOT --> DOCS[docs]
+    ROOT --> SCRIPTS[scripts]
+    ROOT --> COMPOSE[docker-compose.yml]
+    ROOT --> ENV[.env.example]
 
-    B --> BAPP[app]
-    BAPP --> BAPI[api]
-    BAPP --> BCORE[core]
-    BAPP --> BDB[db]
-    BAPP --> BMODELS[models]
-    BAPP --> BSCHEMAS[schemas]
-    BAPP --> BSERVICES[services]
+    FRONTEND --> APPROUTER[src/app]
+    FRONTEND --> FEAT[src/features]
+    FRONTEND --> COMP[src/components]
+    FRONTEND --> STATE[src/state]
+    FRONTEND --> LIB[src/lib]
 
-    FE --> FESRC[src]
-    FESRC --> FEAPP[app]
-    FESRC --> FECOMP[components]
-    FESRC --> FEFEATURES[features]
-    FESRC --> FELIB[lib]
-    FESRC --> FESTATE[state]
+    BACKEND --> API[app/api]
+    BACKEND --> CORE[app/core]
+    BACKEND --> DBLAYER[app/db]
+    BACKEND --> MODELS[app/models]
+    BACKEND --> SCHEMAS[app/schemas]
+    BACKEND --> SERVICES[app/services]
 
-    DOCS --> DEPLOY[deployment.md]
-    DOCS --> TAILSCALE[tailscale.md]
-    R --> S[scripts]
-    S --> VERIFY[verify_cuda_asr.sh]
+    DOCS --> DEPLOYDOC[deployment.md]
+    DOCS --> TAILDOC[tailscale.md]
+    SCRIPTS --> VERIFYCUDA[verify_cuda_asr.sh]
 ```
 
-## Quick start
+## Quick Start
 
-1. Copy the environment file:
+### 1. Create `.env`
 
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` and set at least:
-
-   - `POSTGRES_PASSWORD`
-   - `SECRET_KEY`
-   - `CREDENTIALS_SECRET_KEY`
-   - `DEFAULT_LLM_RUNS_PER_24H`
-   - `DEFAULT_MAX_AUDIO_SECONDS_PER_REQUEST`
-   - `INITIAL_ADMIN_USERNAME`
-   - `INITIAL_ADMIN_PASSWORD`
-
-   Optional ASR tuning:
-
-   - `ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25`
-   - `ASR_DEVICE=cuda`
-   - `ASR_COMPUTE_TYPE=float16`
-   - `ASR_LIVE_PARTIAL_INTERVAL_MS=1500`
-   - `ASR_LIVE_COMMIT_SILENCE_MS=1200`
-   - `ASR_MAX_UPLOAD_MB=512`
-
-   Optional meeting-note setup:
-
-   - `GEMINI_API_KEY=...`
-   - `GEMINI_MODEL=gemini-3.1-flash-lite-preview`
-   - `MEETING_MAX_UPLOAD_MB=512`
-
-3. If you want local Breeze ASR to run on the NVIDIA GPU, install the NVIDIA Container Toolkit on Ubuntu first:
-
-   ```bash
-   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
-     sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-   curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
-   sudo apt-get update
-   sudo apt-get install -y nvidia-container-toolkit
-   sudo nvidia-ctk runtime configure --runtime=docker
-   sudo systemctl restart docker
-   ```
-
-   If Docker still does not see the GPU, these are the failure signs to look for:
-
-   - `docker info` only shows `runc` and no NVIDIA runtime/toolkit integration
-   - `docker run --rm --gpus all alpine:3.21 true` fails with `no known GPU vendor found`
-
-   After the toolkit install, you can prove the app is really using the RTX 5080 and transcribing with:
-
-   ```bash
-   ./scripts/verify_cuda_asr.sh
-   ```
-
-4. Start the stack:
-
-   Recommended on the NVIDIA lab machine:
-
-   ```bash
-   docker compose up --build -d
-   ```
-
-   The main `docker-compose.yml` now requests the NVIDIA GPU for the backend by default. If you intentionally need CPU-only fallback, temporarily switch `.env` back to:
-
-   ```env
-   ASR_DEVICE=cpu
-   ASR_COMPUTE_TYPE=float32
-   ```
-
-5. Open the app locally:
-
-   - Frontend: `http://127.0.0.1:3000`
-   - Backend API: `http://127.0.0.1:8000`
-
-6. Sign in with:
-
-   - username from `INITIAL_ADMIN_USERNAME`
-   - password from `INITIAL_ADMIN_PASSWORD`
-
-7. If you need more accounts or need to manage feature access, sign in as the admin user and open the `Control` page.
-
-8. Open the `Control` page as an admin when you need to:
-
-   - create or disable user accounts
-   - assign users to feature access groups
-   - store ASR or LLM provider settings and API keys
-   - choose which providers stay active in the app
-   - tune the wallet guardrails for text runs and max audio length
-
-The backend auto-creates the MVP tables on startup and bootstraps the initial admin account if no users exist yet.
-
-## CUDA ASR notes
-
-- The main `docker-compose.yml` now keeps the backend on the NVIDIA GPU by default on the lab machine.
-- Breeze ASR now expects CUDA through Docker, not CPU-only inference, when `ASR_DEVICE=cuda`.
-- If the NVIDIA runtime is missing, ASR and Meetings return a clear `503` instead of crashing the backend.
-- `ASR_COMPUTE_TYPE=float16` is the recommended fast path.
-- If you need lower VRAM use, try `ASR_COMPUTE_TYPE=int8_float16`.
-- `scripts/verify_cuda_asr.sh` does a host GPU check, a Docker GPU probe, a CTranslate2 CUDA check, and a real short transcription probe.
-- `docker-compose.cuda.yml` is kept only as a backward-compatible overlay for older commands.
-
-## Core workflows
-
-### Main user workflow
-
-```mermaid
-flowchart LR
-    L[Login] --> H[Home / Dashboard]
-    H --> PT[Project tracer]
-    H --> AW[Audio workspace]
-    H --> CT[Control]
-    H --> UP[Updates]
-
-    PT --> P1[Projects / Milestones / Tasks / Daily logs]
-    AW --> A1[Live stream or upload]
-    A1 --> A2[Transcript lines]
-    A2 --> A3[Saved transcript MP3 TXT]
-    A2 --> A4[Minutes / Summary / To-do]
-    CT --> C1[Users / Groups / Providers / Policy / Devices]
+```bash
+cp .env.example .env
 ```
 
-### Change and release workflow
+Set at least:
+
+- `POSTGRES_PASSWORD`
+- `SECRET_KEY`
+- `CREDENTIALS_SECRET_KEY`
+- `INITIAL_ADMIN_USERNAME`
+- `INITIAL_ADMIN_PASSWORD`
+- `DEFAULT_LLM_RUNS_PER_24H`
+- `DEFAULT_MAX_AUDIO_SECONDS_PER_REQUEST`
+
+Recommended ASR values:
+
+```env
+ASR_MODEL_NAME=SoybeanMilk/faster-whisper-Breeze-ASR-25
+ASR_DEVICE=cuda
+ASR_COMPUTE_TYPE=float16
+ASR_LIVE_PARTIAL_INTERVAL_MS=1500
+ASR_LIVE_COMMIT_SILENCE_MS=1200
+ASR_MAX_UPLOAD_MB=512
+```
+
+Optional meeting-note values:
+
+```env
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3.1-flash-lite-preview
+MEETING_MAX_UPLOAD_MB=512
+```
+
+### 2. Enable CUDA for Docker
+
+If you want local ASR on the RTX 5080, install NVIDIA Container Toolkit first:
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+Verify the CUDA path:
+
+```bash
+./scripts/verify_cuda_asr.sh
+```
+
+### 3. Start the stack
+
+```bash
+docker compose up --build -d
+```
+
+### 4. Open the app
+
+- frontend: `http://127.0.0.1:3000`
+- backend API: `http://127.0.0.1:8000`
+
+Sign in with:
+
+- `INITIAL_ADMIN_USERNAME`
+- `INITIAL_ADMIN_PASSWORD`
+
+## Startup SOP
 
 ```mermaid
 flowchart TD
-    CH[Code or page change] --> IMPL[Implement and verify]
-    IMPL --> DOC[Update README / docs if needed]
-    DOC --> LOG[Add versioned entry in product_update_catalog.py]
-    LOG --> REBUILD[Rebuild containers]
-    REBUILD --> START[Restart stack]
-    START --> FEED[Updates page shows new release]
+    ENV[Set .env] --> GPU[Optional CUDA toolkit]
+    GPU --> BUILD[docker compose up --build -d]
+    BUILD --> LOGIN[Open 127.0.0.1:3000]
+    LOGIN --> CONTROL[Admin config in Control]
+    CONTROL --> RUN[Use project tracer and audio workspace]
 ```
 
-Notes for the versioned updates log:
+## Operating SOPs
 
-- The `Updates` page is read-only for signed-in users.
-- Release entries are source-controlled in [backend/app/core/product_update_catalog.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/core/product_update_catalog.py).
-- When you ship a new page or feature change, add a new catalog entry with the new date and a version label such as `v1.1.0`, then rebuild the backend.
-- On startup, the backend syncs that catalog into the database so the `Updates` page and dashboard stay current.
+### Docker Update Matrix
 
-Notes for ASR:
+Use this rule set:
 
-- The first transcription request downloads the ASR model into the Docker volume `asr_model_cache`.
-- The live ASR path streams normalized mic audio in small chunks instead of waiting for a full upload.
-- Live transcript lines keep timestamps and stay visible during the same session instead of being replaced.
-- The browser capture path applies echo cancellation, noise suppression, adaptive loudness control, and a speech-friendly compressed recording for storage.
-- Uploaded or recorded audio is stored in the Docker volume `app_data`, and transcript/meeting metadata is stored in Postgres.
-- When a live session is saved, the original raw recording is converted to MP3, the raw file is removed, and the saved record can be replayed in the app.
-- Saved live transcripts can also be downloaded as `.txt`.
-- Supported upload formats include common file types such as `wav`, `mp3`, `m4a`, `ogg`, `flac`, and `webm`.
-- In-browser recordings use speech-optimized compressed audio so meeting capture stays storage-friendly.
-- Users only see ASR providers that match their feature permissions.
-- Audio jobs follow the admin policy limit for max duration per file. The default is 5 hours.
-- The first live chunk can take longer than normal if the ASR model still needs to warm the cache on the server.
+- frontend code changed
 
-Notes for meeting records:
+  ```bash
+  docker compose up --build -d frontend
+  ```
 
-- The `Meetings` page runs Breeze ASR locally first, then asks Gemini for minutes, a short summary, and action items.
-- Meeting-note generation requires `GEMINI_API_KEY`.
-- If you change ASR or Gemini settings, rebuild the backend container.
-- The meeting page lets users choose from active providers they are allowed to use.
-- LLM text runs follow the admin policy limit. The default is 3 runs per 24 hours per user.
+- backend code changed
 
-Notes for the control plane:
+  ```bash
+  docker compose up --build -d backend
+  ```
 
-- Feature access is grouped through admin-managed access groups such as `Full access`, `Projects only`, or `Audio workspace`.
-- A user can only see and use pages that match their group's capabilities.
-- Provider secrets are stored encrypted in the database.
-- The `Control` page is admin-only.
-- The `Policy` tab lets you cap text AI runs per 24 hours and max audio duration per file for all users.
-- Admins can delete other users, but cannot delete their own account.
-- Each user has an admin-set concurrent device limit. The default is 2 active devices.
-- The sidebar shows a visible idle-timeout clock, and audio work resets and pauses that timer.
+- both changed or not sure
 
-## Local development
+  ```bash
+  docker compose up --build -d
+  ```
+
+- only restart, no rebuild
+
+  ```bash
+  docker compose restart frontend backend
+  ```
+
+- `.env`, Dockerfile, Compose, or Next config changed
+
+  ```bash
+  docker compose up --build -d
+  ```
+
+### Delivery Workflow
+
+```mermaid
+flowchart TD
+    CHANGE[Change code or UI] --> VERIFY[Run build and checks]
+    VERIFY --> DOCS[Update README or docs if needed]
+    DOCS --> CATALOG[Add release entry to product_update_catalog.py]
+    CATALOG --> REBUILD[Rebuild containers]
+    REBUILD --> DEPLOY[Restart stack]
+    DEPLOY --> FEED[Updates feed reflects release]
+```
+
+### Release Log SOP
+
+- The `Updates` page is read-only for users.
+- Release history lives in `backend/app/core/product_update_catalog.py`.
+- Add a new entry with:
+  - `entry_key`
+  - `version_tag`
+  - `title`
+  - `summary`
+  - `details`
+  - `area`
+  - `change_type`
+  - `changed_at`
+- Rebuild the backend after catalog changes.
+- Startup sync will write the catalog into Postgres and remove stale entries that no longer exist in source.
+
+### Schema Change SOP
+
+This repo does not use Alembic yet. Treat schema work seriously.
+
+Current model:
+
+- `create_all()` creates missing tables
+- `backend/app/db/bootstrap.py` applies explicit upgrade SQL
+
+Rules:
+
+- no schema change
+
+  ```bash
+  docker compose up --build -d backend
+  ```
+
+- small schema change with matching bootstrap SQL
+
+  ```bash
+  docker compose up --build -d backend
+  ```
+
+- risky schema change on real data
+
+  make a real migration step first
+
+- disposable dev reset
+
+  ```bash
+  docker compose down -v
+  docker compose up --build -d
+  ```
+
+Warning: `docker compose down -v` deletes Postgres data and app data.
+
+Backup first:
+
+```bash
+docker compose exec db sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > trace_itself_backup.sql
+```
+
+## ASR Operating Notes
+
+- the first transcription downloads the model into `asr_model_cache`
+- local ASR runs on the lab machine instead of a third-party ASR service
+- live ASR streams rolling audio chunks instead of waiting for a full upload
+- transcript lines stay timestamped during the session
+- saved transcripts keep per-user history and support TXT export
+- browser capture uses echo cancellation, noise suppression, adaptive loudness control, and compressed recording
+- audio budget is policy-controlled; default cap is 5 hours per file
+- the first live chunk can be slower if the model cache is cold
+
+## Meeting Notes Operating Notes
+
+- the Audio workspace starts with local ASR
+- Gemini is optional and used only for notes generation
+- if `GEMINI_API_KEY` is absent, transcript flows still work
+- meeting-note generation follows the text-run budget policy
+- provider visibility is permission-aware per user
+
+## Control Plane
+
+The `Control` page is the operating console for the system.
+
+Admins can:
+
+- create, edit, unlock, deactivate, and delete users
+- assign users to one of three default groups:
+  - `Full access`
+  - `Projects only`
+  - `Audio workspace`
+- set per-user concurrent device limits
+- store ASR and LLM provider settings
+- activate or retire providers
+- set text-run and max-audio policy
+
+## Security Posture
+
+- localhost-only frontend and backend exposure by default
+- Postgres stays internal to Docker
+- signed session cookies
+- hashed passwords
+- temporary lockout after repeated failed logins
+- visible idle timeout with automatic sign-out
+- per-user concurrent session limits
+- encrypted provider API keys in the database
+- private remote access through Tailscale Serve
+
+## Private Remote Access
+
+Use `trace_itself` like this:
+
+```mermaid
+flowchart LR
+    HOST[Lab machine] --> LOCAL[127.0.0.1:3000]
+    LOCAL --> SERVE[Tailscale Serve]
+    SERVE --> URL[Private https://...ts.net]
+    URL --> DEVICE[Authorized tailnet device]
+```
+
+Recommended flow:
+
+1. start the app
+2. sign into Tailscale on the lab machine
+3. run
+
+   ```bash
+   sudo tailscale serve --bg 3000
+   tailscale serve status
+   tailscale funnel status
+   ```
+
+4. open the private `https://...ts.net` URL from a device in the same tailnet
+
+Important:
+
+- use `tailscale serve`, not `tailscale funnel`
+- keep `SESSION_COOKIE_SECURE=true` for real remote use
+- do not expose Postgres or backend ports publicly
+
+See:
+
+- `docs/deployment.md`
+- `docs/tailscale.md`
+
+## Local Development
 
 ### Backend
 
@@ -334,7 +486,11 @@ cd backend
 uvicorn app.main:app --reload
 ```
 
-Use `docker compose up -d db` if you want Postgres running in Docker while developing locally.
+If you want Postgres in Docker:
+
+```bash
+docker compose up -d db
+```
 
 ### Frontend
 
@@ -344,153 +500,27 @@ npm install
 npm run dev
 ```
 
-The Next.js dev server proxies `/api` to `API_PROXY_TARGET`. The default target in [frontend/.env.example](/home/jnln3799/every_on_git_ubuntu/trace_itself/frontend/.env.example) is `http://127.0.0.1:8000`.
+The Next.js dev server proxies `/api` to `API_PROXY_TARGET`. See `frontend/.env.example`.
 
-## Updating a running Docker stack
+## Why This Repo Matters
 
-`docker compose logs -f frontend` and `docker compose logs -f backend` only show logs. They do not rebuild or restart anything.
+Most personal productivity software is noisy, public by default, or structurally weak.
 
-Use these commands when you change code:
+This repo is trying to do something simpler and harder:
 
-- Frontend only:
+- own the stack
+- own the data
+- keep the system small enough to reason about
+- make execution visible
+- make progress measurable
+- make audio capture useful without surrendering privacy
 
-  ```bash
-  docker compose up --build -d frontend
-  ```
+That is the standard.
 
-  Then refresh the browser. If the old UI still appears, do a hard refresh.
+## Suggested Next Steps
 
-- Backend only:
-
-  ```bash
-  docker compose up --build -d backend
-  ```
-
-  Use this after ASR model/config changes, Breeze upgrades, or Gemini env changes too.
-
-- Frontend and backend together, or you are not sure:
-
-  ```bash
-  docker compose up --build -d
-  ```
-
-- Restart containers without rebuilding images:
-
-  ```bash
-  docker compose restart frontend backend
-  ```
-
-- After `.env`, `docker-compose.yml`, Dockerfile, or Next.js config changes:
-
-  ```bash
-  docker compose up --build -d
-  ```
-
-- If the stack looks stuck after network or port changes:
-
-  ```bash
-  docker compose down
-  docker compose up --build -d
-  ```
-
-Quick rule:
-
-- new page/UI feature -> rebuild `frontend`
-- API/backend logic change -> rebuild `backend`
-- both changed -> rebuild both
-- config changed -> rebuild the stack
-
-## Database and schema changes
-
-This repo does not use Alembic yet.
-
-Today, backend startup does two database setup steps:
-
-- creates missing tables from the SQLAlchemy models
-- runs explicit upgrade SQL from [backend/app/db/bootstrap.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/db/bootstrap.py)
-
-Important:
-
-- `create_all()` creates missing tables, but it does not fully migrate existing tables
-- changing a model class alone is not enough for many schema changes
-- for existing data you should treat schema changes carefully
-
-Use this guide:
-
-- If you add backend logic only and the schema does not change:
-
-  ```bash
-  docker compose up --build -d backend
-  ```
-
-- If you add a small schema change and you also added the matching SQL upgrade logic in [backend/app/db/bootstrap.py](/home/jnln3799/every_on_git_ubuntu/trace_itself/backend/app/db/bootstrap.py):
-
-  ```bash
-  docker compose up --build -d backend
-  ```
-
-- If you change existing columns, constraints, names, or relationships:
-
-  Add a real migration step first. Do not assume `docker compose restart` or `docker compose up --build` will safely update the existing database by itself.
-
-- If this is a disposable local dev database and you want to wipe everything and recreate from scratch:
-
-  ```bash
-  docker compose down -v
-  docker compose up --build -d
-  ```
-
-  Warning: `docker compose down -v` deletes the Postgres volume and all app data.
-
-- Before risky schema work on real data, make a backup:
-
-  ```bash
-  docker compose exec db sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > trace_itself_backup.sql
-  ```
-
-- If you change Postgres env vars after the DB volume already exists, remember:
-
-  the old database data is still in the volume. Docker will not magically rewrite existing Postgres users/passwords inside that volume just because `.env` changed.
-
-## Deployment
-
-Use the guide in [docs/deployment.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/deployment.md) for the lab-server deployment flow and [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md) for the step-by-step Tailscale setup tutorial.
-
-## Private remote access with Tailscale
-
-`trace_itself` is designed to stay local to the host and then be shared privately through Tailscale:
-
-- `db` stays on Docker's internal network only
-- `backend` binds to `127.0.0.1:8000`
-- `frontend` binds to `127.0.0.1:3000`
-- Tailscale Serve publishes the frontend privately to your tailnet
-
-Recommended flow:
-
-1. Start the app with Docker Compose.
-2. Install and sign into Tailscale on the lab server.
-3. Run:
-
-   ```bash
-   sudo tailscale serve --bg 3000
-   tailscale serve status
-   tailscale funnel status
-   ```
-
-4. Open the `https://...ts.net` URL shown by `tailscale serve status` from a device that is signed into the same tailnet.
-
-Important:
-
-- Use `tailscale serve`, not `tailscale funnel`, for normal `trace_itself` access.
-- `tailscale funnel` exposes the site to the public internet.
-- Set `SESSION_COOKIE_SECURE=true` in `.env` before real remote use over Tailscale HTTPS, then restart the stack.
-
-The full tutorial, firewall steps, troubleshooting checks, and optional Tailscale SSH notes are in [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md).
-
-## Suggested next steps after MVP
-
-1. Add Alembic migrations before the schema starts changing often.
-2. Add tags or focus areas across tasks and daily logs.
-3. Add project health metrics such as open-task count and milestone completion trends.
-4. Add backups and restore scripts for the Postgres volume.
-5. Add email-based password recovery or MFA if the app ever moves beyond a small trusted environment.
+1. Add Alembic before schema change velocity increases.
+2. Add backups and restore automation for Postgres and app data.
+3. Add deeper project health metrics and trend views.
+4. Add better mobile ergonomics and accessibility auditing.
+5. Add MFA or stronger recovery flows if the trusted-user model expands.
