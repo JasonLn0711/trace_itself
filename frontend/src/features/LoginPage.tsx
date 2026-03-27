@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { BrandMark } from '../components/BrandMark';
 import { Card } from '../components/Primitives';
 import { PublicAuthCard } from '../components/PublicAuthCard';
 import { resolvePostLoginPath } from '../lib/access';
 import { extractApiErrorMessage } from '../lib/api';
 import { useAuth } from '../state/AuthContext';
+
+const APP_VERSION = 'v1.1.9';
 
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
@@ -24,6 +25,7 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const nextPath = safeRedirectPath(searchParams?.get('next') ?? null);
   const logoutReason = searchParams?.get('reason') ?? '';
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     if (authenticated && !loading) {
@@ -65,18 +67,16 @@ export function LoginPage() {
   return (
     <div className="auth-entry-shell">
       <div className="auth-entry-grid">
-        <section className="auth-entry-intro">
-          <div className="auth-brand-row">
-            <div className="auth-brand-mark" aria-hidden="true">
-              <BrandMark />
-            </div>
-            <div className="auth-brand-copy">
-              <div className="auth-brand-heading">
-                <h1 className="auth-brand-title">trace_itself</h1>
-                <div className="auth-stage-chip">Beta</div>
-              </div>
-              <p className="auth-brand-positioning">Execution intelligence for learning and project operations.</p>
-            </div>
+        <section className="auth-entry-intro auth-identity-panel">
+          <div className="auth-identity-title-block">
+            <h1 className="auth-brand-title">trace_itself</h1>
+          </div>
+          <div className="auth-identity-meta auth-identity-footer">
+            <p>PhD student Jason Chia-Sheng Lin</p>
+            <p>NYCU</p>
+            <p>trace_itself</p>
+            <p>Version {APP_VERSION}</p>
+            <p>Copyright {currentYear} Jason Chia-Sheng Lin</p>
           </div>
         </section>
 
@@ -87,13 +87,6 @@ export function LoginPage() {
             submitting={submitting}
             onEmailLogin={handleEmailLogin}
           />
-
-          <div className="auth-support-footer">
-            <button type="button" className="auth-support-link">Privacy</button>
-            <button type="button" className="auth-support-link">Terms</button>
-            <button type="button" className="auth-support-link">Contact</button>
-            <button type="button" className="auth-support-link">Access</button>
-          </div>
         </div>
       </div>
     </div>

@@ -356,8 +356,8 @@ export function ProjectsPage() {
                     </div>
                   </Link>
                   <div className="list-row-actions">
-                    <Link className="btn btn-primary" href={`/projects/${project.id}`}>
-                      Open
+                    <Link className="btn btn-primary" href={`/projects/${project.id}#planning`}>
+                      Plan
                     </Link>
                     <Button variant="secondary" onClick={() => editProject(project)}>
                       Edit

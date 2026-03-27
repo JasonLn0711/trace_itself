@@ -7,6 +7,8 @@ class MeetingRecordSummaryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    project_id: int | None
+    project_name: str | None
     title: str
     audio_filename: str
     audio_mime_type: str | None
@@ -25,6 +27,8 @@ class MeetingRecordRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    project_id: int | None
+    project_name: str | None
     title: str
     audio_filename: str
     audio_mime_type: str | None

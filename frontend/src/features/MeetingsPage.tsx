@@ -1,6 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { AudioCapturePanel } from '../components/AudioCapturePanel';
 import { useConfirmationDialog } from '../components/ConfirmationDialog';
 import { LiveAsrPanel } from '../components/LiveAsrPanel';
@@ -15,8 +17,8 @@ import {
   SectionHeader,
   SegmentedControl
 } from '../components/Primitives';
-import { aiProvidersApi, asrApi, extractApiErrorMessage, meetingsApi, usagePolicyApi } from '../lib/api';
-import { canUseMeetingNotes } from '../lib/access';
+import { aiProvidersApi, asrApi, extractApiErrorMessage, meetingsApi, projectsApi, usagePolicyApi } from '../lib/api';
+import { canUseFeature, canUseMeetingNotes } from '../lib/access';
 import { formatDateTime, formatTimeOfDay } from '../lib/dates';
 import { actionItemCount, formatBytes, formatDuration } from '../lib/media';
 import { useAuth } from '../state/AuthContext';
@@ -26,6 +28,7 @@ import type {
   AsrTranscriptSummary,
   MeetingRecord,
   MeetingRecordSummary,
+  Project,
   UsagePolicySnapshot
 } from '../types';
 
@@ -64,6 +67,11 @@ function languageLabel(value: string | null | undefined) {
   return LANGUAGE_OPTIONS.find((option) => option.value === normalized)?.label ?? normalized;
 }
 
+function parsePositiveIntegerParam(value: string | null) {
+  const next = Number(value);
+  return Number.isInteger(next) && next > 0 ? next : null;
+}
+
 function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefined) {
   return (value || '').toLowerCase() === 'live' ? 'Live' : 'File';
 }
@@ -93,12 +101,18 @@ function AudioMarkIcon() {
 export function MeetingsPage() {
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const { resetIdleTimeout, user } = useAuth();
+  const searchParams = useSearchParams();
   const notesEnabled = canUseMeetingNotes(user);
+  const canLinkMeetingsToProjects = notesEnabled && canUseFeature(user, 'project_tracer');
+  const requestedMode = searchParams.get('mode');
+  const requestedProjectId = parsePositiveIntegerParam(searchParams.get('project'));
+  const requestedMeetingId = parsePositiveIntegerParam(searchParams.get('meeting'));
 
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('transcript');
   const [transcriptInputMode, setTranscriptInputMode] = useState<TranscriptInputMode>('live');
   const [transcriptEntries, setTranscriptEntries] = useState<AsrTranscriptSummary[]>([]);
   const [meetingEntries, setMeetingEntries] = useState<MeetingRecordSummary[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedTranscript, setSelectedTranscript] = useState<AsrTranscript | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingRecord | null>(null);
   const [asrProviders, setAsrProviders] = useState<AIProvider[]>([]);
@@ -110,6 +124,7 @@ export function MeetingsPage() {
   const [selectedMeetingId, setSelectedMeetingId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [language, setLanguage] = useState('');
+  const [meetingProjectId, setMeetingProjectId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<MeetingTab>('summary');
   const [loading, setLoading] = useState(true);
@@ -140,13 +155,15 @@ export function MeetingsPage() {
           nextAsrProviders,
           nextPolicySnapshot,
           nextMeetingEntries,
-          nextLlmProviders
+          nextLlmProviders,
+          nextProjects
         ] = await Promise.all([
           asrApi.list({ limit: 100 }),
           aiProvidersApi.list({ kind: 'asr' }),
           usagePolicyApi.get(),
           notesEnabled ? meetingsApi.list({ limit: 24 }) : Promise.resolve([] as MeetingRecordSummary[]),
-          notesEnabled ? aiProvidersApi.list({ kind: 'llm' }) : Promise.resolve([] as AIProvider[])
+          notesEnabled ? aiProvidersApi.list({ kind: 'llm' }) : Promise.resolve([] as AIProvider[]),
+          canLinkMeetingsToProjects ? projectsApi.list().catch(() => [] as Project[]) : Promise.resolve([] as Project[])
         ]);
 
         if (!alive) {
@@ -155,14 +172,20 @@ export function MeetingsPage() {
 
         setTranscriptEntries(nextTranscriptEntries);
         setMeetingEntries(nextMeetingEntries);
+        setProjects(nextProjects);
         setAsrProviders(nextAsrProviders);
         setLlmProviders(nextLlmProviders);
         setPolicySnapshot(nextPolicySnapshot);
         setAsrProviderId((current) => current ?? nextAsrProviders[0]?.id ?? null);
         setLlmProviderId((current) => current ?? nextLlmProviders[0]?.id ?? null);
+        setMeetingProjectId(
+          canLinkMeetingsToProjects && requestedProjectId && nextProjects.some((project) => project.id === requestedProjectId)
+            ? String(requestedProjectId)
+            : ''
+        );
 
         const nextTranscriptId = nextTranscriptEntries[0]?.id ?? null;
-        const nextMeetingId = nextMeetingEntries[0]?.id ?? null;
+        const nextMeetingId = notesEnabled ? requestedMeetingId ?? nextMeetingEntries[0]?.id ?? null : null;
         setSelectedTranscriptId(nextTranscriptId);
         setSelectedMeetingId(nextMeetingId);
 
@@ -177,6 +200,11 @@ export function MeetingsPage() {
 
         setSelectedTranscript(nextTranscript);
         setSelectedMeeting(nextMeeting);
+        if (notesEnabled && (requestedMeetingId || requestedMode === 'meeting')) {
+          setWorkspaceMode('meeting');
+        } else if (requestedMode === 'transcript') {
+          setWorkspaceMode('transcript');
+        }
       } catch (err) {
         if (alive) {
           setError(extractApiErrorMessage(err));
@@ -192,7 +220,7 @@ export function MeetingsPage() {
     return () => {
       alive = false;
     };
-  }, [notesEnabled]);
+  }, [canLinkMeetingsToProjects, notesEnabled, requestedMeetingId, requestedMode, requestedProjectId]);
 
   const canRunMeetingNotes =
     notesEnabled &&
@@ -323,7 +351,8 @@ export function MeetingsPage() {
         title,
         language,
         asr_provider_id: asrProviderId,
-        llm_provider_id: llmProviderId
+        llm_provider_id: llmProviderId,
+        project_id: meetingProjectId ? Number(meetingProjectId) : null
       });
       setSelectedMeeting(created);
       setSelectedMeetingId(created.id);
@@ -610,6 +639,19 @@ export function MeetingsPage() {
                   </select>
                 </label>
               </div>
+              {canLinkMeetingsToProjects ? (
+                <label className="field">
+                  <span>Project</span>
+                  <select value={meetingProjectId} onChange={(event) => setMeetingProjectId(event.target.value)}>
+                    <option value="">No project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               {asrProviders.length > 1 ? (
                 <label className="field">
                   <span>ASR</span>
@@ -716,6 +758,7 @@ export function MeetingsPage() {
                         <Badge tone={selectedMeetingId === entry.id ? 'info' : 'neutral'}>
                           {selectedMeetingId === entry.id ? 'Open' : 'Saved'}
                         </Badge>
+                        {entry.project_name ? <Badge tone="info">{entry.project_name}</Badge> : null}
                         <Badge tone="neutral">{languageLabel(entry.language)}</Badge>
                         <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
                       </div>
@@ -815,7 +858,13 @@ export function MeetingsPage() {
               <Badge tone="neutral">{formatBytes(selectedMeeting.file_size_bytes)}</Badge>
               <Badge tone="info">{selectedMeeting.asr_model_name}</Badge>
               <Badge tone="warning">{selectedMeeting.llm_model_name}</Badge>
+              {selectedMeeting.project_name ? <Badge tone="info">{selectedMeeting.project_name}</Badge> : null}
               <Badge tone="warning">{actionItemCount(selectedMeeting.action_items_text)} to-do</Badge>
+              {selectedMeeting.project_id && canLinkMeetingsToProjects ? (
+                <Link className="btn btn-ghost" href={`/projects/${selectedMeeting.project_id}`}>
+                  View project
+                </Link>
+              ) : null}
               <a className="btn btn-save-action" href={meetingsApi.audioUrl(selectedMeeting.id)} download>
                 <AudioMarkIcon />
                 Save audio

@@ -326,7 +326,7 @@ export const asrApi = {
 };
 
 export const meetingsApi = {
-  list(query?: { limit?: number }) {
+  list(query?: { limit?: number; project_id?: number }) {
     return request<MeetingRecordSummary[]>(withQuery('/meetings', query));
   },
   get(id: number) {
@@ -341,6 +341,7 @@ export const meetingsApi = {
     language?: string;
     asr_provider_id?: number | null;
     llm_provider_id?: number | null;
+    project_id?: number | null;
   }) {
     const formData = new FormData();
     formData.append('file', input.file);
@@ -355,6 +356,9 @@ export const meetingsApi = {
     }
     if (input.llm_provider_id) {
       formData.append('llm_provider_id', String(input.llm_provider_id));
+    }
+    if (input.project_id) {
+      formData.append('project_id', String(input.project_id));
     }
     return requestForm<MeetingRecord>('/meetings', formData, {
       method: 'POST'

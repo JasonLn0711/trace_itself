@@ -44,6 +44,10 @@ body {
   background: inherit;
 }
 
+body.mobile-nav-open {
+  overflow: hidden;
+}
+
 body::before {
   content: '';
   position: fixed;
@@ -80,6 +84,13 @@ button {
   padding: 16px;
 }
 
+.app-shell-main {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
 .sidebar {
   position: sticky;
   top: 16px;
@@ -87,8 +98,123 @@ button {
   padding: 14px;
 }
 
+.sidebar-shell {
+  display: grid;
+  align-content: start;
+}
+
 .content {
   min-width: 0;
+}
+
+.app-mobile-topbar,
+.mobile-nav-layer {
+  display: none;
+}
+
+.mobile-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mobile-topbar-mark {
+  width: 36px;
+  height: 36px;
+}
+
+.mobile-topbar-copy {
+  min-width: 0;
+}
+
+.mobile-menu-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.mobile-menu-icon {
+  width: 18px;
+  height: 14px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.mobile-menu-icon span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: center;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.mobile-menu-button.is-open .mobile-menu-icon span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.mobile-menu-button.is-open .mobile-menu-icon span:nth-child(2) {
+  opacity: 0;
+}
+
+.mobile-menu-button.is-open .mobile-menu-icon span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.mobile-menu-label {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-nav-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.mobile-nav-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(5, 10, 16, 0.72);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.mobile-nav-drawer {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  bottom: 10px;
+  width: min(320px, calc(100vw - 20px));
+  padding: 12px;
+  overflow: auto;
+  transform: translateX(-110%);
+  transition: transform 220ms ease;
+}
+
+.mobile-nav-layer.is-open {
+  pointer-events: auto;
+}
+
+.mobile-nav-layer.is-open .mobile-nav-backdrop {
+  opacity: 1;
+}
+
+.mobile-nav-layer.is-open .mobile-nav-drawer {
+  transform: translateX(0);
 }
 
 .brand {
@@ -679,6 +805,8 @@ a.card.entity {
 }
 
 .btn:focus-visible,
+.mobile-menu-button:focus-visible,
+.mobile-nav-backdrop:focus-visible,
 .nav a:focus-visible,
 .quick-link:focus-visible,
 .segment:focus-visible {
@@ -1005,6 +1133,36 @@ a.card.entity {
   align-content: center;
   padding: 0;
   max-width: 26rem;
+}
+
+.auth-identity-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 22rem;
+  min-height: 280px;
+}
+
+.auth-identity-meta p {
+  margin: 0;
+}
+
+.auth-identity-title-block {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-identity-meta {
+  display: grid;
+  gap: 4px;
+  color: #a9b7c5;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.auth-identity-footer {
+  margin-top: auto;
 }
 
 .auth-stage-chip {
@@ -2800,6 +2958,10 @@ a.card.entity {
   min-width: 180px;
 }
 
+.section-anchor {
+  scroll-margin-top: 104px;
+}
+
 .line-clamp-1,
 .line-clamp-2 {
   display: -webkit-box;
@@ -3047,6 +3209,39 @@ a.card.entity {
     position: static;
   }
 
+  .sidebar-desktop {
+    display: none;
+  }
+
+  .app-shell-main {
+    gap: 14px;
+  }
+
+  .app-mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 24;
+    padding: 12px;
+  }
+
+  .mobile-nav-layer {
+    display: block;
+  }
+
+  .mobile-nav-drawer .nav {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .mobile-nav-drawer .nav a {
+    text-align: left;
+    white-space: normal;
+  }
+
   .grid.stats,
   .grid.two,
   .grid.three {
@@ -3138,10 +3333,6 @@ a.card.entity {
     gap: 12px;
   }
 
-  .auth-brand-row {
-    align-items: start;
-  }
-
   .public-auth-card {
     padding: 16px 16px 14px;
   }
@@ -3208,11 +3399,6 @@ a.card.entity {
     max-width: 100%;
   }
 
-  .auth-brand-mark {
-    width: 42px;
-    height: 42px;
-  }
-
   .dashboard-command-page-compact {
     gap: 10px;
   }
@@ -3231,8 +3417,8 @@ a.card.entity {
     justify-content: center;
   }
 
-  .auth-brand-positioning {
-    font-size: 0.9rem;
+  .auth-identity-meta {
+    font-size: 0.84rem;
   }
 
   .public-auth-card {
@@ -3305,11 +3491,6 @@ a.card.entity {
     font-size: 0.7rem;
   }
 
-  .auth-support-footer {
-    justify-content: flex-start;
-    gap: 6px 10px;
-  }
-
   .panel-header,
   .panel-title,
   .signal-row,
@@ -3353,6 +3534,10 @@ a.card.entity {
     padding: 12px;
   }
 
+  .app-mobile-topbar {
+    padding: 10px 12px;
+  }
+
   .brand {
     margin-bottom: 12px;
     gap: 10px;
@@ -3373,6 +3558,14 @@ a.card.entity {
     white-space: normal;
     text-align: center;
     padding: 10px 12px;
+  }
+
+  .mobile-nav-drawer .nav {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-nav-drawer .nav a {
+    text-align: left;
   }
 
   .account-card,
@@ -3609,6 +3802,14 @@ a.card.entity {
     padding: 8px;
   }
 
+  .app-mobile-topbar {
+    padding: 9px 10px;
+  }
+
+  .mobile-menu-button {
+    padding: 9px 10px;
+  }
+
   .nav,
   .metric-strip,
   .segmented-control,
@@ -3622,6 +3823,14 @@ a.card.entity {
   .sidebar,
   .page-intro,
   .section-card {
+    padding: 10px;
+  }
+
+  .mobile-nav-drawer {
+    top: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: min(300px, calc(100vw - 16px));
     padding: 10px;
   }
 
@@ -3642,17 +3851,11 @@ a.card.entity {
     padding: 10px;
   }
 
-  .auth-brand-title {
-    font-size: 1.72rem;
+  .auth-identity-panel {
+    min-height: auto;
   }
 
-  .auth-stage-chip {
-    padding: 4px 8px;
-    font-size: 0.68rem;
-  }
-
-  .auth-brand-positioning,
-  .auth-support-link {
+  .auth-identity-meta {
     font-size: 0.76rem;
   }
 

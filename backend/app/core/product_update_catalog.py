@@ -449,4 +449,19 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T01:50:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="project-linked-meeting-notes",
+        version_tag="v1.1.9",
+        title="Meeting notes can now stay attached to a project",
+        summary="Meeting notes can now be saved into a project, and projects have a direct planning shortcut.",
+        details=(
+            "The Audio notes flow now lets users choose a project, project detail pages show linked meeting notes for "
+            "faster tracing, and the extra Open action in the projects list was replaced with a Plan shortcut that "
+            "jumps straight into milestones and tasks."
+        ),
+        area="meetings",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T02:00:00+00:00"),
+        is_pinned=False,
+    ),
 )

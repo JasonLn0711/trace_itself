@@ -16,7 +16,7 @@ import {
   SectionHeader
 } from '../components/Primitives';
 import { useConfirmationDialog } from '../components/ConfirmationDialog';
-import { extractApiErrorMessage, milestonesApi, projectsApi, tasksApi } from '../lib/api';
+import { extractApiErrorMessage, meetingsApi, milestonesApi, projectsApi, tasksApi } from '../lib/api';
 import { clampPercent, formatDate, relativeDueLabel } from '../lib/dates';
 import {
   formatEnumLabel,
@@ -29,7 +29,10 @@ import {
   toneForProjectStatus,
   toneForTaskStatus
 } from '../lib/presentation';
-import type { Milestone, Project, Task } from '../types';
+import { canUseMeetingNotes } from '../lib/access';
+import { actionItemCount } from '../lib/media';
+import { useAuth } from '../state/AuthContext';
+import type { MeetingRecordSummary, Milestone, Project, Task } from '../types';
 
 type MilestoneFormState = {
   title: string;
@@ -113,11 +116,22 @@ function taskToPayload(task: Task, status = task.status) {
   };
 }
 
+function excerpt(value: string, max = 180) {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (compact.length <= max) {
+    return compact;
+  }
+  return `${compact.slice(0, max - 1).trimEnd()}…`;
+}
+
 export function ProjectDetailPage({ projectId }: { projectId: number }) {
   const { confirm, confirmationDialog } = useConfirmationDialog();
+  const { user } = useAuth();
+  const canUseProjectMeetings = canUseMeetingNotes(user);
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [meetings, setMeetings] = useState<MeetingRecordSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectError, setProjectError] = useState('');
   const [notice, setNotice] = useState('');
@@ -132,14 +146,18 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
   const [error, setError] = useState('');
 
   async function loadAll() {
-    const [projectData, milestoneData, taskData] = await Promise.all([
+    const [projectData, milestoneData, taskData, meetingData] = await Promise.all([
       projectsApi.get(projectId),
       milestonesApi.list({ project_id: projectId }),
-      tasksApi.list({ project_id: projectId })
+      tasksApi.list({ project_id: projectId }),
+      canUseProjectMeetings
+        ? meetingsApi.list({ project_id: projectId, limit: 6 }).catch(() => [] as MeetingRecordSummary[])
+        : Promise.resolve([] as MeetingRecordSummary[])
     ]);
     setProject(projectData);
     setMilestones(milestoneData);
     setTasks(taskData);
+    setMeetings(meetingData);
     setTaskForm((current) => ({ ...current, project_id: String(projectId) }));
   }
 
@@ -148,15 +166,19 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
 
     async function load() {
       try {
-        const [projectData, milestoneData, taskData] = await Promise.all([
+        const [projectData, milestoneData, taskData, meetingData] = await Promise.all([
           projectsApi.get(projectId),
           milestonesApi.list({ project_id: projectId }),
-          tasksApi.list({ project_id: projectId })
+          tasksApi.list({ project_id: projectId }),
+          canUseProjectMeetings
+            ? meetingsApi.list({ project_id: projectId, limit: 6 }).catch(() => [] as MeetingRecordSummary[])
+            : Promise.resolve([] as MeetingRecordSummary[])
         ]);
         if (alive) {
           setProject(projectData);
           setMilestones(milestoneData);
           setTasks(taskData);
+          setMeetings(meetingData);
           setTaskForm(emptyTaskForm(projectId));
         }
       } catch (err) {
@@ -180,7 +202,7 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
     return () => {
       alive = false;
     };
-  }, [projectId]);
+  }, [canUseProjectMeetings, projectId]);
 
   const milestoneOptions = useMemo(
     () => sortMilestonesForAttention(milestones).map((milestone) => ({ id: milestone.id, title: milestone.title })),
@@ -421,6 +443,11 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
           <>
             <Link className="btn btn-primary" href="/projects">Projects</Link>
             <Link className="btn btn-ghost" href="/tasks">Tasks</Link>
+            {canUseProjectMeetings ? (
+              <Link className="btn btn-ghost" href={`/meetings?project=${project.id}&mode=meeting`}>
+                New note
+              </Link>
+            ) : null}
           </>
         }
         aside={
@@ -523,7 +550,54 @@ export function ProjectDetailPage({ projectId }: { projectId: number }) {
         </form>
       </Card>
 
-      <div className="grid two">
+      {canUseProjectMeetings ? (
+        <Card className="section-card">
+          <SectionHeader
+            title="Meeting notes"
+            description="Linked summaries, minutes, and action items for this project."
+            action={
+              <Link className="btn btn-secondary" href={`/meetings?project=${project.id}&mode=meeting`}>
+                Add note
+              </Link>
+            }
+          />
+          <div className="list-table">
+            {meetings.length ? (
+              meetings.map((meeting) => (
+                <div key={meeting.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-header">
+                      <h3 className="list-row-title line-clamp-1">{meeting.title}</h3>
+                      <div className="list-row-meta">
+                        <Badge tone="warning">{actionItemCount(meeting.action_items_text)} to-do</Badge>
+                        <Badge tone="neutral">{formatDate(meeting.created_at)}</Badge>
+                      </div>
+                    </div>
+                    <div className="list-row-copy line-clamp-2">{excerpt(meeting.summary_text) || 'No meeting summary yet.'}</div>
+                  </div>
+                  <div className="list-row-actions">
+                    <Link className="btn btn-secondary" href={`/meetings?meeting=${meeting.id}&mode=meeting`}>
+                      Open notes
+                    </Link>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyState
+                title="No linked notes yet"
+                description="Save a meeting note into this project to keep decisions easy to trace."
+                action={
+                  <Link className="btn btn-primary" href={`/meetings?project=${project.id}&mode=meeting`}>
+                    Create first note
+                  </Link>
+                }
+              />
+            )}
+          </div>
+        </Card>
+      ) : null}
+
+      <div className="grid two section-anchor" id="planning">
         <Card className="section-card">
           <SectionHeader title={editingMilestoneId ? 'Edit milestone' : 'New milestone'} />
           <form className="form-grid" onSubmit={handleMilestoneSubmit}>

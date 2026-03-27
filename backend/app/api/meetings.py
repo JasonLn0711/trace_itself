@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import (
     get_current_user,
@@ -16,6 +16,7 @@ from app.api.deps import (
 from app.core.enums import AIProviderKind
 from app.core.config import get_settings
 from app.models.meeting_record import MeetingRecord
+from app.models.project import Project
 from app.models.user import User
 from app.schemas.meeting import MeetingRecordRead, MeetingRecordSummaryRead
 from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
@@ -48,18 +49,30 @@ def to_read(meeting: MeetingRecord) -> MeetingRecordRead:
     return MeetingRecordRead.model_validate(meeting)
 
 
+def resolve_project_for_meeting(project_id: int, current_user: User, db: Session) -> Project:
+    project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == current_user.id))
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
+    return project
+
+
 @router.get("", response_model=list[MeetingRecordSummaryRead])
 def list_meetings(
     limit: int = Query(default=25, ge=1, le=100),
+    project_id: int | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[MeetingRecordSummaryRead]:
     stmt = (
         select(MeetingRecord)
+        .options(selectinload(MeetingRecord.project))
         .where(MeetingRecord.user_id == current_user.id)
         .order_by(MeetingRecord.created_at.desc())
         .limit(limit)
     )
+    if project_id is not None:
+        resolve_project_for_meeting(project_id, current_user, db)
+        stmt = stmt.where(MeetingRecord.project_id == project_id)
     return [to_summary(item) for item in db.scalars(stmt).all()]
 
 
@@ -83,9 +96,11 @@ def create_meeting(
     language: str | None = Form(default=None),
     asr_provider_id: int | None = Form(default=None),
     llm_provider_id: int | None = Form(default=None),
+    project_id: int | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MeetingRecordRead:
+    project = resolve_project_for_meeting(project_id, current_user, db) if project_id is not None else None
     asr_provider = resolve_ai_provider(
         kind=AIProviderKind.ASR,
         provider_id=asr_provider_id,
@@ -140,6 +155,7 @@ def create_meeting(
 
     meeting = MeetingRecord(
         user_id=current_user.id,
+        project_id=project.id if project else None,
         title=meeting_title_from_filename(title, stored_audio.original_filename),
         audio_filename=stored_audio.original_filename,
         audio_storage_path=stored_audio.relative_storage_path,

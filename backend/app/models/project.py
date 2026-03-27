@@ -37,3 +37,4 @@ class Project(Base):
     user = relationship("User", back_populates="projects")
     milestones = relationship("Milestone", back_populates="project", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
+    meeting_records = relationship("MeetingRecord", back_populates="project")

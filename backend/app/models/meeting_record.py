@@ -11,6 +11,7 @@ class MeetingRecord(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     audio_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     audio_storage_path: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -33,3 +34,10 @@ class MeetingRecord(Base):
     )
 
     user = relationship("User", back_populates="meeting_records")
+    project = relationship("Project", back_populates="meeting_records")
+
+    @property
+    def project_name(self) -> str | None:
+        if not self.project:
+            return None
+        return self.project.name

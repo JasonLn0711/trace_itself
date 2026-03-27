@@ -45,6 +45,7 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_mime_type VARCHAR(120)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS capture_mode VARCHAR(32)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS transcript_entries_json TEXT"))
+    connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS project_id INTEGER"))
     connection.execute(text("UPDATE asr_transcripts SET capture_mode = 'file' WHERE capture_mode IS NULL"))
     connection.execute(
         text(
@@ -90,6 +91,7 @@ def apply_schema_upgrades(connection) -> None:
             CREATE TABLE IF NOT EXISTS meeting_records (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                project_id INTEGER NULL REFERENCES projects(id) ON DELETE SET NULL,
                 title VARCHAR(200) NOT NULL,
                 audio_filename VARCHAR(255) NOT NULL,
                 audio_storage_path VARCHAR(255) NOT NULL,
@@ -136,6 +138,7 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_user_id ON asr_transcripts (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_asr_transcripts_created_at ON asr_transcripts (created_at)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_meeting_records_user_id ON meeting_records (user_id)"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_meeting_records_project_id ON meeting_records (project_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_meeting_records_created_at ON meeting_records (created_at)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_projects_user_id ON projects (user_id)"))
     connection.execute(text("CREATE INDEX IF NOT EXISTS ix_milestones_user_id ON milestones (user_id)"))
@@ -162,6 +165,29 @@ def apply_schema_upgrades(connection) -> None:
         text("CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_logs_user_log_date ON daily_logs (user_id, log_date)")
     )
 
+    connection.execute(
+        text(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                     AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_name = 'meeting_records'
+                      AND kcu.column_name = 'project_id'
+                ) THEN
+                    ALTER TABLE meeting_records
+                    ADD CONSTRAINT fk_meeting_records_project_id
+                    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE SET NULL;
+                END IF;
+            END $$;
+            """
+        )
+    )
     connection.execute(
         text(
             """

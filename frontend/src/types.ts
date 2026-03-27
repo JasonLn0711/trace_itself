@@ -165,6 +165,8 @@ export interface LiveAsrSessionSnapshot {
 
 export interface MeetingRecordSummary {
   id: number;
+  project_id: number | null;
+  project_name: string | null;
   title: string;
   audio_filename: string;
   audio_mime_type: string | null;
@@ -181,6 +183,8 @@ export interface MeetingRecordSummary {
 
 export interface MeetingRecord {
   id: number;
+  project_id: number | null;
+  project_name: string | null;
   title: string;
   audio_filename: string;
   audio_mime_type: string | null;
