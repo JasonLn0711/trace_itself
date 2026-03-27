@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { BrandMark } from './BrandMark';
 import { Badge } from './Primitives';
 import { canUseAudioWorkspace, canUseFeature } from '../lib/access';
 import { useAuth } from '../state/AuthContext';
@@ -39,7 +40,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar card">
         <div className="brand">
-          <div className="brand-mark">T</div>
+          <div className="brand-mark">
+            <BrandMark />
+          </div>
           <div>
             <div className="brand-title">trace_itself</div>
           </div>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../state/AuthContext';
+import { BrandMark } from '../components/BrandMark';
 import { Button, Card, Field, Notice } from '../components/Primitives';
 import { resolvePostLoginPath } from '../lib/access';
 import { extractApiErrorMessage } from '../lib/api';
@@ -66,7 +67,9 @@ export function LoginPage() {
     <div className="login-shell">
       <Card className="login-card login-surface">
         <div className="login-brand-stack">
-          <div className="login-brand-mark" aria-hidden="true">T</div>
+          <div className="login-brand-mark" aria-hidden="true">
+            <BrandMark />
+          </div>
           <div className="login-copy">
             <h1 className="login-title">trace_itself</h1>
             <p className="muted login-subtitle">Sign in</p>
