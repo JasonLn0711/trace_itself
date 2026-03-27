@@ -57,7 +57,7 @@ export function AudioCapturePanel({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<number | null>(null);
-  const { setSessionHold } = useAuth();
+  const { resetIdleTimeout, setSessionHold } = useAuth();
   const sessionHoldKey = useId();
 
   const [error, setError] = useState('');
@@ -114,6 +114,7 @@ export function AudioCapturePanel({
     }
 
     setError('');
+    resetIdleTimeout();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {

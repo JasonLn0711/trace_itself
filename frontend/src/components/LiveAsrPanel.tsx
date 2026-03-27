@@ -101,7 +101,7 @@ export function LiveAsrPanel({
   const [snapshot, setSnapshot] = useState<LiveAsrSessionSnapshot | null>(null);
   const [localError, setLocalError] = useState('');
   const [pendingSave, setPendingSave] = useState(false);
-  const { setSessionHold } = useAuth();
+  const { resetIdleTimeout, setSessionHold } = useAuth();
   const sessionHoldKey = useId();
 
   const pipelineRef = useRef<PipelineRefs | null>(null);
@@ -154,6 +154,7 @@ export function LiveAsrPanel({
     }
 
     setLocalError('');
+    resetIdleTimeout();
     setSnapshot(null);
     pendingPersistRef.current = null;
     setPendingSave(false);

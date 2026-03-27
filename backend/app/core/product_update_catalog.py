@@ -323,4 +323,18 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="audio-timeout-reset-freeze",
+        version_tag="v1.0.70",
+        title="Audio work now resets and pauses the idle timeout",
+        summary="Starting live audio, recording, or transcript processing now resets the timeout clock and freezes it at full time.",
+        details=(
+            "The session timeout now jumps back to a full five minutes when audio work begins and stays paused "
+            "while live streaming, in-browser recording, upload processing, or transcript generation is active."
+        ),
+        area="security",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-27T00:00:00+00:00"),
+        is_pinned=False,
+    ),
 )

@@ -68,7 +68,7 @@ function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefine
 }
 
 export function MeetingsPage() {
-  const { user } = useAuth();
+  const { resetIdleTimeout, user } = useAuth();
   const notesEnabled = canUseMeetingNotes(user);
 
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('transcript');
@@ -258,6 +258,7 @@ export function MeetingsPage() {
       return;
     }
 
+    resetIdleTimeout();
     setSubmittingTranscript(true);
     setError('');
     setNotice('');
@@ -286,6 +287,7 @@ export function MeetingsPage() {
       return;
     }
 
+    resetIdleTimeout();
     setSubmittingMeeting(true);
     setError('');
     setNotice('');

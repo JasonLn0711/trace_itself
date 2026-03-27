@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className={`session-clock session-clock-${timeoutTone}`} role="status" aria-live="polite">
             <span className="session-clock-label">Timeout</span>
             <strong>{formatCountdown(idleCountdownMs)}</strong>
-            <span className="session-clock-state">{sessionTimeoutPaused ? 'Active' : 'Idle'}</span>
+            <span className="session-clock-state">{sessionTimeoutPaused ? 'Paused' : 'Idle'}</span>
           </div>
         </div>
 
