@@ -99,7 +99,7 @@ Optional ASR tuning:
 - `ASR_LIVE_MAX_CHUNK_KB=2048` for the backend hard ceiling on accepted live audio chunk size
 - `NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB=512` for the browser-side live flush target; keep it below the backend chunk ceiling
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS=45` for the longest uninterrupted live utterance buffered before a forced commit
-- `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of open live ASR sessions per account
+- `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of non-finalized live ASR sessions per account
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
 - `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
@@ -192,8 +192,10 @@ ASR notes:
 - After the model is cached, later transcriptions are much faster.
 - If CUDA is configured but unavailable, the backend stays up and the ASR endpoints return `503` with a clear fix message.
 - Live ASR now rejects oversized chunks, limits open sessions per user, and force-commits long uninterrupted utterances to keep memory bounded.
-- The live ASR page streams mic audio in small normalized chunks and still stores a compact Opus/WebM recording when the take is saved.
+- The live ASR page streams mic audio in small normalized chunks, keeps recording alive while users browse other in-app pages, and still stores a compact Opus/WebM recording when the take is saved.
+- The open-session limit now counts only non-finalized sessions, and obviously orphaned pre-start sessions are reaped automatically so one visible recorder does not trip a false multi-session error.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
+- Live ASR sessions are held in backend memory, so after deploying a session-lifecycle fix it is reasonable to restart the backend once and clear any stale sessions from the old runtime.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
 - Provider API secrets are stored encrypted in Postgres, and production deployments must now use a dedicated `CREDENTIALS_SECRET_KEY`.
 - The default policy is 3 LLM text runs per user per rolling 24 hours and 5 hours max audio per file.

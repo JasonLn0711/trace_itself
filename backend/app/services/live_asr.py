@@ -11,6 +11,9 @@ from app.core.config import get_settings
 from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
 
 settings = get_settings()
+ORPHANED_PENDING_SESSION_SECONDS = 10
+ACTIVE_SESSION_IDLE_SECONDS = 180
+FINALIZED_SESSION_IDLE_SECONDS = 1800
 
 
 class LiveAsrSessionError(RuntimeError):
@@ -66,7 +69,10 @@ class LiveAsrSessionManager:
         max_duration_seconds: int,
     ) -> LiveAsrSession:
         self._cleanup_expired()
-        active_sessions = sum(1 for session in self._sessions.values() if session.user_id == user_id)
+        self._cleanup_orphaned_pending_sessions(user_id)
+        active_sessions = sum(
+            1 for session in self._sessions.values() if session.user_id == user_id and not session.finalized
+        )
         if active_sessions >= max(1, settings.asr_live_max_sessions_per_user):
             raise LiveAsrSessionError("Too many live ASR sessions are already open for this account.")
         now = monotonic()
@@ -251,10 +257,23 @@ class LiveAsrSessionManager:
         expired: list[str] = []
         for session_id, session in self._sessions.items():
             idle_seconds = now - session.updated_at
-            if session.finalized and idle_seconds > 1800:
+            if session.finalized and idle_seconds > FINALIZED_SESSION_IDLE_SECONDS:
                 expired.append(session_id)
-            elif not session.finalized and idle_seconds > 900:
+            elif not session.finalized and idle_seconds > ACTIVE_SESSION_IDLE_SECONDS:
                 expired.append(session_id)
+        for session_id in expired:
+            self._sessions.pop(session_id, None)
+
+    def _cleanup_orphaned_pending_sessions(self, user_id: int) -> None:
+        now = monotonic()
+        expired = [
+            session_id
+            for session_id, session in self._sessions.items()
+            if session.user_id == user_id
+            and not session.finalized
+            and session.total_samples == 0
+            and (now - session.created_at) > ORPHANED_PENDING_SESSION_SECONDS
+        ]
         for session_id in expired:
             self._sessions.pop(session_id, None)
 

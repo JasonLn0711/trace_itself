@@ -183,6 +183,7 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
   const recorderStopPromiseRef = useRef<Promise<File | null> | null>(null);
   const recorderStopResolverRef = useRef<((file: File | null) => void) | null>(null);
   const sendingRef = useRef(false);
+  const startInFlightRef = useRef(false);
   const pendingFinalizeRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const recordedFileRef = useRef<File | null>(null);
@@ -386,10 +387,11 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
   }, [discardLive, finalizeAndMaybePersist]);
 
   const startLive = useCallback(async () => {
-    if (!supported || !draftRef.current.providerId || state !== 'idle') {
+    if (startInFlightRef.current || !supported || !draftRef.current.providerId || state !== 'idle') {
       return;
     }
 
+    startInFlightRef.current = true;
     clearFeedback();
     setLastSavedTranscript(null);
     resetIdleTimeout();
@@ -402,13 +404,15 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
     chunkQueueRef.current = [];
     pendingFinalizeRef.current = false;
 
+    let createdSessionId: string | null = null;
     try {
       setState('connecting');
       const nextSnapshot = await asrApi.createLiveSession({
         provider_id: draftRef.current.providerId,
         language: draftRef.current.language
       });
-      sessionIdRef.current = nextSnapshot.session_id;
+      createdSessionId = nextSnapshot.session_id;
+      sessionIdRef.current = createdSessionId;
       setSnapshot(nextSnapshot);
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -534,11 +538,20 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
 
       setState('live');
     } catch (nextError) {
-      await discardServerSession();
+      if (createdSessionId) {
+        await asrApi.discardLiveSession(createdSessionId).catch(() => undefined);
+        if (sessionIdRef.current === createdSessionId) {
+          sessionIdRef.current = null;
+        }
+      } else {
+        await discardServerSession();
+      }
       await teardownPipeline();
       clearLiveState();
       setError(extractApiErrorMessage(nextError));
       setNotice('');
+    } finally {
+      startInFlightRef.current = false;
     }
   }, [clearFeedback, clearLiveState, discardServerSession, flushChunkQueue, preset, resetIdleTimeout, state, supported, teardownPipeline]);
 

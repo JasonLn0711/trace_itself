@@ -25,7 +25,7 @@ Latest deployed updates are listed here so reviewers can immediately see what ch
 - `Portfolio-Ready Product Framing`
   Upgraded the README and architecture docs so the project presents as a serious personal execution system rather than a generic task tracker.
 - `Long Live Recording Stability`
-  Fixed `Live ASR error: Internal Server Error` on longer live recordings by streaming the final multipart upload through the Next.js proxy instead of reparsing the full file in memory first.
+  Hardened live ASR by streaming long final uploads through the proxy, keeping live capture active across in-app navigation, and cleaning up false multi-session conflicts.
 
 ### Deployed 2026-03-26
 
@@ -100,22 +100,24 @@ Private audio workflows with:
 - meeting notes
 - summaries and action items
 
-## Live ASR Long Recording Fix
+## Live ASR Stability Fixes
 
-Long live sessions could fail when saving the take after recording for an extended period, even though live chunk transcription itself was still working.
+Recent live ASR work focused on three different failure modes: long recording saves, cross-page browsing while recording, and false "too many sessions" limits.
 
 - `Symptom`
-  Users could record for a long live session, stop normally, and then hit `Live ASR error: Internal Server Error` during the final save step.
-- `What actually failed`
-  The fragile part was not the PCM chunk streaming into the backend. The failure happened later, when the browser-uploaded recording was sent to the live-session `persist` endpoint.
-- `Root cause`
-  Most `/api/*` traffic is sent to FastAPI through a plain Next.js rewrite, but the live-session endpoints use a custom route handler. That proxy was calling `request.formData()` before forwarding the request, which forced Next.js to parse and buffer the full multipart body again. Longer recordings made that extra parse much more likely to fail.
-- `How it was fixed`
-  The proxy now forwards the original multipart request body as a stream, preserves the incoming `content-type` boundary and `content-length`, and uses `duplex: 'half'` so Node can pass the upload through to FastAPI without rebuilding the whole form in memory first.
-- `How it is tuned now`
-  The backend now accepts live chunk requests up to `2048 KB`, while the browser aims to flush queued PCM in smaller `512 KB` batches so network stalls can recover without silently turning each live upload into a huge request.
-- `Why this fix is targeted`
-  The bug was isolated to the live-session save path because it was the one audio flow using the custom Next.js proxy instead of the simpler rewrite path.
+  Users could hit `Live ASR error: Internal Server Error` after longer recordings, lose the live stream when leaving the `Audio` page, or see `Too many live ASR sessions are already open for this account` even though only one visible session existed.
+- `Long recording save fix`
+  The fragile part was not the PCM chunk streaming itself. The failure happened later, when the browser-uploaded recording was sent to the live-session `persist` endpoint. That proxy was reparsing multipart uploads with `request.formData()`, so longer recordings were buffered a second time inside Next.js before FastAPI ever received them.
+- `Upload-path fix`
+  The proxy now forwards the original multipart request body as a stream, preserves the incoming `content-type` boundary and `content-length`, and uses `duplex: 'half'` so Node can pass the upload through without rebuilding the whole form in memory first.
+- `Burst-handling fix`
+  The backend now accepts live chunk requests up to `2048 KB`, while the browser aims to flush queued PCM in smaller `512 KB` batches so temporary network stalls can recover without turning each live upload into a giant request.
+- `Cross-page live-session fix`
+  The live recorder no longer lives only inside the `Audio` page component. Its session state now sits at the authenticated app-shell level, so users can browse other pages in the app while the microphone stream keeps running and return through a compact live dock.
+- `False multi-session fix`
+  The backend now counts only non-finalized live sessions toward the open-session limit, reaps obviously orphaned pre-start sessions, and the frontend blocks duplicate `startLive()` races so one visible recording does not leak ghost sessions behind the scenes.
+- `Operational note`
+  Live ASR sessions are kept in backend memory, so after deploying session-lifecycle fixes it is worth restarting the backend once to clear any stale in-memory sessions that were created before the patch.
 
 ## Security Hardening
 

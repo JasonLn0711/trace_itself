@@ -82,6 +82,7 @@ The audio side extends the system beyond manual tracking:
 - transcript storage
 - meeting notes
 - summaries and action items
+- live capture that can keep running while users browse other app pages
 
 That makes the repo broader than a simple task manager while still keeping execution as the primary theme.
 
