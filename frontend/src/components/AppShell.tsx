@@ -5,9 +5,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandMark } from './BrandMark';
+import { LiveAsrDock } from './LiveAsrDock';
 import { Badge } from './Primitives';
 import { canUseAudioWorkspace, canUseFeature } from '../lib/access';
 import { auditEventsApi } from '../lib/api';
+import { useLiveAsr } from '../state/LiveAsrContext';
 import { useAuth } from '../state/AuthContext';
 
 type NavItem = {
@@ -95,8 +97,10 @@ function ShellSidebarContent({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { idleCountdownMs, logout, sessionTimeoutPaused, user } = useAuth();
+  const { error, lastSavedTranscript, notice, pendingSave, state } = useLiveAsr();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const pathname = usePathname() ?? '/';
+  const liveDockVisible = !pathname.startsWith('/meetings') && (state !== 'idle' || pendingSave || !!error || !!notice || !!lastSavedTranscript);
   const timeoutTone =
     sessionTimeoutPaused ? 'info' : idleCountdownMs <= 60_000 ? 'danger' : idleCountdownMs <= 120_000 ? 'warning' : 'neutral';
   const visibleNavItems: NavItem[] = [
@@ -192,9 +196,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <div className="content">
+        <div className={`content${liveDockVisible ? ' content-with-live-dock' : ''}`}>
           {children}
         </div>
+        <LiveAsrDock />
       </div>
 
       <div className={`mobile-nav-layer${mobileNavOpen ? ' is-open' : ''}`} aria-hidden={!mobileNavOpen}>

@@ -107,6 +107,10 @@ button {
   min-width: 0;
 }
 
+.content-with-live-dock {
+  padding-bottom: 188px;
+}
+
 .app-mobile-topbar,
 .mobile-nav-layer {
   display: none;
@@ -3074,6 +3078,84 @@ a.card.entity {
   gap: 12px;
 }
 
+.live-asr-dock {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  width: min(420px, calc(100vw - 36px));
+}
+
+.live-asr-dock-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-color: rgba(88, 208, 190, 0.26);
+  background:
+    linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(12, 18, 29, 0.96)),
+    rgba(9, 14, 24, 0.94);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(88, 208, 190, 0.08);
+}
+
+.live-asr-dock-head {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.live-asr-dock-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.live-asr-dock-copy strong {
+  font-size: 0.96rem;
+}
+
+.live-asr-dock-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.live-asr-dock-meta,
+.live-asr-dock-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.live-asr-dock-meta {
+  justify-content: flex-end;
+}
+
+.live-asr-dock-preview {
+  padding: 12px 13px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  line-height: 1.55;
+  font-size: 0.9rem;
+}
+
+.live-asr-dock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.live-asr-dock-actions .btn,
+.live-asr-dock-actions a.btn {
+  min-width: 0;
+}
+
 .live-asr-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3294,6 +3376,10 @@ a.card.entity {
     gap: 14px;
   }
 
+  .content-with-live-dock {
+    padding-bottom: 208px;
+  }
+
   .app-mobile-topbar {
     display: flex;
     align-items: center;
@@ -3353,6 +3439,20 @@ a.card.entity {
   .app-shell {
     padding: 14px;
     gap: 14px;
+  }
+
+  .live-asr-dock {
+    right: 14px;
+    bottom: 14px;
+    width: min(440px, calc(100vw - 28px));
+  }
+
+  .live-asr-dock-head {
+    flex-direction: column;
+  }
+
+  .live-asr-dock-meta {
+    justify-content: flex-start;
   }
 
   .page-header,
@@ -3448,6 +3548,10 @@ a.card.entity {
   .app-shell {
     padding: 10px;
     gap: 10px;
+  }
+
+  .content-with-live-dock {
+    padding-bottom: 232px;
   }
 
   .app-shell,
@@ -3841,13 +3945,16 @@ a.card.entity {
   }
 
   .live-asr-actions,
-  .audio-capture-actions {
+  .audio-capture-actions,
+  .live-asr-dock-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .live-asr-actions .btn,
-  .audio-capture-actions .btn {
+  .audio-capture-actions .btn,
+  .live-asr-dock-actions .btn,
+  .live-asr-dock-actions a.btn {
     width: 100%;
     min-width: 0;
   }
@@ -3893,6 +4000,10 @@ a.card.entity {
     padding: 8px;
   }
 
+  .content-with-live-dock {
+    padding-bottom: 252px;
+  }
+
   .app-mobile-topbar {
     padding: 9px 10px;
   }
@@ -3906,6 +4017,7 @@ a.card.entity {
   .segmented-control,
   .list-row-actions,
   .live-asr-actions,
+  .live-asr-dock-actions,
   .audio-capture-actions,
   .form-grid .helper-row {
     grid-template-columns: 1fr;
@@ -3927,6 +4039,13 @@ a.card.entity {
 
   .page-intro h1 {
     font-size: 1.45rem;
+  }
+
+  .live-asr-dock {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
   }
 
   .hero-actions {

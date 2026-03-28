@@ -22,6 +22,7 @@ import { canUseFeature, canUseMeetingNotes } from '../lib/access';
 import { formatDateTime, formatTimeOfDay } from '../lib/dates';
 import { actionItemCount, formatBytes, formatDuration } from '../lib/media';
 import { useAuth } from '../state/AuthContext';
+import { useLiveAsr } from '../state/LiveAsrContext';
 import type {
   AIProvider,
   AsrTranscript,
@@ -124,6 +125,13 @@ export function MeetingsPage() {
   const requestedMode = searchParams.get('mode');
   const requestedProjectId = parsePositiveIntegerParam(searchParams.get('project'));
   const requestedMeetingId = parsePositiveIntegerParam(searchParams.get('meeting'));
+  const requestedTranscriptId = parsePositiveIntegerParam(searchParams.get('transcript'));
+  const {
+    clearLastSavedTranscript,
+    draft: liveAsrDraft,
+    lastSavedTranscript,
+    updateDraft: updateLiveAsrDraft
+  } = useLiveAsr();
 
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('transcript');
   const [transcriptInputMode, setTranscriptInputMode] = useState<TranscriptInputMode>('live');
@@ -135,12 +143,12 @@ export function MeetingsPage() {
   const [asrProviders, setAsrProviders] = useState<AIProvider[]>([]);
   const [llmProviders, setLlmProviders] = useState<AIProvider[]>([]);
   const [policySnapshot, setPolicySnapshot] = useState<UsagePolicySnapshot | null>(null);
-  const [asrProviderId, setAsrProviderId] = useState<number | null>(null);
+  const [asrProviderId, setAsrProviderId] = useState<number | null>(liveAsrDraft.providerId);
   const [llmProviderId, setLlmProviderId] = useState<number | null>(null);
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<number | null>(null);
   const [selectedMeetingId, setSelectedMeetingId] = useState<number | null>(null);
-  const [title, setTitle] = useState('');
-  const [language, setLanguage] = useState('');
+  const [title, setTitle] = useState(liveAsrDraft.title);
+  const [language, setLanguage] = useState(liveAsrDraft.language);
   const [meetingProjectId, setMeetingProjectId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<MeetingTab>('summary');
@@ -201,7 +209,7 @@ export function MeetingsPage() {
             : ''
         );
 
-        const nextTranscriptId = nextTranscriptEntries[0]?.id ?? null;
+        const nextTranscriptId = requestedTranscriptId ?? nextTranscriptEntries[0]?.id ?? null;
         const nextMeetingId = notesEnabled ? requestedMeetingId ?? nextMeetingEntries[0]?.id ?? null : null;
         setSelectedTranscriptId(nextTranscriptId);
         setSelectedMeetingId(nextMeetingId);
@@ -237,7 +245,47 @@ export function MeetingsPage() {
     return () => {
       alive = false;
     };
-  }, [canLinkMeetingsToProjects, notesEnabled, requestedMeetingId, requestedMode, requestedProjectId]);
+  }, [canLinkMeetingsToProjects, notesEnabled, requestedMeetingId, requestedMode, requestedProjectId, requestedTranscriptId]);
+
+  useEffect(() => {
+    updateLiveAsrDraft({
+      providerId: asrProviderId,
+      providerLabel: activeAsrProviderLabel,
+      language,
+      title,
+      usageAudioSeconds: policySnapshot?.usage.audio_seconds_last_24h ?? null,
+      maxDurationSeconds: policySnapshot?.policy.max_audio_seconds_per_request ?? null
+    });
+  }, [
+    activeAsrProviderLabel,
+    asrProviderId,
+    language,
+    policySnapshot?.policy.max_audio_seconds_per_request,
+    policySnapshot?.usage.audio_seconds_last_24h,
+    title,
+    updateLiveAsrDraft
+  ]);
+
+  useEffect(() => {
+    if (!lastSavedTranscript) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await handleLiveSaved(lastSavedTranscript);
+      } finally {
+        if (!cancelled) {
+          clearLastSavedTranscript();
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clearLastSavedTranscript, lastSavedTranscript]);
 
   const canRunMeetingNotes =
     notesEnabled &&
@@ -450,6 +498,7 @@ export function MeetingsPage() {
       ]);
       setPolicySnapshot(nextPolicy);
       setTranscriptEntries(items);
+      setNotice(created.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without audio.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     }
@@ -615,23 +664,7 @@ export function MeetingsPage() {
               ) : null}
 
               {transcriptInputMode === 'live' ? (
-                <LiveAsrPanel
-                  providerId={asrProviderId}
-                  providerLabel={activeAsrProviderLabel}
-                  language={language}
-                  title={title}
-                  usageAudioSeconds={policySnapshot?.usage.audio_seconds_last_24h ?? null}
-                  maxDurationSeconds={policySnapshot?.policy.max_audio_seconds_per_request ?? null}
-                  onSaved={handleLiveSaved}
-                  onNotice={(message) => {
-                    setNotice(message);
-                    setError('');
-                  }}
-                  onError={(message) => {
-                    setError(message);
-                    setNotice('');
-                  }}
-                />
+                <LiveAsrPanel />
               ) : (
                 <form className="form-grid" onSubmit={handleTranscriptSubmit}>
                   <div className="capture-strip">

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { AppShell } from './AppShell';
+import { LiveAsrProvider } from '../state/LiveAsrContext';
 import { useAuth } from '../state/AuthContext';
 
 export function ProtectedShell({ children }: { children: ReactNode }) {
@@ -34,5 +35,9 @@ export function ProtectedShell({ children }: { children: ReactNode }) {
     return null;
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <LiveAsrProvider>
+      <AppShell>{children}</AppShell>
+    </LiveAsrProvider>
+  );
 }
