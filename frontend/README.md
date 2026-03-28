@@ -2,7 +2,7 @@
 
 This is the Next.js App Router frontend for the trace_itself MVP.
 
-It now supports username/password sign-in, an admin-only Users page, and lightweight progress visuals on the dashboard and project detail views.
+It now supports username/password sign-in, an admin-only Users page, lightweight progress visuals on the dashboard and project detail views, and the `Audio` workspace with `Transcript` and `Notes` flows.
 
 ## Frontend map
 
@@ -56,3 +56,10 @@ The included `Dockerfile` builds the Next.js app in standalone mode and runs it 
 ## Notes
 
 The app assumes cookie-based auth and a same-origin `/api` prefix so it can sit behind a private reverse proxy or VPN-style deployment.
+
+Audio-workspace behavior to keep in mind:
+
+- transcript file uploads can opt into multi-speaker diarization
+- meeting-note uploads can opt into multi-speaker diarization and still generate summaries/minutes/action items
+- live ASR remains speaker-blind while recording, but saved live takes now try post-stop diarization after replay audio is uploaded successfully
+- true real-time live diarization is not part of the current stream path

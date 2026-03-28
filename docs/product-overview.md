@@ -79,6 +79,7 @@ Daily logs give the system behavioral memory:
 The audio side extends the system beyond manual tracking:
 
 - local ASR
+- optional speaker diarization for uploaded transcripts and notes
 - transcript storage
 - meeting notes
 - summaries and action items
@@ -87,6 +88,8 @@ The audio side extends the system beyond manual tracking:
 In practice, a live session now behaves like a shared workspace tool rather than a page-local widget: users can start in `Audio`, move through the rest of the app, and keep a compact dock visible until they stop or save the take.
 
 The live pipeline is also layered deliberately: the browser can upload tiny transport batches for stability, while the backend still preserves a larger rolling decode window and utterance-level transcript commits.
+
+Speaker tagging follows the same staged approach. File transcripts can opt into diarization, meeting notes can opt into diarization, and saved live takes can be diarized after stop when replay audio is available. True real-time live diarization is still intentionally deferred so the current streaming path stays stable.
 
 That makes the repo broader than a simple task manager while still keeping execution as the primary theme.
 

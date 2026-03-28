@@ -102,10 +102,10 @@ Optional ASR tuning:
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS=45` for the longest uninterrupted live utterance buffered before a forced commit
 - `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of non-finalized live ASR sessions per account
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
-- `ASR_MEETING_DIARIZATION_ENABLED=true` to allow optional multi-speaker diarization on meeting uploads
-- `ASR_MEETING_DIARIZER_MODEL=nvidia/diar_sortformer_4spk-v1` for the default NeMo Sortformer diarizer used by the optional meeting mode
-- `ASR_MEETING_DIARIZATION_DEVICE=cuda` for GPU-backed meeting diarization
-- `ASR_MEETING_DIARIZATION_DEFAULT_MAX_SPEAKERS=4` for the default speaker cap offered in the meeting form
+- `ASR_MEETING_DIARIZATION_ENABLED=true` to allow optional multi-speaker diarization on transcript uploads, meeting uploads, and saved live-take post-processing
+- `ASR_MEETING_DIARIZER_MODEL=nvidia/diar_sortformer_4spk-v1` for the default NeMo Sortformer diarizer used by the saved-audio diarization path
+- `ASR_MEETING_DIARIZATION_DEVICE=cuda` for GPU-backed diarization on the saved-audio path
+- `ASR_MEETING_DIARIZATION_DEFAULT_MAX_SPEAKERS=4` for the default speaker cap offered in transcript and notes forms, and the fallback cap used when saved live takes are diarized after stop
 - `ASR_MEETING_DIARIZATION_MERGE_GAP_SECONDS=1.2` for how aggressively adjacent same-speaker phrases are merged into one transcript line
 - `ASR_MEETING_DIARIZATION_GAP_TOLERANCE_SECONDS=0.8` for how far a transcript token can be from a diarized speaker turn before speaker assignment is dropped
 - `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
@@ -198,7 +198,7 @@ ASR notes:
 
 - The first transcription request downloads the Breeze ASR model into the Docker volume `asr_model_cache`.
 - The backend image now includes the CUDA user-space libraries faster-whisper expects for GPU inference.
-- The backend now also installs NeMo ASR dependencies so the optional multi-speaker meeting mode can run Sortformer diarization.
+- The backend now also installs NeMo ASR dependencies so transcript uploads, meeting uploads, and saved live takes can run Sortformer diarization on the saved-audio path.
 - The main `docker-compose.yml` now exposes the NVIDIA GPU to the backend container on the lab machine.
 - `docker-compose.cuda.yml` is kept only as a backward-compatible overlay for older commands.
 - The first live ASR chunk can also trigger that model warm-up, so the very first live response may be slower.
@@ -210,11 +210,13 @@ ASR notes:
 - Transport batching is now separate from recognition context: the browser can upload around `32 KB` at a time while the backend still keeps its own rolling decoder window and utterance-commit logic.
 - The recorder now lives at the authenticated app-shell level instead of only inside the `Audio` page, and other pages expose a compact live dock so users can stop, save, or jump back to `Audio` without losing the session.
 - The open-session limit now counts only non-finalized sessions, and obviously orphaned pre-start sessions are reaped automatically so one visible recorder does not trip a false multi-session error.
+- Saved audio passed to the diarizer is normalized to mono `16 kHz` WAV with `ffmpeg` before NeMo runs, which keeps browser-recorded WebM uploads compatible with the Sortformer path.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Live ASR sessions are held in backend memory, so after deploying a session-lifecycle fix it is reasonable to restart the backend once and clear any stale sessions from the old runtime.
 - Cross-page persistence only applies to in-app navigation. A full page refresh or closing the tab still interrupts browser microphone capture, so this should be described to users as navigation-safe rather than reload-safe.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
-- Multi-speaker diarization is opt-in from the `Notes` form and only affects meeting uploads; it does not replace the default transcript or live-ASR path.
+- Multi-speaker diarization is opt-in from the `Transcript` file-upload form and the `Notes` form. Saved live takes also attempt diarization by default after stop/save, but true real-time live diarization is not part of the streaming path yet.
+- If a live save falls back to transcript-only persistence because replay audio could not be attached, the transcript is still kept, but there is no audio file left for the post-save diarization pass.
 - Provider API secrets are stored encrypted in Postgres, and production deployments must now use a dedicated `CREDENTIALS_SECRET_KEY`.
 - The default policy is 3 LLM text runs per user per rolling 24 hours and 5 hours max audio per file.
 

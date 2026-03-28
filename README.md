@@ -8,9 +8,14 @@ It is designed to feel like a command center for real work, not a decorative pro
 
 ## What's New
 
-Latest deployed updates are listed here so reviewers can immediately see what changed and when it shipped.
+Latest repo updates are listed here so reviewers can immediately see what changed and when it landed.
 
-### Deployed 2026-03-27
+### Updated 2026-03-29
+
+- `Expanded Transcript Diarization`
+  Added optional multi-speaker diarization to transcript file uploads, kept live streaming speaker-blind during capture, and now runs diarization on saved live takes by default when replay audio uploads successfully.
+
+### Updated 2026-03-27
 
 - `Security Hardening Pass`
   Added backend-enforced idle session expiry, password-reset session revocation, bounded live-ASR chunk and utterance handling, stricter Gemini provider URL validation, and safer production startup checks for secrets and secure cookies.
@@ -29,7 +34,7 @@ Latest deployed updates are listed here so reviewers can immediately see what ch
 - `Long Live Recording Stability`
   Hardened live ASR by streaming long final uploads through the proxy, keeping live capture active across in-app navigation, and cleaning up false multi-session conflicts.
 
-### Deployed 2026-03-26
+### Updated 2026-03-26
 
 - `Audio Workspace`
   Added private ASR transcription, meeting-note workflows, and audio processing capabilities for local-first capture and review.
@@ -98,7 +103,7 @@ Structured execution model for:
 Private audio workflows with:
 
 - local ASR
-- optional meeting diarization
+- optional speaker diarization for transcripts, meetings, and saved live takes
 - transcript storage
 - meeting notes
 - summaries and action items
@@ -113,10 +118,14 @@ Speaker diarization now covers three audio paths with different defaults:
   The `Transcript` file-upload form exposes `Multi-speaker diarization` for uploaded audio where more than one person is talking.
 - `Saved live takes`
   Live ASR itself stays speaker-blind for low-latency streaming, but once a live take is stopped and saved, the backend now tries to run diarization on the saved replay audio by default and shows speaker-labeled transcript lines when that succeeds.
+- `Not true real-time live diarization`
+  Speaker labels are not assigned while the microphone stream is still running. That remains a later step so the current live capture path stays low-latency and stable.
 - `Meeting notes`
   The `Notes` form still exposes `Multi-speaker diarization` for meeting-style uploads that also generate summaries, minutes, and action items.
 - `Path B integration`
   The app keeps its current FastAPI and browser transport/session flow, uses faster-whisper for transcription, and adds a raw NeMo Sortformer diarizer on top of saved-audio workflows instead of replacing the live transport stack.
+- `Runtime note`
+  Saved audio is normalized to mono `16 kHz` WAV before the NeMo diarizer runs, which keeps WebM and other browser-recorded uploads compatible with the Sortformer path.
 - `Why this split matters`
   Live streaming stays fast and stable, while saved audio workflows can add speaker-attributed transcript lines where they are most useful.
 
@@ -144,6 +153,8 @@ Recent live ASR work focused on three different failure modes: long recording sa
   The backend now counts only non-finalized live sessions toward the open-session limit, reaps obviously orphaned pre-start sessions, and the frontend blocks duplicate `startLive()` races so one visible recording does not leak ghost sessions behind the scenes.
 - `Operational note`
   Live ASR sessions are kept in backend memory, so after deploying session-lifecycle fixes it is worth restarting the backend once to clear any stale in-memory sessions that were created before the patch.
+- `Saved-live diarization scope`
+  The saved-live diarization pass only runs when the stop/save flow successfully uploads replay audio. If the save falls back to transcript-only persistence, the transcript is still preserved, but there is no audio file left to diarize afterward.
 
 ## Security Hardening
 

@@ -14,6 +14,7 @@ The next serious upgrade should deepen signal quality without bloating the produ
 - add `daily_log.focus_quality`
 - add filters on mission-control panels
 - add click-through drilldowns from every dashboard card
+- add true real-time live speaker diarization once the saved-audio diarization path has proved stable enough to justify streaming speaker-state complexity
 
 ### Product outcome
 
