@@ -1,6 +1,8 @@
 # Deploying trace_itself On A Lab Server
 
-This guide assumes you want a private-first deployment on a lab machine that you can reach remotely without broadly exposing the app to the public internet.
+This guide assumes a private-first deployment on a lab machine that you can reach remotely without broadly exposing the app to the public internet.
+
+Tailscale Serve remains the recommended path. Tailscale Funnel is supported as an explicit opt-in when you intentionally want public internet reachability for demos or limited external access.
 
 For the full Tailscale setup tutorial, firewall guidance, verification steps, and troubleshooting, use [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md). This page focuses on the deployment flow for `trace_itself` itself.
 
@@ -22,7 +24,8 @@ The command-center logic is computed inside the existing FastAPI backend. There 
 - `db` stays on the internal Docker network only.
 - `backend` binds to `127.0.0.1:8000` on the host.
 - `frontend` binds to `127.0.0.1:3000` on the host.
-- Remote access is provided through Tailscale Serve so the app stays private to your tailnet.
+- Remote access is provided through Tailscale Serve so the app stays private to your tailnet by default.
+- Public exposure can be added later with Tailscale Funnel without changing the container binding model.
 
 ### Deployment topology
 
@@ -41,7 +44,7 @@ flowchart LR
 - Docker Engine with the Compose plugin installed on the lab machine
 - Tailscale installed on the lab machine
 - A tailnet with HTTPS enabled
-- A non-sensitive machine name if you plan to use the `https://...ts.net` URL publicly inside your tailnet
+- A non-sensitive machine name if you plan to use the `https://...ts.net` URL either inside your tailnet or publicly through Funnel
 
 ## Recommended environment settings
 
@@ -68,8 +71,15 @@ Then change these values:
 Use these security settings:
 
 - For local-only testing on the lab machine: `SESSION_COOKIE_SECURE=false`
-- For real remote access over Tailscale HTTPS: `SESSION_COOKIE_SECURE=true`
+- For real remote access over Tailscale HTTPS, whether via Serve or Funnel: `SESSION_COOKIE_SECURE=true`
 - Keep `SESSION_IDLE_TIMEOUT_MINUTES=5` unless you intentionally want a different backend-enforced idle timeout
+
+If you plan to use Tailscale Funnel:
+
+- `APP_ENV=production` should be treated as required
+- `CREDENTIALS_SECRET_KEY` should be treated as required, not optional
+- the login page becomes public even though self-serve signup is not live
+- ordinary internet scanner traffic in the frontend logs is expected
 
 The backend now refuses to start in production when any of these are still unsafe:
 
@@ -223,6 +233,43 @@ Important:
 
 If you use `ufw`, keep the firewall rule on `tailscale0` and do not open `3000` or `8000` publicly. See [docs/tailscale.md](/home/jnln3799/every_on_git_ubuntu/trace_itself/docs/tailscale.md) for the exact commands.
 
+## Optional public exposure with Tailscale Funnel
+
+Use this only when you intentionally want the frontend reachable from the public internet.
+
+1. Confirm the production settings are in place:
+
+   ```env
+   APP_ENV=production
+   SESSION_COOKIE_SECURE=true
+   CREDENTIALS_SECRET_KEY=<dedicated-strong-secret>
+   ```
+
+2. Keep the containers bound to localhost as they are now. Do not expose `3000` or `8000` with router forwarding or firewall allow rules.
+3. Publish only the frontend:
+
+   ```bash
+   sudo tailscale funnel --bg 3000
+   tailscale funnel status
+   ```
+
+4. Open the `https://...ts.net` URL shown by `tailscale funnel status`.
+
+Important Funnel warnings:
+
+- the login page is public internet reachable
+- Funnel traffic does not carry the Tailscale identity headers that Serve can add for tailnet traffic
+- internet scanner traffic is normal and should be expected in your logs
+- the current auth model is still issued-account based, not self-serve public signup
+- the backend should remain private on `127.0.0.1:8000`
+
+If you want to switch back to private-only access:
+
+```bash
+sudo tailscale funnel reset
+sudo tailscale serve --bg 3000
+```
+
 ## Day-2 operations
 
 View logs:
@@ -343,12 +390,13 @@ docker compose ps
 
 ### Tailscale after app updates
 
-Normally you do not need to re-run `tailscale serve --bg 3000` after rebuilding the app.
+Normally you do not need to re-run `tailscale serve --bg 3000` or `tailscale funnel --bg 3000` after rebuilding the app.
 
 Recheck only if:
 
 - Tailscale was restarted
 - Serve was reset
+- Funnel was reset
 - the frontend port changed
 
 Verification:
@@ -388,5 +436,6 @@ docker compose exec db sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > tra
 
 - This MVP supports multiple users, but each user's data is private to their own account.
 - User management is admin-led through the app.
-- The app expects a trusted private network entrypoint rather than a public open-internet deployment.
+- The app is private-first and works best behind a trusted network boundary.
 - Tailscale is the recommended remote-access layer for this repository.
+- Public open-internet exposure is supported only as an explicit Tailscale Funnel opt-in.

@@ -2,14 +2,20 @@
 
 This guide shows how to make `trace_itself` reachable from anywhere without exposing the app's ports directly to the public internet.
 
+It covers both:
+
+- `Tailscale Serve` for private tailnet-only access
+- `Tailscale Funnel` for explicit public internet exposure
+
 It matches this repo's deployment model:
 
 - `db` is only on Docker's internal network
 - `backend` listens on `127.0.0.1:8000`
 - `frontend` listens on `127.0.0.1:3000`
 - Tailscale Serve publishes the frontend privately to your tailnet
+- Tailscale Funnel can publish the frontend publicly without changing the localhost-only container bindings
 
-This is the recommended production path for a personal or small trusted deployment.
+Serve is the recommended production path for a personal or small trusted deployment. Funnel is a deliberate tradeoff for demos or limited public access, not the default.
 
 ## Private access map
 
@@ -33,6 +39,16 @@ Using Tailscale gives you:
 - a stable `https://...ts.net` URL when Serve is enabled
 - optional device approval and access-control policies for tighter control
 
+## Public exposure warning
+
+If you enable Tailscale Funnel:
+
+- the frontend becomes reachable from the public internet
+- the login page is public even though self-serve signup is not live
+- you should expect ordinary scanner traffic and bot probes in the logs
+- Funnel traffic does not carry the Tailscale identity headers that Serve can add for private tailnet traffic
+- the backend should still stay on `127.0.0.1:8000`
+
 ## Before you start
 
 You need:
@@ -49,11 +65,13 @@ cp .env.example .env
 
 Edit `.env` and set at least:
 
+- `APP_ENV=production` for any real remote deployment
 - `POSTGRES_PASSWORD`
 - `SECRET_KEY`
+- `CREDENTIALS_SECRET_KEY`
 - `INITIAL_ADMIN_USERNAME`
 - `INITIAL_ADMIN_PASSWORD`
-- `SESSION_COOKIE_SECURE=true` for remote HTTPS use over Tailscale Serve
+- `SESSION_COOKIE_SECURE=true` for remote HTTPS use over Tailscale Serve or Funnel
 
 Then start the app:
 
@@ -146,6 +164,29 @@ Why this matters:
 - `tailscale serve` keeps the site private to devices in your tailnet
 - `tailscale funnel` exposes the site to the public internet
 
+## Step 4B: Publish the frontend publicly with Tailscale Funnel
+
+From the Ubuntu server:
+
+```bash
+sudo tailscale funnel --bg 3000
+tailscale funnel status
+tailscale serve status
+```
+
+What you want to see:
+
+- `tailscale funnel status` shows a `https://...ts.net` URL proxying to `http://127.0.0.1:3000`
+- the frontend is still the only published service
+- `3000` and `8000` are still not opened directly on the public internet
+
+Important Funnel notes:
+
+- the same port cannot be private Serve and public Funnel at the same time, so the most recent command wins
+- if you switch from Serve to Funnel, the site becomes public
+- if you switch from Funnel back to Serve, re-run `sudo tailscale serve --bg 3000`
+- keep the backend private and only publish the frontend entrypoint
+
 ## Step 5: Open the app from another device
 
 On the laptop, phone, or tablet you want to use:
@@ -154,6 +195,12 @@ On the laptop, phone, or tablet you want to use:
 2. Sign into the same tailnet.
 3. Open the `https://...ts.net` URL shown by `tailscale serve status`.
 4. Sign in to `trace_itself` using your app account username and password.
+
+If you are using Funnel instead of private Serve:
+
+1. Open the `https://...ts.net` URL shown by `tailscale funnel status`.
+2. A Tailscale client is not required for the browser that visits the site.
+3. Sign in with an issued app account; there is no self-serve public signup flow yet.
 
 To verify connectivity from another Tailscale device:
 
@@ -282,7 +329,7 @@ docker compose down
 docker compose up --build -d
 ```
 
-Normally you do not need to run `tailscale serve --bg 3000` again after a frontend/backend rebuild. The Serve proxy keeps pointing at `127.0.0.1:3000`.
+Normally you do not need to run `tailscale serve --bg 3000` or `tailscale funnel --bg 3000` again after a frontend/backend rebuild. The chosen proxy keeps pointing at `127.0.0.1:3000`.
 
 Stop private web publishing:
 
@@ -318,6 +365,8 @@ sudo tailscale serve --bg 3000
 
 That usually means the site was published with Funnel instead of private Serve.
 
+This is expected behavior for a public internet endpoint and not, by itself, evidence of a breach.
+
 Check:
 
 ```bash
@@ -346,6 +395,28 @@ docker compose down
 docker compose up --build -d
 ```
 
+If you are using Funnel, also confirm:
+
+```bash
+tailscale funnel status
+```
+
+### I want a public Funnel demo but I do not want the site fully public later
+
+Use Funnel only for the period you need:
+
+```bash
+sudo tailscale funnel --bg 3000
+tailscale funnel status
+```
+
+Then switch back to private Serve:
+
+```bash
+sudo tailscale funnel reset
+sudo tailscale serve --bg 3000
+```
+
 ### I cannot reach the server over Tailscale after tightening UFW
 
 Check:
@@ -365,7 +436,9 @@ sudo ufw allow in on tailscale0
 ## Official references
 
 - Tailscale Serve: https://tailscale.com/docs/reference/tailscale-cli/serve
+- Tailscale Funnel: https://tailscale.com/docs/reference/tailscale-cli/funnel
 - Tailnet-only website hosting: https://tailscale.com/docs/features/tailscale-funnel/how-to/host-websites
+- Public website hosting with Funnel: https://tailscale.com/docs/features/tailscale-funnel
 - UFW lockdown on Ubuntu: https://tailscale.com/docs/how-to/secure-ubuntu-server-with-ufw
 - Device approval: https://tailscale.com/docs/features/access-control/device-management/device-approval
 - HTTPS certificates and `ts.net`: https://tailscale.com/docs/how-to/set-up-https-certificates

@@ -2,7 +2,7 @@
 
 ## Why This Page Is Transitional
 
-`trace_itself` is currently in family-and-friends testing behind Tailscale, but the product is being shaped as a real public-facing system rather than an internal tool.
+`trace_itself` is currently in family-and-friends testing behind Tailscale, with optional Tailscale Funnel exposure for demos, but the product is being shaped as a real public-facing system rather than an internal tool.
 
 Version A of the login page is the transition layer between those two realities:
 
@@ -14,7 +14,7 @@ Version A of the login page is the transition layer between those two realities:
 
 Today, access is still controlled in two layers:
 
-- `Tailscale` provides the private network boundary
+- `Tailscale` often provides the network boundary in private deployments, while Funnel can be used as an explicit public-demo path
 - product accounts provide the application session
 
 That means the login page should feel trustworthy and product-grade, while still acknowledging that access is limited and invite-based.
@@ -26,7 +26,7 @@ That means the login page should feel trustworthy and product-grade, while still
 - a working credential-based entry path for current private beta accounts
 - visible placeholders for future `Google` and `GitHub` sign-in options
 
-The current working path is surfaced as `Continue with Email`, but private beta users may still be signing in with issued credentials while the broader public auth system is not live yet.
+The current working path is surfaced as `Continue with Email`, but users are still signing in with issued credentials while the broader public auth system is not live yet. Even if the page is made public through Funnel, there is no self-serve signup flow yet.
 
 ## What It Deliberately Does Not Do Yet
 
