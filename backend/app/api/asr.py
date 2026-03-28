@@ -17,7 +17,9 @@ from app.models.user import User
 from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary, LiveAsrSessionCreate, LiveAsrSessionRead
 from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
 from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
+from app.services.diarization import DiarizationRuntimeUnavailableError, DiarizationServiceError, service as diarization_service
 from app.services.live_asr import LiveAsrSessionError, service as live_asr_service
+from app.services.meeting_transcription import service as meeting_transcription_service
 from app.services.usage_policy import ensure_audio_duration_allowed, get_or_create_usage_policy, record_usage_event
 from app.core.enums import UsageEventKind
 
@@ -71,6 +73,8 @@ def to_summary(transcript: AsrTranscript) -> AsrTranscriptSummary:
         model_name=transcript.model_name,
         capture_mode=normalize_capture_mode(transcript.capture_mode),
         live_entry_count=len(parsed_entries),
+        speaker_diarization_enabled=bool(transcript.speaker_diarization_enabled),
+        speaker_count=transcript.speaker_count,
         excerpt=build_excerpt(transcript.transcript_text),
         created_at=transcript.created_at,
         updated_at=transcript.updated_at,
@@ -90,6 +94,9 @@ def to_read(transcript: AsrTranscript) -> AsrTranscriptRead:
         capture_mode=normalize_capture_mode(transcript.capture_mode),
         transcript_text=transcript.transcript_text,
         transcript_entries=parse_transcript_entries(transcript.transcript_entries_json),
+        speaker_diarization_enabled=bool(transcript.speaker_diarization_enabled),
+        speaker_count=transcript.speaker_count,
+        speaker_diarization_model_name=transcript.speaker_diarization_model_name,
         created_at=transcript.created_at,
         updated_at=transcript.updated_at,
     )
@@ -137,12 +144,47 @@ def resolve_live_original_filename(title: str | None, uploaded_filename: str | N
 
 
 def serialize_live_entries(entries: list[dict[str, str]]) -> str | None:
-    if not entries:
+    return serialize_transcript_entries(entries)
+
+
+def serialize_transcript_entries(entries: list[dict[str, object]]) -> str | None:
+    normalized_entries: list[dict[str, object]] = []
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        entry_id = str(item.get("id", "")).strip()
+        text = str(item.get("text", "")).strip()
+        if not entry_id or not text:
+            continue
+
+        normalized: dict[str, object] = {
+            "id": entry_id,
+            "text": text,
+        }
+        recorded_at = str(item.get("recorded_at", "")).strip()
+        if recorded_at:
+            normalized["recorded_at"] = recorded_at
+
+        speaker_label = str(item.get("speaker_label", "")).strip()
+        if speaker_label:
+            normalized["speaker_label"] = speaker_label
+
+        started_at_seconds = parse_optional_seconds(item.get("started_at_seconds"))
+        if started_at_seconds is not None:
+            normalized["started_at_seconds"] = started_at_seconds
+
+        ended_at_seconds = parse_optional_seconds(item.get("ended_at_seconds"))
+        if ended_at_seconds is not None:
+            normalized["ended_at_seconds"] = ended_at_seconds
+
+        normalized_entries.append(normalized)
+
+    if not normalized_entries:
         return None
-    return json.dumps(entries, separators=(",", ":"))
+    return json.dumps(normalized_entries, separators=(",", ":"))
 
 
-def parse_transcript_entries(value: str | None) -> list[dict[str, str]]:
+def parse_transcript_entries(value: str | None) -> list[dict[str, object]]:
     if not value:
         return []
     try:
@@ -151,23 +193,106 @@ def parse_transcript_entries(value: str | None) -> list[dict[str, str]]:
         return []
     if not isinstance(parsed, list):
         return []
-    normalized: list[dict[str, str]] = []
+    normalized: list[dict[str, object]] = []
     for item in parsed:
         if not isinstance(item, dict):
             continue
         entry_id = str(item.get("id", "")).strip()
-        recorded_at = str(item.get("recorded_at", "")).strip()
         text = str(item.get("text", "")).strip()
-        if not entry_id or not recorded_at or not text:
+        if not entry_id or not text:
             continue
-        normalized.append(
-            {
-                "id": entry_id,
-                "recorded_at": recorded_at,
-                "text": text,
-            }
-        )
+
+        normalized_entry: dict[str, object] = {
+            "id": entry_id,
+            "text": text,
+        }
+        recorded_at = str(item.get("recorded_at", "")).strip()
+        if recorded_at:
+            normalized_entry["recorded_at"] = recorded_at
+
+        speaker_label = str(item.get("speaker_label", "")).strip()
+        if speaker_label:
+            normalized_entry["speaker_label"] = speaker_label
+
+        started_at_seconds = parse_optional_seconds(item.get("started_at_seconds"))
+        if started_at_seconds is not None:
+            normalized_entry["started_at_seconds"] = started_at_seconds
+
+        ended_at_seconds = parse_optional_seconds(item.get("ended_at_seconds"))
+        if ended_at_seconds is not None:
+            normalized_entry["ended_at_seconds"] = ended_at_seconds
+
+        normalized.append(normalized_entry)
     return normalized
+
+
+def parse_optional_seconds(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return round(float(value), 3)
+    except (TypeError, ValueError):
+        return None
+
+
+def has_diarized_transcript_entries(entries: list[dict[str, object]]) -> bool:
+    return any(
+        str(entry.get("speaker_label", "")).strip() or parse_optional_seconds(entry.get("started_at_seconds")) is not None
+        for entry in entries
+    )
+
+
+def format_audio_timestamp(seconds: float | None) -> str | None:
+    if seconds is None:
+        return None
+    total_seconds = max(0, int(round(seconds)))
+    minutes, remaining_seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}"
+    return f"{minutes:02d}:{remaining_seconds:02d}"
+
+
+def build_transcript_text_download(transcript: AsrTranscript) -> str:
+    entries = parse_transcript_entries(transcript.transcript_entries_json)
+    if not has_diarized_transcript_entries(entries):
+        return transcript.transcript_text
+
+    lines: list[str] = []
+    for entry in entries:
+        parts: list[str] = []
+        timestamp = format_audio_timestamp(parse_optional_seconds(entry.get("started_at_seconds")))
+        if timestamp:
+            parts.append(f"[{timestamp}]")
+
+        speaker_label = str(entry.get("speaker_label", "")).strip()
+        if speaker_label:
+            parts.append(f"{speaker_label}:")
+
+        text = str(entry.get("text", "")).strip()
+        if text:
+            parts.append(text)
+
+        line = " ".join(parts).strip()
+        if line:
+            lines.append(line)
+
+    return "\n".join(lines).strip() or transcript.transcript_text
+
+
+def serialize_meeting_transcript_entries(entries) -> str | None:
+    return serialize_transcript_entries(
+        [
+            {
+                "id": entry.id,
+                "speaker_label": entry.speaker_label,
+                "started_at_seconds": entry.started_at_seconds,
+                "ended_at_seconds": entry.ended_at_seconds,
+                "text": entry.text,
+            }
+            for entry in entries
+        ]
+    )
 
 
 def to_live_read(payload: dict[str, object]) -> LiveAsrSessionRead:
@@ -188,7 +313,7 @@ def download_audio(transcript: AsrTranscript = Depends(get_asr_transcript_or_404
 def download_transcript_text(transcript: AsrTranscript = Depends(get_asr_transcript_or_404)) -> PlainTextResponse:
     filename = build_download_filename(transcript.title, "txt")
     return PlainTextResponse(
-        transcript.transcript_text,
+        build_transcript_text_download(transcript),
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -321,19 +446,51 @@ async def persist_live_session(
             logger.exception("Live ASR audio attachment failed; continuing with transcript-only save.")
             stored_audio = None
 
+    transcript_text = session.committed_text
+    transcript_entries_json = serialize_live_entries(live_asr_service.serialize_entries(session.entries))
+    transcript_language = session.detected_language or session.language_hint
+    transcript_duration_seconds = captured_duration_seconds or None
+    transcript_model_name = session.model_name
+    speaker_diarization_enabled = False
+    speaker_count = None
+    speaker_diarization_model_name = None
+
+    if stored_audio is not None and settings.asr_meeting_diarization_enabled:
+        try:
+            diarized_transcript = meeting_transcription_service.transcribe(
+                stored_audio.storage_path,
+                language=transcript_language,
+                model_name=session.model_name,
+                enable_speaker_diarization=True,
+                max_speaker_count=None,
+            )
+            transcript_text = diarized_transcript.transcript_text
+            transcript_entries_json = serialize_meeting_transcript_entries(diarized_transcript.transcript_entries)
+            transcript_language = diarized_transcript.language
+            transcript_duration_seconds = diarized_transcript.duration_seconds or transcript_duration_seconds
+            transcript_model_name = diarized_transcript.asr_model_name
+            speaker_diarization_enabled = diarized_transcript.speaker_diarization_enabled
+            speaker_count = diarized_transcript.speaker_count
+            speaker_diarization_model_name = diarized_transcript.speaker_diarization_model_name
+        except (AsrRuntimeUnavailableError, AsrServiceError, DiarizationRuntimeUnavailableError, DiarizationServiceError):
+            logger.exception("Saved live ASR diarization failed; falling back to the transcript captured during streaming.")
+
     transcript = AsrTranscript(
         user_id=current_user.id,
         title=normalize_title(title, stored_audio.original_filename if stored_audio else fallback_original_filename),
         original_filename=stored_audio.original_filename if stored_audio else fallback_original_filename,
         audio_storage_path=stored_audio.relative_storage_path if stored_audio else None,
         audio_mime_type=stored_audio.mime_type if stored_audio else None,
-        language=session.detected_language or session.language_hint,
-        duration_seconds=captured_duration_seconds or None,
+        language=transcript_language,
+        duration_seconds=transcript_duration_seconds,
         file_size_bytes=stored_audio.file_size_bytes if stored_audio else 0,
-        model_name=session.model_name,
+        model_name=transcript_model_name,
         capture_mode="live",
-        transcript_text=session.committed_text,
-        transcript_entries_json=serialize_live_entries(live_asr_service.serialize_entries(session.entries)),
+        transcript_text=transcript_text,
+        transcript_entries_json=transcript_entries_json,
+        speaker_diarization_enabled=speaker_diarization_enabled,
+        speaker_count=speaker_count,
+        speaker_diarization_model_name=speaker_diarization_model_name,
     )
     db.add(transcript)
     record_usage_event(
@@ -364,6 +521,8 @@ async def transcribe_audio(
     title: str | None = Form(default=None),
     language: str | None = Form(default=None),
     provider_id: int | None = Form(default=None),
+    speaker_diarization: bool = Form(default=False),
+    max_speaker_count: int | None = Form(default=None, ge=2, le=8),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AsrTranscriptRead:
@@ -375,7 +534,11 @@ async def transcribe_audio(
     )
     try:
         asr_service.ensure_model_ready(provider.model_name)
+        if speaker_diarization:
+            diarization_service.ensure_model_ready()
     except AsrRuntimeUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except DiarizationRuntimeUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     stored_audio = save_upload_file(
         file,
@@ -394,12 +557,23 @@ async def transcribe_audio(
     normalized_language = normalize_language(language)
 
     try:
-        result = asr_service.transcribe_file(
+        result = meeting_transcription_service.transcribe(
             stored_audio.storage_path,
             language=normalized_language,
             model_name=provider.model_name,
+            enable_speaker_diarization=speaker_diarization,
+            max_speaker_count=max_speaker_count,
         )
+    except AsrRuntimeUnavailableError as exc:
+        delete_audio_file(stored_audio.storage_path)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except AsrServiceError as exc:
+        delete_audio_file(stored_audio.storage_path)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except DiarizationRuntimeUnavailableError as exc:
+        delete_audio_file(stored_audio.storage_path)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except DiarizationServiceError as exc:
         delete_audio_file(stored_audio.storage_path)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
@@ -412,10 +586,13 @@ async def transcribe_audio(
         language=result.language,
         duration_seconds=result.duration_seconds or probed_duration_seconds,
         file_size_bytes=stored_audio.file_size_bytes,
-        model_name=result.model_name,
+        model_name=result.asr_model_name,
         capture_mode="file",
-        transcript_text=result.text,
-        transcript_entries_json=None,
+        transcript_text=result.transcript_text,
+        transcript_entries_json=serialize_meeting_transcript_entries(result.transcript_entries),
+        speaker_diarization_enabled=result.speaker_diarization_enabled,
+        speaker_count=result.speaker_count,
+        speaker_diarization_model_name=result.speaker_diarization_model_name,
     )
     db.add(transcript)
     record_usage_event(

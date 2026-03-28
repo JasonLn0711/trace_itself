@@ -362,7 +362,13 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       setPendingSave(false);
       clearLiveState();
       setLastSavedTranscript(transcript);
-      setNotice(transcript.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without replay audio.');
+      setNotice(
+        transcript.speaker_diarization_enabled
+          ? 'Live transcript saved with speaker tags.'
+          : transcript.audio_mime_type
+            ? 'Live transcript saved.'
+            : 'Live transcript saved without replay audio.'
+      );
     } catch (nextError) {
       if (pending.file) {
         const rescued = await persistTranscriptOnly(

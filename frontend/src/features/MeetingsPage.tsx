@@ -26,6 +26,7 @@ import { useLiveAsr } from '../state/LiveAsrContext';
 import type {
   AIProvider,
   AsrTranscript,
+  AsrTranscriptEntry,
   AsrTranscriptSummary,
   MeetingRecord,
   MeetingRecordSummary,
@@ -128,6 +129,42 @@ function buildMeetingTranscriptText(entries: MeetingTranscriptEntry[]) {
   return entries.map((entry) => formatMeetingTranscriptLine(entry)).join('\n');
 }
 
+function hasSpeakerAttributedTranscriptEntries(entries: AsrTranscriptEntry[]) {
+  return entries.some((entry) => !!entry.speaker_label || entry.started_at_seconds != null);
+}
+
+function formatAsrTranscriptLine(entry: AsrTranscriptEntry) {
+  const parts: string[] = [];
+  const timestamp = formatAudioTimestamp(entry.started_at_seconds) || '--:--';
+  if (timestamp) {
+    parts.push(`[${timestamp}]`);
+  }
+  if (entry.speaker_label) {
+    parts.push(`${entry.speaker_label}:`);
+  }
+  parts.push(entry.text);
+  return parts.join(' ').trim();
+}
+
+function buildAsrTranscriptText(entries: AsrTranscriptEntry[]) {
+  return entries.map((entry) => formatAsrTranscriptLine(entry)).join('\n');
+}
+
+function renderAsrTranscriptEntries(entries: AsrTranscriptEntry[]) {
+  return (
+    <div className="transcript-body live-transcript-log">
+      {entries.map((entry) => (
+        <div
+          key={`${entry.id}-${entry.started_at_seconds ?? entry.recorded_at ?? 'entry'}`}
+          className="live-transcript-entry"
+        >
+          <span className="live-transcript-text">{formatAsrTranscriptLine(entry)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function formatMeetingTranscriptLine(entry: MeetingTranscriptEntry) {
   const parts: string[] = [];
   const timestamp = formatAudioTimestamp(entry.started_at_seconds) || '--:--';
@@ -197,6 +234,8 @@ export function MeetingsPage() {
   const [title, setTitle] = useState(liveAsrDraft.title);
   const [language, setLanguage] = useState(liveAsrDraft.language);
   const [meetingProjectId, setMeetingProjectId] = useState('');
+  const [transcriptSpeakerDiarization, setTranscriptSpeakerDiarization] = useState(false);
+  const [transcriptMaxSpeakerCount, setTranscriptMaxSpeakerCount] = useState('4');
   const [meetingSpeakerDiarization, setMeetingSpeakerDiarization] = useState(false);
   const [meetingMaxSpeakerCount, setMeetingMaxSpeakerCount] = useState('4');
   const [file, setFile] = useState<File | null>(null);
@@ -431,7 +470,14 @@ export function MeetingsPage() {
     setError('');
     setNotice('');
     try {
-      const created = await asrApi.transcribe({ file, title, language, provider_id: asrProviderId });
+      const created = await asrApi.transcribe({
+        file,
+        title,
+        language,
+        provider_id: asrProviderId,
+        speaker_diarization: transcriptSpeakerDiarization,
+        max_speaker_count: transcriptSpeakerDiarization ? Number(transcriptMaxSpeakerCount) : null
+      });
       setSelectedTranscript(created);
       setSelectedTranscriptId(created.id);
       setFile(null);
@@ -549,7 +595,13 @@ export function MeetingsPage() {
       ]);
       setPolicySnapshot(nextPolicy);
       setTranscriptEntries(items);
-      setNotice(created.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without replay audio.');
+      setNotice(
+        created.speaker_diarization_enabled
+          ? 'Live transcript saved with speaker tags.'
+          : created.audio_mime_type
+            ? 'Live transcript saved.'
+            : 'Live transcript saved without replay audio.'
+      );
     } catch (err) {
       setError(extractApiErrorMessage(err));
     }
@@ -558,7 +610,9 @@ export function MeetingsPage() {
   async function copyActiveContent() {
     const value =
       workspaceMode === 'transcript'
-        ? selectedTranscript?.transcript_text
+        ? selectedTranscript?.speaker_diarization_enabled && selectedTranscript.transcript_entries.length
+          ? buildAsrTranscriptText(selectedTranscript.transcript_entries)
+          : selectedTranscript?.transcript_text
         : activeTab === 'summary'
           ? selectedMeeting?.summary_text
           : activeTab === 'minutes'
@@ -720,7 +774,12 @@ export function MeetingsPage() {
               ) : null}
 
               {transcriptInputMode === 'live' ? (
-                <LiveAsrPanel />
+                <>
+                  <LiveAsrPanel />
+                  <div className="list-row-copy">
+                    Saved live takes try speaker diarization automatically after stop when replay audio uploads successfully.
+                  </div>
+                </>
               ) : (
                 <form className="form-grid" onSubmit={handleTranscriptSubmit}>
                   <div className="capture-strip">
@@ -729,6 +788,35 @@ export function MeetingsPage() {
                     <span className="capture-pill">{activeAsrProviderLabel}</span>
                   </div>
                   <AudioCapturePanel file={file} onChange={setFile} filenameBase="audio" disabled={submittingTranscript} />
+                  <div className="field">
+                    <span>Transcript mode</span>
+                    <label className="list-row-copy" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={transcriptSpeakerDiarization}
+                        onChange={(event) => setTranscriptSpeakerDiarization(event.target.checked)}
+                      />
+                      Multi-speaker diarization
+                    </label>
+                    <div className="list-row-copy">
+                      Use this only when more than one person is talking. It keeps the default transcript path unchanged unless you opt in.
+                    </div>
+                  </div>
+                  {transcriptSpeakerDiarization ? (
+                    <label className="field">
+                      <span>Max speakers</span>
+                      <select value={transcriptMaxSpeakerCount} onChange={(event) => setTranscriptMaxSpeakerCount(event.target.value)}>
+                        {SPEAKER_COUNT_OPTIONS.map((count) => (
+                          <option key={count} value={count}>
+                            {count}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  <div className="detail-row">
+                    {transcriptSpeakerDiarization ? <span className="capture-pill">Speaker tags on</span> : null}
+                  </div>
                   <Button type="submit" disabled={submittingTranscript || !file || !asrProviders.length}>
                     {submittingTranscript ? 'Saving...' : 'Save transcript'}
                   </Button>
@@ -861,6 +949,11 @@ export function MeetingsPage() {
                           </Badge>
                           <Badge tone="neutral">{languageLabel(entry.language)}</Badge>
                           <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
+                          {entry.speaker_diarization_enabled ? (
+                            <Badge tone="info">
+                              {entry.speaker_count ? `${entry.speaker_count} speakers` : 'Multi-speaker'}
+                            </Badge>
+                          ) : null}
                           {entry.capture_mode === 'live' && entry.live_entry_count ? (
                             <Badge tone="neutral">{entry.live_entry_count} lines</Badge>
                           ) : null}
@@ -971,6 +1064,14 @@ export function MeetingsPage() {
                   {selectedTranscript.audio_mime_type ? formatBytes(selectedTranscript.file_size_bytes) : 'No audio file'}
                 </Badge>
                 <Badge tone="info">{selectedTranscript.model_name}</Badge>
+                {selectedTranscript.speaker_diarization_enabled ? (
+                  <Badge tone="info">
+                    {selectedTranscript.speaker_count ? `${selectedTranscript.speaker_count} speakers` : 'Multi-speaker'}
+                  </Badge>
+                ) : null}
+                {selectedTranscript.speaker_diarization_model_name ? (
+                  <Badge tone="neutral">{selectedTranscript.speaker_diarization_model_name}</Badge>
+                ) : null}
                 {selectedTranscript.audio_mime_type ? (
                   <a className="btn btn-save-action" href={asrApi.audioUrl(selectedTranscript.id)} download>
                     <AudioMarkIcon />
@@ -992,14 +1093,18 @@ export function MeetingsPage() {
                 />
               )}
               {selectedTranscript.transcript_entries.length ? (
-                <div className="transcript-body live-transcript-log">
-                  {selectedTranscript.transcript_entries.map((entry) => (
-                    <div key={`${entry.id}-${entry.recorded_at}`} className="live-transcript-entry">
-                      <span className="live-transcript-time">[{formatTimeOfDay(entry.recorded_at)}]</span>
-                      <span className="live-transcript-text">{entry.text}</span>
-                    </div>
-                  ))}
-                </div>
+                selectedTranscript.speaker_diarization_enabled && hasSpeakerAttributedTranscriptEntries(selectedTranscript.transcript_entries) ? (
+                  renderAsrTranscriptEntries(selectedTranscript.transcript_entries)
+                ) : (
+                  <div className="transcript-body live-transcript-log">
+                    {selectedTranscript.transcript_entries.map((entry) => (
+                      <div key={`${entry.id}-${entry.recorded_at ?? entry.started_at_seconds ?? 'entry'}`} className="live-transcript-entry">
+                        {entry.recorded_at ? <span className="live-transcript-time">[{formatTimeOfDay(entry.recorded_at)}]</span> : null}
+                        <span className="live-transcript-text">{entry.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
               ) : (
                 <pre className="transcript-body">{selectedTranscript.transcript_text}</pre>
               )}

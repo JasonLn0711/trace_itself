@@ -1,5 +1,8 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+import subprocess
+from tempfile import TemporaryDirectory
 
 from app.core.config import get_settings
 
@@ -40,13 +43,13 @@ class DiarizationService:
         diarizer = self._get_model()
         requested_speakers = max(2, min(max_speakers or settings.asr_meeting_diarization_default_max_speakers, 8))
         try:
-            diarized = diarizer.diarize(
-                audio=str(file_path),
-                batch_size=1,
-                num_workers=0,
-                verbose=False,
-                max_num_of_spks=requested_speakers,
-            )
+            with self._prepare_audio_for_diarization(file_path) as prepared_file:
+                diarized = diarizer.diarize(
+                    audio=str(prepared_file),
+                    override_config=self._build_diarize_config(requested_speakers),
+                )
+        except (DiarizationRuntimeUnavailableError, DiarizationServiceError):
+            raise
         except Exception as exc:
             raise DiarizationServiceError("Speaker diarization failed for this audio file.") from exc
 
@@ -89,6 +92,51 @@ class DiarizationService:
         return self._model
 
     @staticmethod
+    def _build_diarize_config(max_speakers: int):
+        from nemo.collections.asr.parts.mixins.diarization import DiarizeConfig, InternalDiarizeConfig
+
+        config = DiarizeConfig(
+            batch_size=1,
+            num_workers=0,
+            verbose=False,
+            max_num_of_spks=max_speakers,
+        )
+        config._internal = InternalDiarizeConfig(max_num_of_spks=max_speakers)
+        return config
+
+    @staticmethod
+    @contextmanager
+    def _prepare_audio_for_diarization(file_path: Path):
+        try:
+            with TemporaryDirectory(prefix="meeting-diarization-") as temp_dir:
+                prepared_path = Path(temp_dir) / f"{file_path.stem}.wav"
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-nostdin",
+                        "-y",
+                        "-i",
+                        str(file_path),
+                        "-ac",
+                        "1",
+                        "-ar",
+                        "16000",
+                        str(prepared_path),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                yield prepared_path
+        except FileNotFoundError as exc:
+            raise DiarizationRuntimeUnavailableError(
+                "Speaker diarization requires ffmpeg in the backend runtime."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            raise DiarizationServiceError("Speaker diarization failed for this audio file.") from exc
+
+    @staticmethod
     def _parse_turns(payload: object) -> list[SpeakerTurn]:
         lines: list[str] = []
         if isinstance(payload, (list, tuple)):
@@ -116,7 +164,7 @@ class DiarizationService:
                     end_seconds=end_seconds,
                 )
             )
-        return turns
+        return sorted(turns, key=lambda turn: (turn.start_seconds, turn.end_seconds, turn.speaker_label))
 
 
 service = DiarizationService()

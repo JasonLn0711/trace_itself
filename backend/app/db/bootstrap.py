@@ -45,12 +45,21 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_mime_type VARCHAR(120)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS capture_mode VARCHAR(32)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS transcript_entries_json TEXT"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS speaker_diarization_enabled BOOLEAN"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS speaker_count INTEGER"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS speaker_diarization_model_name VARCHAR(160)"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS project_id INTEGER"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS transcript_entries_json TEXT"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS speaker_diarization_enabled BOOLEAN"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS speaker_count INTEGER"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS speaker_diarization_model_name VARCHAR(160)"))
     connection.execute(text("UPDATE asr_transcripts SET capture_mode = 'file' WHERE capture_mode IS NULL"))
+    connection.execute(text("ALTER TABLE asr_transcripts ALTER COLUMN speaker_diarization_enabled SET DEFAULT FALSE"))
+    connection.execute(
+        text(
+            "UPDATE asr_transcripts SET speaker_diarization_enabled = FALSE WHERE speaker_diarization_enabled IS NULL"
+        )
+    )
     connection.execute(text("ALTER TABLE meeting_records ALTER COLUMN speaker_diarization_enabled SET DEFAULT FALSE"))
     connection.execute(
         text(
@@ -89,6 +98,9 @@ def apply_schema_upgrades(connection) -> None:
                 capture_mode VARCHAR(32) NOT NULL DEFAULT 'file',
                 transcript_text TEXT NOT NULL,
                 transcript_entries_json TEXT NULL,
+                speaker_diarization_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                speaker_count INTEGER NULL,
+                speaker_diarization_model_name VARCHAR(160) NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )

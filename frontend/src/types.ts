@@ -121,9 +121,20 @@ export interface AsrTranscriptSummary {
   model_name: string;
   capture_mode: 'live' | 'file';
   live_entry_count: number;
+  speaker_diarization_enabled: boolean;
+  speaker_count: number | null;
   excerpt: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface AsrTranscriptEntry {
+  id: string;
+  recorded_at: string | null;
+  speaker_label: string | null;
+  started_at_seconds: number | null;
+  ended_at_seconds: number | null;
+  text: string;
 }
 
 export interface AsrTranscript {
@@ -137,7 +148,10 @@ export interface AsrTranscript {
   model_name: string;
   capture_mode: 'live' | 'file';
   transcript_text: string;
-  transcript_entries: LiveAsrTranscriptEntry[];
+  transcript_entries: AsrTranscriptEntry[];
+  speaker_diarization_enabled: boolean;
+  speaker_count: number | null;
+  speaker_diarization_model_name: string | null;
   created_at: string;
   updated_at: string;
 }

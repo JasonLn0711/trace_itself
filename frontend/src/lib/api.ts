@@ -268,7 +268,14 @@ export const asrApi = {
   textUrl(id: number) {
     return `${API_BASE}/asr/transcripts/${id}/text`;
   },
-  transcribe(input: { file: File; title?: string; language?: string; provider_id?: number | null }) {
+  transcribe(input: {
+    file: File;
+    title?: string;
+    language?: string;
+    provider_id?: number | null;
+    speaker_diarization?: boolean;
+    max_speaker_count?: number | null;
+  }) {
     const formData = new FormData();
     formData.append('file', input.file);
     if (input.title?.trim()) {
@@ -279,6 +286,12 @@ export const asrApi = {
     }
     if (input.provider_id) {
       formData.append('provider_id', String(input.provider_id));
+    }
+    if (input.speaker_diarization) {
+      formData.append('speaker_diarization', 'true');
+    }
+    if (input.max_speaker_count) {
+      formData.append('max_speaker_count', String(input.max_speaker_count));
     }
     return requestForm<AsrTranscript>('/asr/transcripts', formData, {
       method: 'POST'

@@ -16,9 +16,20 @@ class AsrTranscriptSummary(BaseModel):
     model_name: str
     capture_mode: str
     live_entry_count: int
+    speaker_diarization_enabled: bool
+    speaker_count: int | None
     excerpt: str
     created_at: datetime
     updated_at: datetime
+
+
+class AsrTranscriptEntryRead(BaseModel):
+    id: str
+    recorded_at: datetime | None = None
+    speaker_label: str | None = None
+    started_at_seconds: float | None = None
+    ended_at_seconds: float | None = None
+    text: str
 
 
 class AsrTranscriptRead(BaseModel):
@@ -34,7 +45,10 @@ class AsrTranscriptRead(BaseModel):
     model_name: str
     capture_mode: str
     transcript_text: str
-    transcript_entries: list["LiveAsrTranscriptEntryRead"]
+    transcript_entries: list["AsrTranscriptEntryRead"]
+    speaker_diarization_enabled: bool
+    speaker_count: int | None
+    speaker_diarization_model_name: str | None
     created_at: datetime
     updated_at: datetime
 

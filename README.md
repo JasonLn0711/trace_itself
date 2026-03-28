@@ -103,18 +103,22 @@ Private audio workflows with:
 - meeting notes
 - summaries and action items
 
-## Optional Meeting Diarization
+## Optional Speaker Diarization
 
-Meeting notes now support an explicit multi-speaker mode for uploaded audio files.
+Speaker diarization now covers three audio paths with different defaults:
 
 - `Default behavior stays the same`
-  Regular transcript uploads and live ASR stay on the existing single-speaker path.
-- `Meeting-only opt-in`
-  The `Notes` form exposes a `Multi-speaker diarization` option for meetings where more than one person is talking.
+  Plain transcript uploads still default to the existing single-speaker path unless you opt in.
+- `Transcript opt-in`
+  The `Transcript` file-upload form exposes `Multi-speaker diarization` for uploaded audio where more than one person is talking.
+- `Saved live takes`
+  Live ASR itself stays speaker-blind for low-latency streaming, but once a live take is stopped and saved, the backend now tries to run diarization on the saved replay audio by default and shows speaker-labeled transcript lines when that succeeds.
+- `Meeting notes`
+  The `Notes` form still exposes `Multi-speaker diarization` for meeting-style uploads that also generate summaries, minutes, and action items.
 - `Path B integration`
-  The app keeps its current FastAPI and browser transport/session flow, uses faster-whisper for transcription, and adds a raw NeMo Sortformer diarizer only for the optional meeting mode.
+  The app keeps its current FastAPI and browser transport/session flow, uses faster-whisper for transcription, and adds a raw NeMo Sortformer diarizer on top of saved-audio workflows instead of replacing the live transport stack.
 - `Why this split matters`
-  Solo dictation stays faster and simpler, while actual meetings gain speaker-attributed transcript lines that make summaries and action items easier to trust.
+  Live streaming stays fast and stable, while saved audio workflows can add speaker-attributed transcript lines where they are most useful.
 
 ## Live ASR Stability Fixes
 
