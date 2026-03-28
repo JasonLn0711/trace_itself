@@ -297,6 +297,53 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
     await asrApi.discardLiveSession(sessionId).catch(() => undefined);
   }, []);
 
+  const livePersistTitle = useCallback(() => buildLiveTranscriptName(startedAtRef.current, draftRef.current.title), []);
+
+  const audioSaveRetryMessage = useCallback((error: unknown) => {
+    const detail = extractApiErrorMessage(error).trim();
+    if (!detail || detail === 'Internal Server Error') {
+      return 'Live audio could not be attached. You can retry saving transcript-only.';
+    }
+    return `Live audio could not be attached. ${detail} You can retry saving transcript-only.`;
+  }, []);
+
+  const queueTranscriptOnlyRetry = useCallback((sessionId: string, error: unknown) => {
+    pendingPersistRef.current = {
+      sessionId,
+      file: null,
+    };
+    setPendingSave(true);
+    setState('idle');
+    setNotice('');
+    setError(audioSaveRetryMessage(error));
+  }, [audioSaveRetryMessage]);
+
+  const persistTranscriptOnly = useCallback(
+    async (sessionId: string, successNotice: string) => {
+      try {
+        const finalSnapshot = await asrApi.finalizeLiveSession(sessionId).catch(() => null);
+        if (finalSnapshot) {
+          setSnapshot(finalSnapshot);
+        }
+        const transcript = await asrApi.persistLiveSession({
+          session_id: sessionId,
+          title: livePersistTitle(),
+        });
+        pendingPersistRef.current = null;
+        setPendingSave(false);
+        clearLiveState();
+        setLastSavedTranscript(transcript);
+        setError('');
+        setNotice(successNotice);
+        return true;
+      } catch (fallbackError) {
+        queueTranscriptOnlyRetry(sessionId, fallbackError);
+        return false;
+      }
+    },
+    [clearLiveState, livePersistTitle, queueTranscriptOnlyRetry]
+  );
+
   const persistPendingLiveTake = useCallback(async () => {
     const pending = pendingPersistRef.current;
     if (!pending) {
@@ -309,19 +356,27 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       const transcript = await asrApi.persistLiveSession({
         session_id: pending.sessionId,
         file: pending.file,
-        title: buildLiveTranscriptName(startedAtRef.current, draftRef.current.title)
+        title: livePersistTitle()
       });
       pendingPersistRef.current = null;
       setPendingSave(false);
       clearLiveState();
       setLastSavedTranscript(transcript);
-      setNotice(transcript.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without audio.');
+      setNotice(transcript.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without replay audio.');
     } catch (nextError) {
-      setError(extractApiErrorMessage(nextError));
-      setNotice('');
-      setState('idle');
+      if (pending.file) {
+        const rescued = await persistTranscriptOnly(
+          pending.sessionId,
+          'Live audio could not be attached, but the transcript was saved and is available now.'
+        );
+        if (rescued) {
+          return;
+        }
+      } else {
+        queueTranscriptOnlyRetry(pending.sessionId, nextError);
+      }
     }
-  }, [clearFeedback, clearLiveState]);
+  }, [clearFeedback, clearLiveState, livePersistTitle, persistTranscriptOnly, queueTranscriptOnlyRetry]);
 
   const finalizeAndMaybePersist = useCallback(async () => {
     const sessionId = sessionIdRef.current;
@@ -349,12 +404,16 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       };
       setPendingSave(true);
       await persistPendingLiveTake();
-    } catch (nextError) {
-      setError(extractApiErrorMessage(nextError));
-      setNotice('');
-      setState('idle');
+    } catch {
+      const rescued = await persistTranscriptOnly(
+        sessionId,
+        'Live audio could not be attached during stop, but the transcript was saved and is available now.'
+      );
+      if (rescued) {
+        return;
+      }
     }
-  }, [clearFeedback, clearLiveState, discardServerSession, persistPendingLiveTake]);
+  }, [clearFeedback, clearLiveState, discardServerSession, persistPendingLiveTake, persistTranscriptOnly]);
 
   const discardLive = useCallback(async () => {
     pendingFinalizeRef.current = false;
@@ -396,6 +455,19 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       const nextSnapshot = await asrApi.pushLiveChunk(sessionId, payload);
       setSnapshot(nextSnapshot);
     } catch (nextError) {
+      const sessionId = sessionIdRef.current;
+      const isStopping = pendingFinalizeRef.current || state === 'stopping';
+      pendingFinalizeRef.current = false;
+      if (isStopping && sessionId) {
+        const rescued = await persistTranscriptOnly(
+          sessionId,
+          'Some live audio could not be uploaded during stop, but the transcript was saved without replay audio.'
+        );
+        if (rescued) {
+          return;
+        }
+        return;
+      }
       setError(extractApiErrorMessage(nextError));
       setNotice('');
       await discardLive();
@@ -420,7 +492,7 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       pendingFinalizeRef.current = false;
       await finalizeAndMaybePersist();
     }
-  }, [discardLive, finalizeAndMaybePersist]);
+  }, [discardLive, finalizeAndMaybePersist, persistTranscriptOnly, state]);
 
   const startLive = useCallback(async () => {
     if (startInFlightRef.current || !supported || !draftRef.current.providerId || state !== 'idle') {

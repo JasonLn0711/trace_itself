@@ -344,6 +344,8 @@ export const meetingsApi = {
     asr_provider_id?: number | null;
     llm_provider_id?: number | null;
     project_id?: number | null;
+    speaker_diarization?: boolean;
+    max_speaker_count?: number | null;
   }) {
     const formData = new FormData();
     formData.append('file', input.file);
@@ -361,6 +363,12 @@ export const meetingsApi = {
     }
     if (input.project_id) {
       formData.append('project_id', String(input.project_id));
+    }
+    if (input.speaker_diarization) {
+      formData.append('speaker_diarization', 'true');
+    }
+    if (input.max_speaker_count) {
+      formData.append('max_speaker_count', String(input.max_speaker_count));
     }
     return requestForm<MeetingRecord>('/meetings', formData, {
       method: 'POST'

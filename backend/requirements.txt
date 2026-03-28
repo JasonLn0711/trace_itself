@@ -2,6 +2,7 @@ cryptography==46.0.6
 faster-whisper==1.2.1
 fastapi==0.135.2
 itsdangerous==2.2.0
+nemo_toolkit[asr]==2.7.2
 nvidia-cublas-cu12
 nvidia-cudnn-cu12==9.*
 passlib==1.7.4

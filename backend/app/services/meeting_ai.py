@@ -21,7 +21,9 @@ class MeetingArtifacts:
     model_name: str
 
 
-def build_meeting_prompt(transcript_text: str, title: str) -> str:
+def build_meeting_prompt(transcript_text: str, title: str, structured_transcript_text: str | None = None) -> str:
+    transcript_label = "Speaker-attributed transcript" if structured_transcript_text else "Transcript"
+    transcript_body = structured_transcript_text or transcript_text
     return (
         "You are a precise meeting assistant.\n"
         f"Meeting title: {title}\n\n"
@@ -29,12 +31,19 @@ def build_meeting_prompt(transcript_text: str, title: str) -> str:
         "- summary_text: 3 to 5 sentences\n"
         "- minutes_text: concise chronological minutes\n"
         "- action_items: array of clear next-step tasks\n\n"
+        "If speaker labels are present, preserve who said what when it matters.\n"
         "If something is uncertain, keep it cautious and factual.\n\n"
-        f"Transcript:\n{transcript_text}"
+        f"{transcript_label}:\n{transcript_body}"
     )
 
 
-def generate_meeting_artifacts(transcript_text: str, title: str, provider: AIProvider) -> MeetingArtifacts:
+def generate_meeting_artifacts(
+    transcript_text: str,
+    title: str,
+    provider: AIProvider,
+    *,
+    structured_transcript_text: str | None = None,
+) -> MeetingArtifacts:
     if provider.driver != AIProviderDriver.GEMINI:
         raise MeetingAiError("Selected LLM provider is not supported yet.")
 
@@ -72,7 +81,11 @@ def generate_meeting_artifacts(transcript_text: str, title: str, provider: AIPro
                 {
                     "parts": [
                         {
-                            "text": build_meeting_prompt(transcript_text, title),
+                            "text": build_meeting_prompt(
+                                transcript_text,
+                                title,
+                                structured_transcript_text=structured_transcript_text,
+                            ),
                         }
                     ]
                 }

@@ -29,6 +29,7 @@ import type {
   AsrTranscriptSummary,
   MeetingRecord,
   MeetingRecordSummary,
+  MeetingTranscriptEntry,
   Project,
   UsagePolicySnapshot
 } from '../types';
@@ -44,6 +45,8 @@ const LANGUAGE_OPTIONS = [
   { value: 'ko', label: 'ko' },
   { value: 'en', label: 'en' }
 ] as const;
+
+const SPEAKER_COUNT_OPTIONS = [2, 3, 4, 5, 6, 8] as const;
 
 function excerpt(value: string, max = 160) {
   const compact = value.replace(/\s+/g, ' ').trim();
@@ -92,6 +95,45 @@ function parsePositiveIntegerParam(value: string | null) {
 
 function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefined) {
   return (value || '').toLowerCase() === 'live' ? 'Live' : 'File';
+}
+
+function formatAudioTimestamp(seconds: number | null | undefined) {
+  if (seconds == null || Number.isNaN(seconds)) {
+    return '';
+  }
+  const wholeSeconds = Math.max(0, Math.round(seconds));
+  const totalMinutes = Math.floor(wholeSeconds / 60);
+  const remainingSeconds = wholeSeconds % 60;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours) {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+  }
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+function renderMeetingTranscriptEntries(entries: MeetingTranscriptEntry[]) {
+  return (
+    <div className="transcript-body live-transcript-log">
+      {entries.map((entry) => (
+        <div key={`${entry.id}-${entry.started_at_seconds ?? 'start'}`} className="live-transcript-entry">
+          <span className="live-transcript-time">[{formatAudioTimestamp(entry.started_at_seconds) || '--:--'}]</span>
+          {entry.speaker_label ? <Badge tone="info">{entry.speaker_label}</Badge> : null}
+          <span className="live-transcript-text">{entry.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function buildMeetingTranscriptText(entries: MeetingTranscriptEntry[]) {
+  return entries
+    .map((entry) => {
+      const timestamp = formatAudioTimestamp(entry.started_at_seconds) || '--:--';
+      const speaker = entry.speaker_label ? `${entry.speaker_label}: ` : '';
+      return `[${timestamp}] ${speaker}${entry.text}`;
+    })
+    .join('\n');
 }
 
 function SaveMarkIcon() {
@@ -150,6 +192,8 @@ export function MeetingsPage() {
   const [title, setTitle] = useState(liveAsrDraft.title);
   const [language, setLanguage] = useState(liveAsrDraft.language);
   const [meetingProjectId, setMeetingProjectId] = useState('');
+  const [meetingSpeakerDiarization, setMeetingSpeakerDiarization] = useState(false);
+  const [meetingMaxSpeakerCount, setMeetingMaxSpeakerCount] = useState('4');
   const [file, setFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<MeetingTab>('summary');
   const [loading, setLoading] = useState(true);
@@ -417,7 +461,9 @@ export function MeetingsPage() {
         language,
         asr_provider_id: asrProviderId,
         llm_provider_id: llmProviderId,
-        project_id: meetingProjectId ? Number(meetingProjectId) : null
+        project_id: meetingProjectId ? Number(meetingProjectId) : null,
+        speaker_diarization: meetingSpeakerDiarization,
+        max_speaker_count: meetingSpeakerDiarization ? Number(meetingMaxSpeakerCount) : null
       });
       setSelectedMeeting(created);
       setSelectedMeetingId(created.id);
@@ -498,7 +544,7 @@ export function MeetingsPage() {
       ]);
       setPolicySnapshot(nextPolicy);
       setTranscriptEntries(items);
-      setNotice(created.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without audio.');
+      setNotice(created.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without replay audio.');
     } catch (err) {
       setError(extractApiErrorMessage(err));
     }
@@ -514,7 +560,9 @@ export function MeetingsPage() {
             ? selectedMeeting?.minutes_text
             : activeTab === 'actions'
               ? selectedMeeting?.action_items_text
-              : selectedMeeting?.transcript_text;
+              : selectedMeeting?.transcript_entries.length
+                ? buildMeetingTranscriptText(selectedMeeting.transcript_entries)
+                : selectedMeeting?.transcript_text;
 
     if (!value || typeof navigator === 'undefined' || !navigator.clipboard) {
       return;
@@ -545,6 +593,9 @@ export function MeetingsPage() {
       ) : (
         <EmptyState title="No to-do" description="This note set has no action items." />
       );
+    }
+    if (meeting.transcript_entries.length) {
+      return renderMeetingTranscriptEntries(meeting.transcript_entries);
     }
     return <pre className="transcript-body meeting-body">{meeting.transcript_text}</pre>;
   }
@@ -711,6 +762,32 @@ export function MeetingsPage() {
                   </select>
                 </label>
               ) : null}
+              <div className="field">
+                <span>Meeting mode</span>
+                <label className="list-row-copy" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={meetingSpeakerDiarization}
+                    onChange={(event) => setMeetingSpeakerDiarization(event.target.checked)}
+                  />
+                  Multi-speaker diarization
+                </label>
+                <div className="list-row-copy">
+                  Use this only when more than one person is talking. It runs on the optional NeMo diarizer path and is slower than the default single-speaker flow.
+                </div>
+              </div>
+              {meetingSpeakerDiarization ? (
+                <label className="field">
+                  <span>Max speakers</span>
+                  <select value={meetingMaxSpeakerCount} onChange={(event) => setMeetingMaxSpeakerCount(event.target.value)}>
+                    {SPEAKER_COUNT_OPTIONS.map((count) => (
+                      <option key={count} value={count}>
+                        {count}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               {asrProviders.length > 1 ? (
                 <label className="field">
                   <span>ASR</span>
@@ -750,6 +827,7 @@ export function MeetingsPage() {
                     : 'Text budget loading'}
                 </span>
                 <span className="capture-pill">Max {formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)}</span>
+                {meetingSpeakerDiarization ? <span className="capture-pill">Speaker tags on</span> : null}
               </div>
               {!llmProviders.length ? <Notice title="Add one LLM provider in Control." tone="warning" /> : null}
               <Button type="submit" disabled={submittingMeeting || !file || !asrProviders.length || !canRunMeetingNotes}>
@@ -820,6 +898,11 @@ export function MeetingsPage() {
                         {entry.project_name ? <Badge tone="info">{entry.project_name}</Badge> : null}
                         <Badge tone="neutral">{languageLabel(entry.language)}</Badge>
                         <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
+                        {entry.speaker_diarization_enabled ? (
+                          <Badge tone="info">
+                            {entry.speaker_count ? `${entry.speaker_count} speakers` : 'Multi-speaker'}
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                     <div className="list-row-copy line-clamp-2">{excerpt(entry.summary_text)}</div>
@@ -928,6 +1011,14 @@ export function MeetingsPage() {
               <Badge tone="neutral">{formatDuration(selectedMeeting.duration_seconds)}</Badge>
               <Badge tone="neutral">{formatBytes(selectedMeeting.file_size_bytes)}</Badge>
               <Badge tone="info">{selectedMeeting.asr_model_name}</Badge>
+              {selectedMeeting.speaker_diarization_enabled ? (
+                <Badge tone="info">
+                  {selectedMeeting.speaker_count ? `${selectedMeeting.speaker_count} speakers` : 'Multi-speaker'}
+                </Badge>
+              ) : null}
+              {selectedMeeting.speaker_diarization_model_name ? (
+                <Badge tone="neutral">{selectedMeeting.speaker_diarization_model_name}</Badge>
+              ) : null}
               <Badge tone="warning">{selectedMeeting.llm_model_name}</Badge>
               {selectedMeeting.project_name ? <Badge tone="info">{selectedMeeting.project_name}</Badge> : null}
               <Badge tone="warning">{actionItemCount(selectedMeeting.action_items_text)} to-do</Badge>

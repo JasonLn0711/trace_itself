@@ -102,6 +102,12 @@ Optional ASR tuning:
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS=45` for the longest uninterrupted live utterance buffered before a forced commit
 - `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of non-finalized live ASR sessions per account
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
+- `ASR_MEETING_DIARIZATION_ENABLED=true` to allow optional multi-speaker diarization on meeting uploads
+- `ASR_MEETING_DIARIZER_MODEL=nvidia/diar_sortformer_4spk-v1` for the default NeMo Sortformer diarizer used by the optional meeting mode
+- `ASR_MEETING_DIARIZATION_DEVICE=cuda` for GPU-backed meeting diarization
+- `ASR_MEETING_DIARIZATION_DEFAULT_MAX_SPEAKERS=4` for the default speaker cap offered in the meeting form
+- `ASR_MEETING_DIARIZATION_MERGE_GAP_SECONDS=1.2` for how aggressively adjacent same-speaker phrases are merged into one transcript line
+- `ASR_MEETING_DIARIZATION_GAP_TOLERANCE_SECONDS=0.8` for how far a transcript token can be from a diarized speaker turn before speaker assignment is dropped
 - `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
 
@@ -192,6 +198,7 @@ ASR notes:
 
 - The first transcription request downloads the Breeze ASR model into the Docker volume `asr_model_cache`.
 - The backend image now includes the CUDA user-space libraries faster-whisper expects for GPU inference.
+- The backend now also installs NeMo ASR dependencies so the optional multi-speaker meeting mode can run Sortformer diarization.
 - The main `docker-compose.yml` now exposes the NVIDIA GPU to the backend container on the lab machine.
 - `docker-compose.cuda.yml` is kept only as a backward-compatible overlay for older commands.
 - The first live ASR chunk can also trigger that model warm-up, so the very first live response may be slower.
@@ -207,6 +214,7 @@ ASR notes:
 - Live ASR sessions are held in backend memory, so after deploying a session-lifecycle fix it is reasonable to restart the backend once and clear any stale sessions from the old runtime.
 - Cross-page persistence only applies to in-app navigation. A full page refresh or closing the tab still interrupts browser microphone capture, so this should be described to users as navigation-safe rather than reload-safe.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
+- Multi-speaker diarization is opt-in from the `Notes` form and only affects meeting uploads; it does not replace the default transcript or live-ASR path.
 - Provider API secrets are stored encrypted in Postgres, and production deployments must now use a dedicated `CREDENTIALS_SECRET_KEY`.
 - The default policy is 3 LLM text runs per user per rolling 24 hours and 5 hours max audio per file.
 

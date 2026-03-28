@@ -14,6 +14,8 @@ Latest deployed updates are listed here so reviewers can immediately see what ch
 
 - `Security Hardening Pass`
   Added backend-enforced idle session expiry, password-reset session revocation, bounded live-ASR chunk and utterance handling, stricter Gemini provider URL validation, and safer production startup checks for secrets and secure cookies.
+- `Optional Meeting Diarization`
+  Added an opt-in multi-speaker meeting mode that keeps the default ASR path unchanged, but can run NeMo Sortformer diarization for uploaded meeting audio and store speaker-attributed transcript lines for summaries, minutes, and action items.
 - `Mission Control Dashboard`
   Rebuilt the dashboard into a high-signal command center with `Now`, `Alerts`, `Mission Timeline`, `Execution Flow`, `Project Radar`, `Reality Gap`, and `Weekly Command Review`.
 - `Dashboard Intelligence APIs`
@@ -96,9 +98,23 @@ Structured execution model for:
 Private audio workflows with:
 
 - local ASR
+- optional meeting diarization
 - transcript storage
 - meeting notes
 - summaries and action items
+
+## Optional Meeting Diarization
+
+Meeting notes now support an explicit multi-speaker mode for uploaded audio files.
+
+- `Default behavior stays the same`
+  Regular transcript uploads and live ASR stay on the existing single-speaker path.
+- `Meeting-only opt-in`
+  The `Notes` form exposes a `Multi-speaker diarization` option for meetings where more than one person is talking.
+- `Path B integration`
+  The app keeps its current FastAPI and browser transport/session flow, uses faster-whisper for transcription, and adds a raw NeMo Sortformer diarizer only for the optional meeting mode.
+- `Why this split matters`
+  Solo dictation stays faster and simpler, while actual meetings gain speaker-attributed transcript lines that make summaries and action items easier to trust.
 
 ## Live ASR Stability Fixes
 

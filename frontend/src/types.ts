@@ -176,9 +176,19 @@ export interface MeetingRecordSummary {
   summary_text: string;
   action_items_text: string;
   asr_model_name: string;
+  speaker_diarization_enabled: boolean;
+  speaker_count: number | null;
   llm_model_name: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface MeetingTranscriptEntry {
+  id: string;
+  speaker_label: string | null;
+  started_at_seconds: number | null;
+  ended_at_seconds: number | null;
+  text: string;
 }
 
 export interface MeetingRecord {
@@ -192,10 +202,14 @@ export interface MeetingRecord {
   language: string | null;
   duration_seconds: number | null;
   transcript_text: string;
+  transcript_entries: MeetingTranscriptEntry[];
   minutes_text: string;
   summary_text: string;
   action_items_text: string;
   asr_model_name: string;
+  speaker_diarization_enabled: boolean;
+  speaker_count: number | null;
+  speaker_diarization_model_name: string | null;
   llm_model_name: string;
   created_at: string;
   updated_at: string;

@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -20,11 +20,27 @@ class AsrRuntimeUnavailableError(AsrServiceError):
 
 
 @dataclass(slots=True)
+class AsrWordTimestamp:
+    text: str
+    start_seconds: float | None
+    end_seconds: float | None
+
+
+@dataclass(slots=True)
+class AsrSegment:
+    text: str
+    start_seconds: float | None
+    end_seconds: float | None
+    words: list[AsrWordTimestamp] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class AsrTranscriptionResult:
     text: str
     language: str | None
     duration_seconds: float | None
     model_name: str
+    segments: list[AsrSegment] = field(default_factory=list)
 
 
 class AsrService:
@@ -108,6 +124,7 @@ class AsrService:
         condition_on_previous_text: bool = True,
         chunk_length: int | None = None,
         vad_parameters: dict[str, Any] | None = None,
+        word_timestamps: bool = False,
     ) -> AsrTranscriptionResult:
         resolved_model_name = model_name or settings.asr_model_name
         normalized_audio = audio_input
@@ -126,11 +143,22 @@ class AsrService:
                 condition_on_previous_text=condition_on_previous_text,
                 initial_prompt=initial_prompt or None,
                 chunk_length=chunk_length,
+                word_timestamps=word_timestamps,
                 vad_filter=True,
                 vad_parameters=vad_parameters,
             )
             segment_items = list(segments)
-            text = " ".join(segment.text.strip() for segment in segment_items if segment.text and segment.text.strip()).strip()
+            normalized_segments = [
+                AsrSegment(
+                    text=(segment.text or "").strip(),
+                    start_seconds=self._normalize_seconds(getattr(segment, "start", None)),
+                    end_seconds=self._normalize_seconds(getattr(segment, "end", None)),
+                    words=self._extract_words(segment),
+                )
+                for segment in segment_items
+                if (segment.text or "").strip()
+            ]
+            text = " ".join(segment.text for segment in normalized_segments).strip()
         except Exception as exc:
             raise AsrServiceError("Transcription failed. Check the audio file and ASR settings.") from exc
 
@@ -144,7 +172,36 @@ class AsrService:
             language=normalized_language,
             duration_seconds=duration_seconds,
             model_name=resolved_model_name,
+            segments=normalized_segments,
         )
+
+    @staticmethod
+    def _normalize_seconds(value: object) -> float | None:
+        if value is None:
+            return None
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return None
+        if np.isnan(numeric):
+            return None
+        return round(numeric, 3)
+
+    def _extract_words(self, segment: object) -> list[AsrWordTimestamp]:
+        raw_words = getattr(segment, "words", None) or []
+        words: list[AsrWordTimestamp] = []
+        for raw_word in raw_words:
+            word_text = str(getattr(raw_word, "word", None) or getattr(raw_word, "text", None) or "")
+            if not word_text.strip():
+                continue
+            words.append(
+                AsrWordTimestamp(
+                    text=word_text,
+                    start_seconds=self._normalize_seconds(getattr(raw_word, "start", None)),
+                    end_seconds=self._normalize_seconds(getattr(raw_word, "end", None)),
+                )
+            )
+        return words
 
     def transcribe_file(
         self,
@@ -152,11 +209,13 @@ class AsrService:
         *,
         language: str | None = None,
         model_name: str | None = None,
+        word_timestamps: bool = False,
     ) -> AsrTranscriptionResult:
         return self._transcribe_audio(
             file_path,
             language=language,
             model_name=model_name,
+            word_timestamps=word_timestamps,
         )
 
     def transcribe_waveform(
@@ -170,6 +229,7 @@ class AsrService:
         condition_on_previous_text: bool = False,
         chunk_length: int | None = None,
         vad_parameters: dict[str, Any] | None = None,
+        word_timestamps: bool = False,
     ) -> AsrTranscriptionResult:
         if waveform.ndim != 1:
             raise AsrServiceError("Streaming audio must be mono.")
@@ -185,6 +245,7 @@ class AsrService:
             condition_on_previous_text=condition_on_previous_text,
             chunk_length=chunk_length,
             vad_parameters=vad_parameters,
+            word_timestamps=word_timestamps,
         )
 
 

@@ -20,10 +20,14 @@ class MeetingRecord(Base):
     language: Mapped[str | None] = mapped_column(String(32))
     duration_seconds: Mapped[float | None] = mapped_column(Float)
     transcript_text: Mapped[str] = mapped_column(Text, nullable=False)
+    transcript_entries_json: Mapped[str | None] = mapped_column(Text)
     minutes_text: Mapped[str] = mapped_column(Text, nullable=False)
     summary_text: Mapped[str] = mapped_column(Text, nullable=False)
     action_items_text: Mapped[str] = mapped_column(Text, nullable=False)
     asr_model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    speaker_diarization_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
+    speaker_count: Mapped[int | None]
+    speaker_diarization_model_name: Mapped[str | None] = mapped_column(String(160))
     llm_model_name: Mapped[str] = mapped_column(String(120), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

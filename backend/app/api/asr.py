@@ -1,3 +1,4 @@
+import logging
 import json
 import re
 from pathlib import Path
@@ -22,6 +23,7 @@ from app.core.enums import UsageEventKind
 
 router = APIRouter(prefix="/asr", tags=["asr"], dependencies=[Depends(require_asr_access)])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 async def read_capped_request_body(request: Request, *, max_bytes: int) -> bytes:
@@ -312,6 +314,11 @@ async def persist_live_session(
         except HTTPException:
             if stored_audio is not None:
                 delete_audio_file(stored_audio.storage_path)
+            stored_audio = None
+        except Exception:
+            if stored_audio is not None:
+                delete_audio_file(stored_audio.storage_path)
+            logger.exception("Live ASR audio attachment failed; continuing with transcript-only save.")
             stored_audio = None
 
     transcript = AsrTranscript(

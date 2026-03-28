@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -21,7 +22,13 @@ from app.models.user import User
 from app.schemas.meeting import MeetingRecordRead, MeetingRecordSummaryRead
 from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
 from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
+from app.services.diarization import (
+    DiarizationRuntimeUnavailableError,
+    DiarizationServiceError,
+    service as diarization_service,
+)
 from app.services.meeting_ai import MeetingAiError, generate_meeting_artifacts
+from app.services.meeting_transcription import MeetingTranscriptEntry, service as meeting_transcription_service
 from app.services.usage_policy import ensure_audio_duration_allowed, ensure_llm_budget_available, get_or_create_usage_policy, record_usage_event
 from app.core.enums import UsageEventKind
 
@@ -42,11 +49,51 @@ def meeting_title_from_filename(title: str | None, filename: str) -> str:
 
 
 def to_summary(meeting: MeetingRecord) -> MeetingRecordSummaryRead:
-    return MeetingRecordSummaryRead.model_validate(meeting)
+    return MeetingRecordSummaryRead(
+        id=meeting.id,
+        project_id=meeting.project_id,
+        project_name=meeting.project_name,
+        title=meeting.title,
+        audio_filename=meeting.audio_filename,
+        audio_mime_type=meeting.audio_mime_type,
+        file_size_bytes=meeting.file_size_bytes,
+        language=meeting.language,
+        duration_seconds=meeting.duration_seconds,
+        summary_text=meeting.summary_text,
+        action_items_text=meeting.action_items_text,
+        asr_model_name=meeting.asr_model_name,
+        speaker_diarization_enabled=bool(meeting.speaker_diarization_enabled),
+        speaker_count=meeting.speaker_count,
+        llm_model_name=meeting.llm_model_name,
+        created_at=meeting.created_at,
+        updated_at=meeting.updated_at,
+    )
 
 
 def to_read(meeting: MeetingRecord) -> MeetingRecordRead:
-    return MeetingRecordRead.model_validate(meeting)
+    return MeetingRecordRead(
+        id=meeting.id,
+        project_id=meeting.project_id,
+        project_name=meeting.project_name,
+        title=meeting.title,
+        audio_filename=meeting.audio_filename,
+        audio_mime_type=meeting.audio_mime_type,
+        file_size_bytes=meeting.file_size_bytes,
+        language=meeting.language,
+        duration_seconds=meeting.duration_seconds,
+        transcript_text=meeting.transcript_text,
+        transcript_entries=parse_meeting_entries(meeting.transcript_entries_json),
+        minutes_text=meeting.minutes_text,
+        summary_text=meeting.summary_text,
+        action_items_text=meeting.action_items_text,
+        asr_model_name=meeting.asr_model_name,
+        speaker_diarization_enabled=bool(meeting.speaker_diarization_enabled),
+        speaker_count=meeting.speaker_count,
+        speaker_diarization_model_name=meeting.speaker_diarization_model_name,
+        llm_model_name=meeting.llm_model_name,
+        created_at=meeting.created_at,
+        updated_at=meeting.updated_at,
+    )
 
 
 def resolve_project_for_meeting(project_id: int, current_user: User, db: Session) -> Project:
@@ -54,6 +101,66 @@ def resolve_project_for_meeting(project_id: int, current_user: User, db: Session
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
     return project
+
+
+def serialize_meeting_entries(entries: list[MeetingTranscriptEntry]) -> str | None:
+    if not entries:
+        return None
+    payload = [
+        {
+            "id": entry.id,
+            "speaker_label": entry.speaker_label,
+            "started_at_seconds": entry.started_at_seconds,
+            "ended_at_seconds": entry.ended_at_seconds,
+            "text": entry.text,
+        }
+        for entry in entries
+    ]
+    return json.dumps(payload, separators=(",", ":"))
+
+
+def parse_meeting_entries(value: str | None) -> list[dict[str, object]]:
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+
+    entries: list[dict[str, object]] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        entry_id = str(item.get("id", "")).strip()
+        text = str(item.get("text", "")).strip()
+        if not entry_id or not text:
+            continue
+
+        speaker_label = item.get("speaker_label")
+        if speaker_label is not None:
+            speaker_label = str(speaker_label).strip() or None
+
+        entries.append(
+            {
+                "id": entry_id,
+                "speaker_label": speaker_label,
+                "started_at_seconds": parse_optional_seconds(item.get("started_at_seconds")),
+                "ended_at_seconds": parse_optional_seconds(item.get("ended_at_seconds")),
+                "text": text,
+            }
+        )
+    return entries
+
+
+def parse_optional_seconds(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return round(float(value), 3)
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("", response_model=list[MeetingRecordSummaryRead])
@@ -97,6 +204,8 @@ def create_meeting(
     asr_provider_id: int | None = Form(default=None),
     llm_provider_id: int | None = Form(default=None),
     project_id: int | None = Form(default=None),
+    speaker_diarization: bool = Form(default=False),
+    max_speaker_count: int | None = Form(default=None, ge=2, le=8),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MeetingRecordRead:
@@ -115,7 +224,11 @@ def create_meeting(
     )
     try:
         asr_service.ensure_model_ready(asr_provider.model_name)
+        if speaker_diarization:
+            diarization_service.ensure_model_ready()
     except AsrRuntimeUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except DiarizationRuntimeUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     stored_audio = save_upload_file(
         file,
@@ -136,17 +249,29 @@ def create_meeting(
         normalized_language = None
 
     try:
-        transcript = asr_service.transcribe_file(
+        transcript = meeting_transcription_service.transcribe(
             stored_audio.storage_path,
             language=normalized_language,
             model_name=asr_provider.model_name,
+            enable_speaker_diarization=speaker_diarization,
+            max_speaker_count=max_speaker_count,
         )
         artifacts = generate_meeting_artifacts(
-            transcript_text=transcript.text,
+            transcript_text=transcript.transcript_text,
             title=meeting_title_from_filename(title, stored_audio.original_filename),
             provider=llm_provider,
+            structured_transcript_text=transcript.llm_transcript_text() if transcript.speaker_diarization_enabled else None,
         )
+    except AsrRuntimeUnavailableError as exc:
+        delete_audio_file(stored_audio.storage_path)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except AsrServiceError as exc:
+        delete_audio_file(stored_audio.storage_path)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except DiarizationRuntimeUnavailableError as exc:
+        delete_audio_file(stored_audio.storage_path)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except DiarizationServiceError as exc:
         delete_audio_file(stored_audio.storage_path)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except MeetingAiError as exc:
@@ -163,11 +288,15 @@ def create_meeting(
         file_size_bytes=stored_audio.file_size_bytes,
         language=transcript.language,
         duration_seconds=transcript.duration_seconds or probed_duration_seconds,
-        transcript_text=transcript.text,
+        transcript_text=transcript.transcript_text,
+        transcript_entries_json=serialize_meeting_entries(transcript.transcript_entries),
         minutes_text=artifacts.minutes_text,
         summary_text=artifacts.summary_text,
         action_items_text=artifacts.action_items_text,
-        asr_model_name=transcript.model_name,
+        asr_model_name=transcript.asr_model_name,
+        speaker_diarization_enabled=transcript.speaker_diarization_enabled,
+        speaker_count=transcript.speaker_count,
+        speaker_diarization_model_name=transcript.speaker_diarization_model_name,
         llm_model_name=artifacts.model_name,
     )
     db.add(meeting)
