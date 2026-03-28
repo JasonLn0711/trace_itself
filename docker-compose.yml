@@ -16,6 +16,7 @@ services:
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile
     restart: unless-stopped
     gpus: all
     env_file:
