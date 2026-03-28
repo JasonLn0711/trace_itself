@@ -3,7 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.core.config import get_settings
-from app.services.asr import AsrSegment, AsrTranscriptionResult, AsrWordTimestamp, service as asr_service
+from app.services.asr import AsrSegment, AsrTranscriptionResult, service as asr_service
 from app.services.diarization import SpeakerTurn, service as diarization_service
 
 settings = get_settings()
@@ -56,7 +56,7 @@ class MeetingTranscriptionService:
             file_path,
             language=language,
             model_name=model_name,
-            word_timestamps=enable_speaker_diarization,
+            word_timestamps=False,
         )
         if not enable_speaker_diarization:
             return MeetingTranscriptionResult(
@@ -128,26 +128,15 @@ def build_meeting_entries(
     if current:
         entries.append(normalize_entry(current))
 
-    return [entry for entry in entries if entry.text]
+    return reindex_speaker_labels(smooth_short_speaker_turns([entry for entry in entries if entry.text]))
 
 
 def _build_timed_units(segments: list[AsrSegment]) -> list[tuple[str, float | None, float | None]]:
-    word_units: list[tuple[str, float | None, float | None]] = []
-    for segment in segments:
-        if segment.words:
-            word_units.extend(_word_to_unit(word) for word in segment.words if word.text.strip())
-    if word_units:
-        return word_units
-
     return [
         ((segment.text or "").strip(), segment.start_seconds, segment.end_seconds)
         for segment in segments
         if (segment.text or "").strip()
     ]
-
-
-def _word_to_unit(word: AsrWordTimestamp) -> tuple[str, float | None, float | None]:
-    return (word.text, word.start_seconds, word.end_seconds)
 
 
 def resolve_speaker_label(
@@ -189,7 +178,7 @@ def resolve_speaker_label(
             nearest_distance = distance
             nearest_turn = turn
 
-    if best_label:
+    if best_label and best_overlap >= min_required_overlap_seconds(start_value, end_value):
         return best_label
     if nearest_turn and nearest_distance is not None and nearest_distance <= settings.asr_meeting_diarization_gap_tolerance_seconds:
         return nearest_turn.speaker_label
@@ -200,6 +189,111 @@ def _should_merge_entry(current: MeetingTranscriptEntry, next_start_seconds: flo
     if current.ended_at_seconds is None or next_start_seconds is None:
         return True
     return (next_start_seconds - current.ended_at_seconds) <= settings.asr_meeting_diarization_merge_gap_seconds
+
+
+def smooth_short_speaker_turns(entries: list[MeetingTranscriptEntry]) -> list[MeetingTranscriptEntry]:
+    smoothed = [normalize_entry(entry) for entry in entries if entry.text]
+    if len(smoothed) < 3:
+        return smoothed
+
+    while True:
+        replaced = False
+        for index in range(1, len(smoothed) - 1):
+            previous_entry = smoothed[index - 1]
+            current_entry = smoothed[index]
+            next_entry = smoothed[index + 1]
+            if not should_smooth_short_turn(previous_entry, current_entry, next_entry):
+                continue
+
+            merged = merge_entries(previous_entry, current_entry, speaker_label=previous_entry.speaker_label)
+            merged = merge_entries(merged, next_entry, speaker_label=previous_entry.speaker_label)
+            smoothed = [
+                *smoothed[: index - 1],
+                normalize_entry(merged),
+                *smoothed[index + 2 :],
+            ]
+            replaced = True
+            break
+        if not replaced:
+            return smoothed
+
+
+def reindex_speaker_labels(entries: list[MeetingTranscriptEntry]) -> list[MeetingTranscriptEntry]:
+    remapped_labels: dict[str, str] = {}
+    next_index = 1
+    normalized_entries: list[MeetingTranscriptEntry] = []
+    for entry in entries:
+        normalized_label = normalize_speaker_label(entry.speaker_label)
+        if normalized_label:
+            normalized_label = remapped_labels.setdefault(normalized_label, f"Speaker {next_index}")
+            if normalized_label == f"Speaker {next_index}":
+                next_index += 1
+        normalized_entries.append(
+            MeetingTranscriptEntry(
+                id=entry.id,
+                speaker_label=normalized_label,
+                started_at_seconds=entry.started_at_seconds,
+                ended_at_seconds=entry.ended_at_seconds,
+                text=entry.text,
+            )
+        )
+    return normalized_entries
+
+
+def should_smooth_short_turn(
+    previous_entry: MeetingTranscriptEntry,
+    current_entry: MeetingTranscriptEntry,
+    next_entry: MeetingTranscriptEntry,
+) -> bool:
+    if not previous_entry.speaker_label or not current_entry.speaker_label or not next_entry.speaker_label:
+        return False
+    if previous_entry.speaker_label != next_entry.speaker_label:
+        return False
+    if current_entry.speaker_label == previous_entry.speaker_label:
+        return False
+    duration_seconds = entry_duration_seconds(current_entry)
+    if duration_seconds is None or duration_seconds > settings.asr_meeting_diarization_short_turn_seconds:
+        return False
+    if entry_gap_seconds(previous_entry, current_entry) > settings.asr_meeting_diarization_merge_gap_seconds:
+        return False
+    if entry_gap_seconds(current_entry, next_entry) > settings.asr_meeting_diarization_merge_gap_seconds:
+        return False
+    return True
+
+
+def entry_duration_seconds(entry: MeetingTranscriptEntry) -> float | None:
+    if entry.started_at_seconds is None or entry.ended_at_seconds is None:
+        return None
+    return max(0.0, entry.ended_at_seconds - entry.started_at_seconds)
+
+
+def entry_gap_seconds(left: MeetingTranscriptEntry, right: MeetingTranscriptEntry) -> float:
+    if left.ended_at_seconds is None or right.started_at_seconds is None:
+        return 0.0
+    return max(0.0, right.started_at_seconds - left.ended_at_seconds)
+
+
+def merge_entries(
+    left: MeetingTranscriptEntry,
+    right: MeetingTranscriptEntry,
+    *,
+    speaker_label: str | None,
+) -> MeetingTranscriptEntry:
+    return MeetingTranscriptEntry(
+        id=left.id,
+        speaker_label=speaker_label,
+        started_at_seconds=left.started_at_seconds,
+        ended_at_seconds=right.ended_at_seconds if right.ended_at_seconds is not None else left.ended_at_seconds,
+        text=merge_unit_text(left.text, right.text),
+    )
+
+
+def min_required_overlap_seconds(start_seconds: float, end_seconds: float) -> float:
+    duration_seconds = max(0.0, end_seconds - start_seconds)
+    return min(
+        settings.asr_meeting_diarization_min_overlap_seconds,
+        max(0.08, duration_seconds * settings.asr_meeting_diarization_min_overlap_ratio),
+    )
 
 
 def merge_unit_text(existing: str, addition: str) -> str:
@@ -227,12 +321,19 @@ def normalize_entry(entry: MeetingTranscriptEntry) -> MeetingTranscriptEntry:
 def normalize_speaker_label(value: str | None) -> str | None:
     if not value:
         return None
-    compact = value.strip().replace("_", " ")
-    if compact.lower().startswith("speaker "):
-        suffix = compact.split()[-1]
+    raw = value.strip()
+    raw_lower = raw.lower()
+    if raw_lower.startswith("speaker_"):
+        suffix = raw.rsplit("_", maxsplit=1)[-1]
         if suffix.isdigit():
             return f"Speaker {int(suffix) + 1}"
-    return compact.title()
+    if raw_lower.startswith("speaker ") and raw == raw.lower():
+        suffix = raw.split()[-1]
+        if suffix.isdigit():
+            return f"Speaker {int(suffix) + 1}"
+    if raw_lower.startswith("speaker ") and raw[:1].isupper():
+        return raw
+    return raw.replace("_", " ").title()
 
 
 def format_seconds_label(value: float | None) -> str:

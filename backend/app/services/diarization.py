@@ -53,7 +53,7 @@ class DiarizationService:
         except Exception as exc:
             raise DiarizationServiceError("Speaker diarization failed for this audio file.") from exc
 
-        return self._parse_turns(diarized)
+        return self._normalize_turns(self._enforce_speaker_cap(self._parse_turns(diarized), requested_speakers))
 
     def _get_model(self):
         desired_name = settings.asr_meeting_diarizer_model.strip()
@@ -165,6 +165,91 @@ class DiarizationService:
                 )
             )
         return sorted(turns, key=lambda turn: (turn.start_seconds, turn.end_seconds, turn.speaker_label))
+
+    @staticmethod
+    def _enforce_speaker_cap(turns: list[SpeakerTurn], max_speakers: int) -> list[SpeakerTurn]:
+        unique_labels = {turn.speaker_label for turn in turns if turn.speaker_label}
+        if len(unique_labels) <= max_speakers:
+            return turns
+
+        durations: dict[str, float] = {}
+        for turn in turns:
+            durations[turn.speaker_label] = durations.get(turn.speaker_label, 0.0) + max(
+                0.0, turn.end_seconds - turn.start_seconds
+            )
+        kept_labels = {
+            label
+            for label, _ in sorted(
+                durations.items(),
+                key=lambda item: (-item[1], item[0]),
+            )[:max_speakers]
+        }
+        fallback_label = next(iter(sorted(kept_labels))) if kept_labels else None
+        if fallback_label is None:
+            return turns
+
+        kept_turns = [turn for turn in turns if turn.speaker_label in kept_labels]
+        constrained: list[SpeakerTurn] = []
+        for turn in turns:
+            if turn.speaker_label in kept_labels:
+                constrained.append(turn)
+                continue
+            constrained.append(
+                SpeakerTurn(
+                    speaker_label=DiarizationService._nearest_kept_label(
+                        turn,
+                        kept_turns,
+                        fallback_label=fallback_label,
+                    ),
+                    start_seconds=turn.start_seconds,
+                    end_seconds=turn.end_seconds,
+                )
+            )
+        return constrained
+
+    @staticmethod
+    def _nearest_kept_label(
+        target_turn: SpeakerTurn,
+        kept_turns: list[SpeakerTurn],
+        *,
+        fallback_label: str,
+    ) -> str:
+        best_label = fallback_label
+        best_distance: float | None = None
+        best_duration = -1.0
+        for turn in kept_turns:
+            overlap = max(0.0, min(target_turn.end_seconds, turn.end_seconds) - max(target_turn.start_seconds, turn.start_seconds))
+            if overlap > 0:
+                distance = 0.0
+            elif target_turn.end_seconds <= turn.start_seconds:
+                distance = turn.start_seconds - target_turn.end_seconds
+            else:
+                distance = target_turn.start_seconds - turn.end_seconds
+            duration = max(0.0, turn.end_seconds - turn.start_seconds)
+            if best_distance is None or distance < best_distance or (distance == best_distance and duration > best_duration):
+                best_label = turn.speaker_label
+                best_distance = distance
+                best_duration = duration
+        return best_label
+
+    @staticmethod
+    def _normalize_turns(turns: list[SpeakerTurn]) -> list[SpeakerTurn]:
+        normalized: list[SpeakerTurn] = []
+        for turn in sorted(turns, key=lambda item: (item.start_seconds, item.end_seconds, item.speaker_label)):
+            if not normalized:
+                normalized.append(turn)
+                continue
+            previous = normalized[-1]
+            gap_seconds = max(0.0, turn.start_seconds - previous.end_seconds)
+            if previous.speaker_label == turn.speaker_label and gap_seconds <= settings.asr_meeting_diarization_merge_gap_seconds:
+                normalized[-1] = SpeakerTurn(
+                    speaker_label=previous.speaker_label,
+                    start_seconds=previous.start_seconds,
+                    end_seconds=max(previous.end_seconds, turn.end_seconds),
+                )
+                continue
+            normalized.append(turn)
+        return normalized
 
 
 service = DiarizationService()

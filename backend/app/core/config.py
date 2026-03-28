@@ -55,9 +55,12 @@ class Settings(BaseSettings):
     asr_meeting_diarization_enabled: bool = True
     asr_meeting_diarizer_model: str = "nvidia/diar_sortformer_4spk-v1"
     asr_meeting_diarization_device: str = "cuda"
-    asr_meeting_diarization_default_max_speakers: int = 4
+    asr_meeting_diarization_default_max_speakers: int = 3
     asr_meeting_diarization_merge_gap_seconds: float = 1.2
-    asr_meeting_diarization_gap_tolerance_seconds: float = 0.8
+    asr_meeting_diarization_gap_tolerance_seconds: float = 0.4
+    asr_meeting_diarization_short_turn_seconds: float = 1.6
+    asr_meeting_diarization_min_overlap_seconds: float = 0.35
+    asr_meeting_diarization_min_overlap_ratio: float = 0.35
     meeting_upload_dir: str = "/data/meetings"
     meeting_max_upload_mb: int = 512
     gemini_api_key: str | None = None

@@ -235,9 +235,9 @@ export function MeetingsPage() {
   const [language, setLanguage] = useState(liveAsrDraft.language);
   const [meetingProjectId, setMeetingProjectId] = useState('');
   const [transcriptSpeakerDiarization, setTranscriptSpeakerDiarization] = useState(false);
-  const [transcriptMaxSpeakerCount, setTranscriptMaxSpeakerCount] = useState('4');
+  const [transcriptMaxSpeakerCount, setTranscriptMaxSpeakerCount] = useState('3');
   const [meetingSpeakerDiarization, setMeetingSpeakerDiarization] = useState(false);
-  const [meetingMaxSpeakerCount, setMeetingMaxSpeakerCount] = useState('4');
+  const [meetingMaxSpeakerCount, setMeetingMaxSpeakerCount] = useState('3');
   const [file, setFile] = useState<File | null>(null);
   const [activeTab, setActiveTab] = useState<MeetingTab>('summary');
   const [loading, setLoading] = useState(true);

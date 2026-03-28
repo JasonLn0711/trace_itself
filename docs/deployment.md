@@ -105,9 +105,12 @@ Optional ASR tuning:
 - `ASR_MEETING_DIARIZATION_ENABLED=true` to allow optional multi-speaker diarization on transcript uploads, meeting uploads, and saved live-take post-processing
 - `ASR_MEETING_DIARIZER_MODEL=nvidia/diar_sortformer_4spk-v1` for the default NeMo Sortformer diarizer used by the saved-audio diarization path
 - `ASR_MEETING_DIARIZATION_DEVICE=cuda` for GPU-backed diarization on the saved-audio path
-- `ASR_MEETING_DIARIZATION_DEFAULT_MAX_SPEAKERS=4` for the default speaker cap offered in transcript and notes forms, and the fallback cap used when saved live takes are diarized after stop
+- `ASR_MEETING_DIARIZATION_DEFAULT_MAX_SPEAKERS=3` for the default auto-detect speaker cap offered in transcript and notes forms, and the fallback cap used when saved live takes are diarized after stop
 - `ASR_MEETING_DIARIZATION_MERGE_GAP_SECONDS=1.2` for how aggressively adjacent same-speaker phrases are merged into one transcript line
-- `ASR_MEETING_DIARIZATION_GAP_TOLERANCE_SECONDS=0.8` for how far a transcript token can be from a diarized speaker turn before speaker assignment is dropped
+- `ASR_MEETING_DIARIZATION_GAP_TOLERANCE_SECONDS=0.4` for how far a transcript segment can be from a diarized speaker turn before speaker assignment falls back instead of forcing a label
+- `ASR_MEETING_DIARIZATION_SHORT_TURN_SECONDS=1.6` for how short an isolated speaker flip must be before it is merged back into matching neighbors
+- `ASR_MEETING_DIARIZATION_MIN_OVERLAP_SECONDS=0.35` for the maximum absolute overlap required before a speaker label is accepted from a turn match
+- `ASR_MEETING_DIARIZATION_MIN_OVERLAP_RATIO=0.35` for the proportional overlap threshold used on shorter ASR segments before a speaker label is accepted
 - `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
 
