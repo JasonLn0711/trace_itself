@@ -97,12 +97,19 @@ Optional ASR tuning:
 - `ASR_LIVE_COMMIT_SILENCE_MS=1200` for the pause length that commits a live utterance
 - `ASR_LIVE_MAX_WINDOW_SECONDS=18` for the rolling live decode window
 - `ASR_LIVE_MAX_CHUNK_KB=2048` for the backend hard ceiling on accepted live audio chunk size
-- `NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB=512` for the browser-side live flush target; keep it below the backend chunk ceiling
+- `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB=32` for the browser-side upload granularity; this only changes transport batching and not ASR decoder context
+- `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS=1000` for the browser-side max wait before flushing a smaller transport batch
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS=45` for the longest uninterrupted live utterance buffered before a forced commit
 - `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of non-finalized live ASR sessions per account
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
 - `MEETING_MAX_UPLOAD_MB=512` for long compressed meeting uploads
 - `GEMINI_MODEL=gemini-3.1-flash-lite-preview` unless you intentionally pin a different Gemini release
+
+When tuning live ASR, keep these layers separate:
+
+- transport/upload granularity: `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB`, `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS`
+- rolling decoder context: `ASR_LIVE_MAX_WINDOW_SECONDS`
+- utterance commit policy: `ASR_LIVE_COMMIT_SILENCE_MS`, `ASR_LIVE_MAX_UTTERANCE_SECONDS`
 
 After first login, use the `Control` page to:
 
@@ -193,6 +200,7 @@ ASR notes:
 - If CUDA is configured but unavailable, the backend stays up and the ASR endpoints return `503` with a clear fix message.
 - Live ASR now rejects oversized chunks, limits open sessions per user, and force-commits long uninterrupted utterances to keep memory bounded.
 - The live ASR page streams mic audio in small normalized chunks, keeps recording alive while users browse other in-app pages, and still stores a compact Opus/WebM recording when the take is saved.
+- Transport batching is now separate from recognition context: the browser can upload around `32 KB` at a time while the backend still keeps its own rolling decoder window and utterance-commit logic.
 - The recorder now lives at the authenticated app-shell level instead of only inside the `Audio` page, and other pages expose a compact live dock so users can stop, save, or jump back to `Audio` without losing the session.
 - The open-session limit now counts only non-finalized sessions, and obviously orphaned pre-start sessions are reaped automatically so one visible recorder does not trip a false multi-session error.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.

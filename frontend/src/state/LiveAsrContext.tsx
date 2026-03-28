@@ -56,7 +56,8 @@ const RECORDING_PRESETS: RecordingPreset[] = [
   { mimeType: 'audio/ogg;codecs=opus', extension: 'ogg' }
 ];
 
-const DEFAULT_LIVE_BATCH_TARGET_KB = 512;
+const DEFAULT_LIVE_TRANSPORT_TARGET_KB = 32;
+const DEFAULT_LIVE_TRANSPORT_MAX_WAIT_MS = 1000;
 const INITIAL_DRAFT: LiveAsrDraft = {
   providerId: null,
   providerLabel: 'ASR',
@@ -114,11 +115,19 @@ function mergeByteChunks(chunks: Uint8Array[]) {
   return merged;
 }
 
-function resolveLiveBatchTargetBytes() {
-  const rawValue = process.env.NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB;
+function resolveLiveTransportTargetBytes() {
+  const rawValue =
+    process.env.NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB ||
+    process.env.NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB;
   const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : Number.NaN;
-  const sizeKb = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : DEFAULT_LIVE_BATCH_TARGET_KB;
+  const sizeKb = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : DEFAULT_LIVE_TRANSPORT_TARGET_KB;
   return sizeKb * 1024;
+}
+
+function resolveLiveTransportMaxWaitMs() {
+  const rawValue = process.env.NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS;
+  const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : Number.NaN;
+  return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : DEFAULT_LIVE_TRANSPORT_MAX_WAIT_MS;
 }
 
 function dequeueChunkBatch(queue: Uint8Array[], maxBytes: number) {
@@ -138,7 +147,8 @@ function dequeueChunkBatch(queue: Uint8Array[], maxBytes: number) {
   return mergeByteChunks(selected);
 }
 
-const LIVE_BATCH_TARGET_BYTES = resolveLiveBatchTargetBytes();
+const LIVE_TRANSPORT_TARGET_BYTES = resolveLiveTransportTargetBytes();
+const LIVE_TRANSPORT_MAX_WAIT_MS = resolveLiveTransportMaxWaitMs();
 
 function isLiveAsrSupported() {
   return (
@@ -179,6 +189,8 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
   const draftRef = useRef(draft);
   const pipelineRef = useRef<PipelineRefs | null>(null);
   const chunkQueueRef = useRef<Uint8Array[]>([]);
+  const queuedTransportBytesRef = useRef(0);
+  const flushTimerRef = useRef<number | null>(null);
   const recorderChunksRef = useRef<BlobPart[]>([]);
   const recorderStopPromiseRef = useRef<Promise<File | null> | null>(null);
   const recorderStopResolverRef = useRef<((file: File | null) => void) | null>(null);
@@ -229,11 +241,16 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
   }, [pendingSave, setSessionHold, state]);
 
   const clearLiveState = useCallback(() => {
+    if (flushTimerRef.current !== null && typeof window !== 'undefined') {
+      window.clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
     sessionIdRef.current = null;
     recordedFileRef.current = null;
     recorderStopPromiseRef.current = null;
     recorderStopResolverRef.current = null;
     chunkQueueRef.current = [];
+    queuedTransportBytesRef.current = 0;
     recorderChunksRef.current = [];
     pendingFinalizeRef.current = false;
     pendingPersistRef.current = null;
@@ -348,15 +365,27 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
     clearLiveState();
   }, [clearFeedback, clearLastSavedTranscript, clearLiveState, discardServerSession, teardownPipeline]);
 
-  const flushChunkQueue = useCallback(async () => {
+  const flushChunkQueue = useCallback(async (force = false) => {
     if (sendingRef.current || !sessionIdRef.current || !chunkQueueRef.current.length) {
       return;
     }
 
-    const payload = dequeueChunkBatch(chunkQueueRef.current, LIVE_BATCH_TARGET_BYTES);
+    if (!force && queuedTransportBytesRef.current < LIVE_TRANSPORT_TARGET_BYTES) {
+      return;
+    }
+
+    if (flushTimerRef.current !== null && typeof window !== 'undefined') {
+      window.clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+
+    const payload = force && chunkQueueRef.current.length
+      ? mergeByteChunks(chunkQueueRef.current.splice(0))
+      : dequeueChunkBatch(chunkQueueRef.current, LIVE_TRANSPORT_TARGET_BYTES);
     if (!payload.byteLength) {
       return;
     }
+    queuedTransportBytesRef.current = Math.max(0, queuedTransportBytesRef.current - payload.byteLength);
 
     sendingRef.current = true;
     try {
@@ -376,7 +405,14 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
     }
 
     if (chunkQueueRef.current.length) {
-      void flushChunkQueue();
+      if (pendingFinalizeRef.current || queuedTransportBytesRef.current >= LIVE_TRANSPORT_TARGET_BYTES) {
+        void flushChunkQueue(pendingFinalizeRef.current);
+      } else if (flushTimerRef.current === null && typeof window !== 'undefined') {
+        flushTimerRef.current = window.setTimeout(() => {
+          flushTimerRef.current = null;
+          void flushChunkQueue(true);
+        }, LIVE_TRANSPORT_MAX_WAIT_MS);
+      }
       return;
     }
 
@@ -402,6 +438,7 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
     recordedFileRef.current = null;
     recorderChunksRef.current = [];
     chunkQueueRef.current = [];
+    queuedTransportBytesRef.current = 0;
     pendingFinalizeRef.current = false;
 
     let createdSessionId: string | null = null;
@@ -482,8 +519,17 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
           );
         }
         if (event.data?.pcm) {
-          chunkQueueRef.current.push(new Uint8Array(event.data.pcm));
-          void flushChunkQueue();
+          const nextChunk = new Uint8Array(event.data.pcm);
+          chunkQueueRef.current.push(nextChunk);
+          queuedTransportBytesRef.current += nextChunk.byteLength;
+          if (queuedTransportBytesRef.current >= LIVE_TRANSPORT_TARGET_BYTES) {
+            void flushChunkQueue();
+          } else if (flushTimerRef.current === null && typeof window !== 'undefined') {
+            flushTimerRef.current = window.setTimeout(() => {
+              flushTimerRef.current = null;
+              void flushChunkQueue(true);
+            }, LIVE_TRANSPORT_MAX_WAIT_MS);
+          }
         }
       };
 
@@ -566,11 +612,12 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
 
     if (sendingRef.current || chunkQueueRef.current.length) {
       pendingFinalizeRef.current = true;
+      void flushChunkQueue(true);
       return;
     }
 
     await finalizeAndMaybePersist();
-  }, [clearFeedback, finalizeAndMaybePersist, state, stopRecorderAndPipeline]);
+  }, [clearFeedback, finalizeAndMaybePersist, flushChunkQueue, state, stopRecorderAndPipeline]);
 
   useEffect(() => {
     return () => {

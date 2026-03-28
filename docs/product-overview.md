@@ -86,6 +86,8 @@ The audio side extends the system beyond manual tracking:
 
 In practice, a live session now behaves like a shared workspace tool rather than a page-local widget: users can start in `Audio`, move through the rest of the app, and keep a compact dock visible until they stop or save the take.
 
+The live pipeline is also layered deliberately: the browser can upload tiny transport batches for stability, while the backend still preserves a larger rolling decode window and utterance-level transcript commits.
+
 That makes the repo broader than a simple task manager while still keeping execution as the primary theme.
 
 ## Why This Is Useful

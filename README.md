@@ -111,7 +111,9 @@ Recent live ASR work focused on three different failure modes: long recording sa
 - `Upload-path fix`
   The proxy now forwards the original multipart request body as a stream, preserves the incoming `content-type` boundary and `content-length`, and uses `duplex: 'half'` so Node can pass the upload through without rebuilding the whole form in memory first.
 - `Burst-handling fix`
-  The backend now accepts live chunk requests up to `2048 KB`, while the browser aims to flush queued PCM in smaller `512 KB` batches so temporary network stalls can recover without turning each live upload into a giant request.
+  The backend now accepts live chunk requests up to `2048 KB`, while the browser sends much smaller transport batches by default. Normal live uploads now target about `32 KB` with a short max-wait guard, but the backend still keeps its own rolling decoder window and utterance buffer so recognition context does not shrink with transport size.
+- `Why the transport split matters`
+  The browser-side upload granularity is now a transport concern instead of a recognition concern. In other words, a `32 KB` upload is not treated like a final mini-transcript. The backend still aggregates those uploads into larger utterance state, refreshes partials from its own rolling preview window, and only commits final text on silence or utterance-length boundaries.
 - `Cross-page live-session fix`
   The live recorder no longer lives only inside the `Audio` page component. Its session state now sits at the authenticated app-shell level, so users can browse other pages in the app while the microphone stream keeps running and return through a compact live dock.
 - `Why this is cool`
@@ -139,9 +141,19 @@ New security-related environment settings:
 - `APP_ENV`
 - `SESSION_IDLE_TIMEOUT_MINUTES`
 - `ASR_LIVE_MAX_CHUNK_KB`
-- `NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB`
+- `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB`
+- `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS`
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS`
 - `ASR_LIVE_MAX_SESSIONS_PER_USER`
+
+Live ASR tuning is intentionally split across three layers:
+
+- `Transport`
+  `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB` and `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS` control how often the browser uploads PCM to the backend.
+- `Decoder context`
+  `ASR_LIVE_MAX_WINDOW_SECONDS` controls how much recent audio is used for rolling preview decoding.
+- `Utterance commit`
+  `ASR_LIVE_COMMIT_SILENCE_MS` and `ASR_LIVE_MAX_UTTERANCE_SECONDS` control when buffered speech is turned into a committed transcript entry.
 
 ## Architecture
 
