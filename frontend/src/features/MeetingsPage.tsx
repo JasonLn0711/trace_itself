@@ -117,9 +117,7 @@ function renderMeetingTranscriptEntries(entries: MeetingTranscriptEntry[]) {
     <div className="transcript-body live-transcript-log">
       {entries.map((entry) => (
         <div key={`${entry.id}-${entry.started_at_seconds ?? 'start'}`} className="live-transcript-entry">
-          <span className="live-transcript-time">[{formatAudioTimestamp(entry.started_at_seconds) || '--:--'}]</span>
-          {entry.speaker_label ? <Badge tone="info">{entry.speaker_label}</Badge> : null}
-          <span className="live-transcript-text">{entry.text}</span>
+          <span className="live-transcript-text">{formatMeetingTranscriptLine(entry)}</span>
         </div>
       ))}
     </div>
@@ -127,13 +125,20 @@ function renderMeetingTranscriptEntries(entries: MeetingTranscriptEntry[]) {
 }
 
 function buildMeetingTranscriptText(entries: MeetingTranscriptEntry[]) {
-  return entries
-    .map((entry) => {
-      const timestamp = formatAudioTimestamp(entry.started_at_seconds) || '--:--';
-      const speaker = entry.speaker_label ? `${entry.speaker_label}: ` : '';
-      return `[${timestamp}] ${speaker}${entry.text}`;
-    })
-    .join('\n');
+  return entries.map((entry) => formatMeetingTranscriptLine(entry)).join('\n');
+}
+
+function formatMeetingTranscriptLine(entry: MeetingTranscriptEntry) {
+  const parts: string[] = [];
+  const timestamp = formatAudioTimestamp(entry.started_at_seconds) || '--:--';
+  if (timestamp) {
+    parts.push(`[${timestamp}]`);
+  }
+  if (entry.speaker_label) {
+    parts.push(`${entry.speaker_label}:`);
+  }
+  parts.push(entry.text);
+  return parts.join(' ').trim();
 }
 
 function SaveMarkIcon() {
@@ -1027,6 +1032,10 @@ export function MeetingsPage() {
                   View project
                 </Link>
               ) : null}
+              <a className="btn btn-save-action" href={meetingsApi.transcriptTextUrl(selectedMeeting.id)} download>
+                <SaveMarkIcon />
+                Save transcript
+              </a>
               <a className="btn btn-save-action" href={meetingsApi.audioUrl(selectedMeeting.id)} download>
                 <AudioMarkIcon />
                 Save audio

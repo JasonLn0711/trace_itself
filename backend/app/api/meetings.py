@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
+import re
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -163,6 +164,46 @@ def parse_optional_seconds(value: object) -> float | None:
         return None
 
 
+def build_download_filename(stem: str | None, suffix: str) -> str:
+    candidate = (stem or "").strip() or "meeting_transcript"
+    safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", candidate).strip("._-")
+    return f"{safe_stem or 'meeting_transcript'}.{suffix}"
+
+
+def format_transcript_timestamp(seconds: float | None) -> str | None:
+    if seconds is None:
+        return None
+    total_seconds = max(0, int(round(seconds)))
+    minutes, remaining_seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{remaining_seconds:02d}"
+    return f"{minutes:02d}:{remaining_seconds:02d}"
+
+
+def build_meeting_transcript_text(meeting: MeetingRecord) -> str:
+    entries = parse_meeting_entries(meeting.transcript_entries_json)
+    if not entries:
+        return meeting.transcript_text
+
+    lines: list[str] = []
+    for entry in entries:
+        parts: list[str] = []
+        timestamp = format_transcript_timestamp(parse_optional_seconds(entry.get("started_at_seconds")))
+        speaker_label = str(entry.get("speaker_label") or "").strip()
+        text = str(entry.get("text") or "").strip()
+        if timestamp:
+            parts.append(f"[{timestamp}]")
+        if speaker_label:
+            parts.append(f"{speaker_label}:")
+        if text:
+            parts.append(text)
+        line = " ".join(parts).strip()
+        if line:
+            lines.append(line)
+    return "\n".join(lines).strip() or meeting.transcript_text
+
+
 @router.get("", response_model=list[MeetingRecordSummaryRead])
 def list_meetings(
     limit: int = Query(default=25, ge=1, le=100),
@@ -194,6 +235,15 @@ def download_meeting_audio(meeting: MeetingRecord = Depends(get_meeting_record_o
     if not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file not found.")
     return FileResponse(path, media_type=meeting.audio_mime_type, filename=meeting.audio_filename)
+
+
+@router.get("/{meeting_id}/transcript-text")
+def download_meeting_transcript_text(meeting: MeetingRecord = Depends(get_meeting_record_or_404)) -> PlainTextResponse:
+    filename = build_download_filename(meeting.title, "txt")
+    return PlainTextResponse(
+        build_meeting_transcript_text(meeting),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("", response_model=MeetingRecordRead, status_code=status.HTTP_201_CREATED)

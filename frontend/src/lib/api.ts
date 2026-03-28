@@ -337,6 +337,9 @@ export const meetingsApi = {
   audioUrl(id: number) {
     return `${API_BASE}/meetings/${id}/audio`;
   },
+  transcriptTextUrl(id: number) {
+    return `${API_BASE}/meetings/${id}/transcript-text`;
+  },
   create(input: {
     file: File;
     title?: string;
