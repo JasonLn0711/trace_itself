@@ -112,6 +112,8 @@ Long live sessions could fail when saving the take after recording for an extend
   Most `/api/*` traffic is sent to FastAPI through a plain Next.js rewrite, but the live-session endpoints use a custom route handler. That proxy was calling `request.formData()` before forwarding the request, which forced Next.js to parse and buffer the full multipart body again. Longer recordings made that extra parse much more likely to fail.
 - `How it was fixed`
   The proxy now forwards the original multipart request body as a stream, preserves the incoming `content-type` boundary and `content-length`, and uses `duplex: 'half'` so Node can pass the upload through to FastAPI without rebuilding the whole form in memory first.
+- `How it is tuned now`
+  The backend now accepts live chunk requests up to `2048 KB`, while the browser aims to flush queued PCM in smaller `512 KB` batches so network stalls can recover without silently turning each live upload into a huge request.
 - `Why this fix is targeted`
   The bug was isolated to the live-session save path because it was the one audio flow using the custom Next.js proxy instead of the simpler rewrite path.
 
@@ -131,6 +133,7 @@ New security-related environment settings:
 - `APP_ENV`
 - `SESSION_IDLE_TIMEOUT_MINUTES`
 - `ASR_LIVE_MAX_CHUNK_KB`
+- `NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB`
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS`
 - `ASR_LIVE_MAX_SESSIONS_PER_USER`
 

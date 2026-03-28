@@ -96,7 +96,8 @@ Optional ASR tuning:
 - `ASR_LIVE_PARTIAL_INTERVAL_MS=1500` for the live partial refresh cadence
 - `ASR_LIVE_COMMIT_SILENCE_MS=1200` for the pause length that commits a live utterance
 - `ASR_LIVE_MAX_WINDOW_SECONDS=18` for the rolling live decode window
-- `ASR_LIVE_MAX_CHUNK_KB=256` for the maximum accepted live audio chunk size
+- `ASR_LIVE_MAX_CHUNK_KB=2048` for the backend hard ceiling on accepted live audio chunk size
+- `NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB=512` for the browser-side live flush target; keep it below the backend chunk ceiling
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS=45` for the longest uninterrupted live utterance buffered before a forced commit
 - `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of open live ASR sessions per account
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads

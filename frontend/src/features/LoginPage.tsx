@@ -9,7 +9,7 @@ import { resolvePostLoginPath } from '../lib/access';
 import { extractApiErrorMessage } from '../lib/api';
 import { useAuth } from '../state/AuthContext';
 
-const APP_VERSION = 'v1.1.10';
+const APP_VERSION = 'v1.1.12';
 
 function safeRedirectPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {

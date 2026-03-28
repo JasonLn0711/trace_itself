@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     asr_live_vad_speech_pad_ms: int = 180
     asr_live_preview_beam_size: int = 1
     asr_live_final_beam_size: int = 5
-    asr_live_max_chunk_kb: int = 256
+    asr_live_max_chunk_kb: int = 2048
     asr_live_max_utterance_seconds: int = 45
     asr_live_max_sessions_per_user: int = 2
     asr_upload_dir: str = "/data/asr"

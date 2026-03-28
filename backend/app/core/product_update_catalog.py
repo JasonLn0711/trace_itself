@@ -494,4 +494,19 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-28T00:00:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-asr-burst-tuning",
+        version_tag="v1.1.12",
+        title="Live ASR now tolerates larger bursts without giant uploads",
+        summary="The backend accepts larger live audio bursts, while the browser now flushes them in smaller batches.",
+        details=(
+            "The live ASR chunk ceiling was raised from 256 KB to 2048 KB for better burst tolerance, but the browser "
+            "now aims to ship queued PCM in smaller 512 KB batches so longer sessions stay resilient without turning "
+            "temporary network stalls into oversized requests."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-28T03:30:00+00:00"),
+        is_pinned=True,
+    ),
 )

@@ -43,6 +43,8 @@ const RECORDING_PRESETS: RecordingPreset[] = [
   { mimeType: 'audio/ogg;codecs=opus', extension: 'ogg' }
 ];
 
+const DEFAULT_LIVE_BATCH_TARGET_KB = 512;
+
 function getRecordingPreset(): RecordingPreset | null {
   if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined') {
     return null;
@@ -88,6 +90,32 @@ function mergeByteChunks(chunks: Uint8Array[]) {
   }
   return merged;
 }
+
+function resolveLiveBatchTargetBytes() {
+  const rawValue = process.env.NEXT_PUBLIC_ASR_LIVE_BATCH_TARGET_KB;
+  const parsedValue = rawValue ? Number.parseInt(rawValue, 10) : NaN;
+  const sizeKb = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : DEFAULT_LIVE_BATCH_TARGET_KB;
+  return sizeKb * 1024;
+}
+
+function dequeueChunkBatch(queue: Uint8Array[], maxBytes: number) {
+  const selected: Uint8Array[] = [];
+  let totalBytes = 0;
+  while (queue.length) {
+    const nextChunk = queue[0];
+    if (selected.length && totalBytes + nextChunk.byteLength > maxBytes) {
+      break;
+    }
+    selected.push(queue.shift()!);
+    totalBytes += nextChunk.byteLength;
+    if (totalBytes >= maxBytes) {
+      break;
+    }
+  }
+  return mergeByteChunks(selected);
+}
+
+const LIVE_BATCH_TARGET_BYTES = resolveLiveBatchTargetBytes();
 
 function formatTranscriptTimestamp(value: string) {
   const date = new Date(value);
@@ -354,7 +382,7 @@ export function LiveAsrPanel({
       return;
     }
 
-    const payload = mergeByteChunks(chunkQueueRef.current.splice(0));
+    const payload = dequeueChunkBatch(chunkQueueRef.current, LIVE_BATCH_TARGET_BYTES);
     if (!payload.byteLength) {
       return;
     }
