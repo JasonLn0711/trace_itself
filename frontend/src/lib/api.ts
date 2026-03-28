@@ -303,9 +303,11 @@ export const asrApi = {
       method: 'POST'
     });
   },
-  persistLiveSession(input: { session_id: string; file: File; title?: string }) {
+  persistLiveSession(input: { session_id: string; file?: File | null; title?: string }) {
     const formData = new FormData();
-    formData.append('file', input.file);
+    if (input.file) {
+      formData.append('file', input.file);
+    }
     if (input.title?.trim()) {
       formData.append('title', input.title.trim());
     }

@@ -129,7 +129,7 @@ export function LiveAsrPanel({
   const pendingFinalizeRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const recordedFileRef = useRef<File | null>(null);
-  const pendingPersistRef = useRef<{ sessionId: string; file: File } | null>(null);
+  const pendingPersistRef = useRef<{ sessionId: string; file: File | null } | null>(null);
   const startedAtRef = useRef<Date | null>(null);
   const titleRef = useRef(title);
 
@@ -399,7 +399,7 @@ export function LiveAsrPanel({
       setSnapshot(finalSnapshot);
       const recordedFile = recordedFileRef.current ?? (recorderStopPromiseRef.current ? await recorderStopPromiseRef.current : null);
 
-      if (!recordedFile || !finalSnapshot.preview_text.trim()) {
+      if (!finalSnapshot.preview_text.trim()) {
         await discardServerSession();
         clearLiveState();
         onNotice('Live session stopped.');
@@ -436,7 +436,7 @@ export function LiveAsrPanel({
       setPendingSave(false);
       clearLiveState();
       await onSaved(transcript);
-      onNotice('Live transcript saved.');
+      onNotice(transcript.audio_mime_type ? 'Live transcript saved.' : 'Live transcript saved without audio.');
     } catch (error) {
       setLocalError(extractApiErrorMessage(error));
       setState('idle');

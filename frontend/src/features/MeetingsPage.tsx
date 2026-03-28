@@ -726,7 +726,7 @@ export function MeetingsPage() {
                       </div>
                       <div className="list-row-copy line-clamp-1">{entry.excerpt || 'No transcript text.'}</div>
                       <div className="list-row-copy line-clamp-1">
-                        {entry.original_filename} · {formatBytes(entry.file_size_bytes)} · {formatDateTime(entry.created_at)}
+                        {entry.original_filename} · {entry.audio_mime_type ? formatBytes(entry.file_size_bytes) : 'No audio'} · {formatDateTime(entry.created_at)}
                       </div>
                     </div>
                     <div className="list-row-side">
@@ -801,7 +801,7 @@ export function MeetingsPage() {
           description={
             workspaceMode === 'transcript'
               ? selectedTranscript
-                ? `${selectedTranscript.original_filename} · ${formatDateTime(selectedTranscript.created_at)}`
+                ? `${selectedTranscript.original_filename} · ${selectedTranscript.audio_mime_type ? formatBytes(selectedTranscript.file_size_bytes) : 'No audio'} · ${formatDateTime(selectedTranscript.created_at)}`
                 : undefined
               : selectedMeeting
                 ? `${selectedMeeting.audio_filename} · ${formatDateTime(selectedMeeting.created_at)}`
@@ -820,18 +820,30 @@ export function MeetingsPage() {
                 </Badge>
                 <Badge tone="neutral">{languageLabel(selectedTranscript.language)}</Badge>
                 <Badge tone="neutral">{formatDuration(selectedTranscript.duration_seconds)}</Badge>
-                <Badge tone="neutral">{formatBytes(selectedTranscript.file_size_bytes)}</Badge>
+                <Badge tone={selectedTranscript.audio_mime_type ? 'neutral' : 'warning'}>
+                  {selectedTranscript.audio_mime_type ? formatBytes(selectedTranscript.file_size_bytes) : 'No audio file'}
+                </Badge>
                 <Badge tone="info">{selectedTranscript.model_name}</Badge>
-                <a className="btn btn-save-action" href={asrApi.audioUrl(selectedTranscript.id)} download>
-                  <AudioMarkIcon />
-                  Save audio
-                </a>
+                {selectedTranscript.audio_mime_type ? (
+                  <a className="btn btn-save-action" href={asrApi.audioUrl(selectedTranscript.id)} download>
+                    <AudioMarkIcon />
+                    Save audio
+                  </a>
+                ) : null}
                 <a className="btn btn-save-action" href={asrApi.textUrl(selectedTranscript.id)} download>
                   <SaveMarkIcon />
                   Save transcript
                 </a>
               </div>
-              <audio className="audio-player" controls preload="none" src={asrApi.audioUrl(selectedTranscript.id)} />
+              {selectedTranscript.audio_mime_type ? (
+                <audio className="audio-player" controls preload="none" src={asrApi.audioUrl(selectedTranscript.id)} />
+              ) : (
+                <Notice
+                  title="Audio unavailable"
+                  description="This transcript was saved without an audio file, but the transcript text and live lines were preserved."
+                  tone="warning"
+                />
+              )}
               {selectedTranscript.transcript_entries.length ? (
                 <div className="transcript-body live-transcript-log">
                   {selectedTranscript.transcript_entries.map((entry) => (

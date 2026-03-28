@@ -121,6 +121,19 @@ def build_download_filename(stem: str | None, suffix: str) -> str:
     return f"{safe_stem or 'transcript'}.{suffix}"
 
 
+def normalize_uploaded_filename(filename: str | None) -> str | None:
+    candidate = Path(filename or "").name.strip()[:255]
+    return candidate or None
+
+
+def build_transcript_only_filename(title: str | None) -> str:
+    return build_download_filename((title or "").strip() or "live transcript", "txt")
+
+
+def resolve_live_original_filename(title: str | None, uploaded_filename: str | None) -> str:
+    return normalize_uploaded_filename(uploaded_filename) or build_transcript_only_filename(title)
+
+
 def serialize_live_entries(entries: list[dict[str, str]]) -> str | None:
     if not entries:
         return None
@@ -263,7 +276,7 @@ async def finalize_live_session(
 @router.post("/live-sessions/{session_id}/persist", response_model=AsrTranscriptRead, status_code=status.HTTP_201_CREATED)
 async def persist_live_session(
     session_id: str,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(default=None),
     title: str | None = Form(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -278,31 +291,38 @@ async def persist_live_session(
     if not session.committed_text.strip():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No speech was captured in this live session.")
 
-    stored_audio = save_upload_file(
-        file,
-        storage_root=Path(settings.asr_upload_dir),
-        max_bytes=settings.asr_max_upload_bytes,
-        prefix=f"asr-live-{current_user.id}",
-    )
     captured_duration_seconds = round(session.total_samples / settings.asr_live_sample_rate, 3)
-    try:
-        policy = get_or_create_usage_policy(db)
-        if captured_duration_seconds <= 0:
-            captured_duration_seconds = probe_audio_duration_seconds(stored_audio.storage_path)
+    policy = get_or_create_usage_policy(db)
+    if captured_duration_seconds > 0:
         ensure_audio_duration_allowed(captured_duration_seconds, policy)
-    except HTTPException:
-        delete_audio_file(stored_audio.storage_path)
-        raise
+
+    fallback_original_filename = resolve_live_original_filename(title, file.filename if file is not None else None)
+    stored_audio = None
+    if file is not None:
+        try:
+            stored_audio = save_upload_file(
+                file,
+                storage_root=Path(settings.asr_upload_dir),
+                max_bytes=settings.asr_max_upload_bytes,
+                prefix=f"asr-live-{current_user.id}",
+            )
+            if captured_duration_seconds <= 0:
+                captured_duration_seconds = probe_audio_duration_seconds(stored_audio.storage_path)
+                ensure_audio_duration_allowed(captured_duration_seconds, policy)
+        except HTTPException:
+            if stored_audio is not None:
+                delete_audio_file(stored_audio.storage_path)
+            stored_audio = None
 
     transcript = AsrTranscript(
         user_id=current_user.id,
-        title=normalize_title(title, stored_audio.original_filename),
-        original_filename=stored_audio.original_filename,
-        audio_storage_path=stored_audio.relative_storage_path,
-        audio_mime_type=stored_audio.mime_type,
+        title=normalize_title(title, stored_audio.original_filename if stored_audio else fallback_original_filename),
+        original_filename=stored_audio.original_filename if stored_audio else fallback_original_filename,
+        audio_storage_path=stored_audio.relative_storage_path if stored_audio else None,
+        audio_mime_type=stored_audio.mime_type if stored_audio else None,
         language=session.detected_language or session.language_hint,
-        duration_seconds=captured_duration_seconds,
-        file_size_bytes=stored_audio.file_size_bytes,
+        duration_seconds=captured_duration_seconds or None,
+        file_size_bytes=stored_audio.file_size_bytes if stored_audio else 0,
         model_name=session.model_name,
         capture_mode="live",
         transcript_text=session.committed_text,
