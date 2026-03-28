@@ -193,9 +193,11 @@ ASR notes:
 - If CUDA is configured but unavailable, the backend stays up and the ASR endpoints return `503` with a clear fix message.
 - Live ASR now rejects oversized chunks, limits open sessions per user, and force-commits long uninterrupted utterances to keep memory bounded.
 - The live ASR page streams mic audio in small normalized chunks, keeps recording alive while users browse other in-app pages, and still stores a compact Opus/WebM recording when the take is saved.
+- The recorder now lives at the authenticated app-shell level instead of only inside the `Audio` page, and other pages expose a compact live dock so users can stop, save, or jump back to `Audio` without losing the session.
 - The open-session limit now counts only non-finalized sessions, and obviously orphaned pre-start sessions are reaped automatically so one visible recorder does not trip a false multi-session error.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Live ASR sessions are held in backend memory, so after deploying a session-lifecycle fix it is reasonable to restart the backend once and clear any stale sessions from the old runtime.
+- Cross-page persistence only applies to in-app navigation. A full page refresh or closing the tab still interrupts browser microphone capture, so this should be described to users as navigation-safe rather than reload-safe.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
 - Provider API secrets are stored encrypted in Postgres, and production deployments must now use a dedicated `CREDENTIALS_SECRET_KEY`.
 - The default policy is 3 LLM text runs per user per rolling 24 hours and 5 hours max audio per file.

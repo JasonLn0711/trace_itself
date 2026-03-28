@@ -114,6 +114,10 @@ Recent live ASR work focused on three different failure modes: long recording sa
   The backend now accepts live chunk requests up to `2048 KB`, while the browser aims to flush queued PCM in smaller `512 KB` batches so temporary network stalls can recover without turning each live upload into a giant request.
 - `Cross-page live-session fix`
   The live recorder no longer lives only inside the `Audio` page component. Its session state now sits at the authenticated app-shell level, so users can browse other pages in the app while the microphone stream keeps running and return through a compact live dock.
+- `Why this is cool`
+  The `Audio` page still gives the full transcript log and controls, but it is no longer the single place that has to stay mounted for recording to survive. The recorder now acts more like a real workspace tool: start in `Audio`, move to `Projects` or `Tasks` while speaking, then come back or use the dock to stop, save, or reopen the result.
+- `Scope`
+  This fix covers in-app route changes inside the authenticated shell. A full browser refresh, tab close, or browser crash still ends microphone capture because the recording pipeline lives in browser memory and cannot survive a page unload.
 - `False multi-session fix`
   The backend now counts only non-finalized live sessions toward the open-session limit, reaps obviously orphaned pre-start sessions, and the frontend blocks duplicate `startLive()` races so one visible recording does not leak ghost sessions behind the scenes.
 - `Operational note`
