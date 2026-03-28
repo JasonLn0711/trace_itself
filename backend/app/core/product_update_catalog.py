@@ -479,4 +479,19 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-27T02:10:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-right-panel-and-language-tag-fix",
+        version_tag="v1.1.11",
+        title="Live saves now open instantly with cleaner language tags",
+        summary="Stopping live audio now opens the saved transcript on the right, and language badges use more accurate codes.",
+        details=(
+            "The Audio workspace now keeps the just-saved live transcript visible in the detail panel without waiting "
+            "for a follow-up reload, live ASR prefers detected language after the first confirmed result, and the old "
+            "zh-tw, jp, and kr labels were replaced with cleaner language-code tags."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-28T00:00:00+00:00"),
+        is_pinned=True,
+    ),
 )

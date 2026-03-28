@@ -184,7 +184,7 @@ class LiveAsrSessionManager:
             result = await asyncio.to_thread(
                 asr_service.transcribe_waveform,
                 preview_audio,
-                language=session.language_hint or session.detected_language,
+                language=session.detected_language or session.language_hint,
                 model_name=session.model_name,
                 beam_size=settings.asr_live_preview_beam_size,
                 initial_prompt=self._prompt_tail(session.committed_text),
@@ -211,7 +211,7 @@ class LiveAsrSessionManager:
             result = await asyncio.to_thread(
                 asr_service.transcribe_waveform,
                 full_audio,
-                language=session.language_hint or session.detected_language,
+                language=session.detected_language or session.language_hint,
                 model_name=session.model_name,
                 beam_size=settings.asr_live_final_beam_size,
                 initial_prompt=self._prompt_tail(session.committed_text),

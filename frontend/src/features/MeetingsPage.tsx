@@ -38,9 +38,9 @@ type TranscriptInputMode = 'live' | 'file';
 
 const LANGUAGE_OPTIONS = [
   { value: '', label: 'auto' },
-  { value: 'zh', label: 'zh-tw' },
-  { value: 'ja', label: 'jp' },
-  { value: 'ko', label: 'kr' },
+  { value: 'zh', label: 'zh' },
+  { value: 'ja', label: 'ja' },
+  { value: 'ko', label: 'ko' },
   { value: 'en', label: 'en' }
 ] as const;
 
@@ -59,10 +59,27 @@ function splitActionItems(value: string) {
     .filter(Boolean);
 }
 
-function languageLabel(value: string | null | undefined) {
+function normalizeLanguageCode(value: string | null | undefined) {
   const normalized = (value || '').trim().toLowerCase();
+  if (!normalized || normalized === 'auto') {
+    return '';
+  }
+  if (normalized === 'jp') {
+    return 'ja';
+  }
+  if (normalized === 'kr') {
+    return 'ko';
+  }
+  return normalized;
+}
+
+function languageLabel(value: string | null | undefined) {
+  const normalized = normalizeLanguageCode(value);
   if (!normalized) {
     return 'auto';
+  }
+  if (normalized.startsWith('zh-')) {
+    return normalized;
   }
   return LANGUAGE_OPTIONS.find((option) => option.value === normalized)?.label ?? normalized;
 }
@@ -420,13 +437,22 @@ export function MeetingsPage() {
   }
 
   async function handleLiveSaved(created: AsrTranscript) {
+    setWorkspaceMode('transcript');
+    setLoadingTranscript(false);
     setSelectedTranscript(created);
     setSelectedTranscriptId(created.id);
     setTitle('');
     setLanguage('');
-    setPolicySnapshot(await usagePolicyApi.get());
-    await loadTranscriptEntries(created.id);
-    setWorkspaceMode('transcript');
+    try {
+      const [nextPolicy, items] = await Promise.all([
+        usagePolicyApi.get(),
+        asrApi.list({ limit: 100 })
+      ]);
+      setPolicySnapshot(nextPolicy);
+      setTranscriptEntries(items);
+    } catch (err) {
+      setError(extractApiErrorMessage(err));
+    }
   }
 
   async function copyActiveContent() {
