@@ -614,7 +614,7 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       const mediaRecorder = preset?.mimeType
         ? new MediaRecorder(destination.stream, {
             mimeType: preset.mimeType,
-            audioBitsPerSecond: 128000
+            audioBitsPerSecond: 64000
           })
         : new MediaRecorder(destination.stream);
 
