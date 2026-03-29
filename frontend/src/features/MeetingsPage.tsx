@@ -100,6 +100,18 @@ function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefine
   return (value || '').toLowerCase() === 'live' ? 'Live' : 'File';
 }
 
+function providerDisplayLabel(provider: AIProvider | null | undefined, fallback = 'ASR') {
+  return (provider?.name ?? fallback).replace(/^Local Breeze ASR$/i, 'Local ASR');
+}
+
+function providerSupportsLiveStreaming(provider: AIProvider | null | undefined) {
+  return provider?.driver === 'local_breeze';
+}
+
+function providerSupportsSpeakerDiarization(provider: AIProvider | null | undefined) {
+  return provider?.driver === 'local_breeze';
+}
+
 function isTranscriptPostProcessingPending(state: AsrTranscriptPostProcessingState | string | null | undefined) {
   return state === 'queued' || state === 'running';
 }
@@ -116,13 +128,13 @@ function transcriptPostProcessingTone(state: AsrTranscriptPostProcessingState | 
 
 function transcriptPostProcessingLabel(state: AsrTranscriptPostProcessingState | string | null | undefined) {
   if (state === 'queued') {
-    return 'Queued';
+    return 'Tagging queued';
   }
   if (state === 'running') {
-    return 'Refining';
+    return 'Tagging';
   }
   if (state === 'failed') {
-    return 'Replay failed';
+    return 'Tagging failed';
   }
   return 'Ready';
 }
@@ -145,10 +157,10 @@ function transcriptProcessingDescription(transcript: AsrTranscript) {
     return 'Replay audio is saved. Speaker-tag refinement will start in the background shortly.';
   }
   if (transcript.post_processing_state === 'running') {
-    return 'Replay audio is being reprocessed in the background so this transcript can pick up cleaner speaker tags.';
+    return 'Replay audio is being reprocessed in the background so this transcript can pick up speaker tags.';
   }
   if (transcript.post_processing_state === 'failed') {
-    return transcript.post_processing_error || 'Replay processing did not finish. The original live transcript is still available below.';
+    return transcript.post_processing_error || 'Speaker-tag processing did not finish. The live transcript is still available below.';
   }
   return '';
 }
@@ -282,7 +294,11 @@ export function MeetingsPage() {
   const [asrProviders, setAsrProviders] = useState<AIProvider[]>([]);
   const [llmProviders, setLlmProviders] = useState<AIProvider[]>([]);
   const [policySnapshot, setPolicySnapshot] = useState<UsagePolicySnapshot | null>(null);
-  const [asrProviderId, setAsrProviderId] = useState<number | null>(liveAsrDraft.providerId);
+  const [asrProviderId, setAsrProviderId] = useState<number | null>(liveAsrDraft.finalProviderId ?? liveAsrDraft.providerId);
+  const [liveAsrProviderId, setLiveAsrProviderId] = useState<number | null>(liveAsrDraft.providerId);
+  const [liveFinalAsrProviderId, setLiveFinalAsrProviderId] = useState<number | null>(
+    liveAsrDraft.finalProviderId ?? liveAsrDraft.providerId
+  );
   const [llmProviderId, setLlmProviderId] = useState<number | null>(null);
   const [selectedTranscriptId, setSelectedTranscriptId] = useState<number | null>(null);
   const [selectedMeetingId, setSelectedMeetingId] = useState<number | null>(null);
@@ -304,8 +320,17 @@ export function MeetingsPage() {
   const [deletingMeetingId, setDeletingMeetingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const activeAsrProviderLabel = (asrProviders.find((provider) => provider.id === asrProviderId)?.name ?? asrProviders[0]?.name ?? 'ASR')
-    .replace(/^Local Breeze ASR$/i, 'Local ASR');
+  const liveAsrProviders = asrProviders.filter((provider) => providerSupportsLiveStreaming(provider));
+  const activeAsrProvider = asrProviders.find((provider) => provider.id === asrProviderId) ?? asrProviders[0] ?? null;
+  const activeLiveAsrProvider =
+    liveAsrProviders.find((provider) => provider.id === liveAsrProviderId) ?? liveAsrProviders[0] ?? null;
+  const activeLiveFinalAsrProvider =
+    asrProviders.find((provider) => provider.id === liveFinalAsrProviderId) ?? activeLiveAsrProvider ?? asrProviders[0] ?? null;
+  const activeAsrProviderLabel = providerDisplayLabel(activeAsrProvider);
+  const activeLiveAsrProviderLabel = providerDisplayLabel(activeLiveAsrProvider, 'Low-latency ASR');
+  const activeLiveFinalAsrProviderLabel = providerDisplayLabel(activeLiveFinalAsrProvider);
+  const savedAudioProviderSupportsSpeakerDiarization = providerSupportsSpeakerDiarization(activeAsrProvider);
+  const liveFinalProviderSupportsSpeakerDiarization = providerSupportsSpeakerDiarization(activeLiveFinalAsrProvider);
 
   useEffect(() => {
     if (!notesEnabled && workspaceMode === 'meeting') {
@@ -344,7 +369,20 @@ export function MeetingsPage() {
         setAsrProviders(nextAsrProviders);
         setLlmProviders(nextLlmProviders);
         setPolicySnapshot(nextPolicySnapshot);
-        setAsrProviderId((current) => current ?? nextAsrProviders[0]?.id ?? null);
+        const nextLiveAsrProviders = nextAsrProviders.filter((provider) => providerSupportsLiveStreaming(provider));
+        setAsrProviderId((current) =>
+          current != null && nextAsrProviders.some((provider) => provider.id === current) ? current : nextAsrProviders[0]?.id ?? null
+        );
+        setLiveAsrProviderId((current) =>
+          current != null && nextLiveAsrProviders.some((provider) => provider.id === current)
+            ? current
+            : nextLiveAsrProviders[0]?.id ?? null
+        );
+        setLiveFinalAsrProviderId((current) =>
+          current != null && nextAsrProviders.some((provider) => provider.id === current)
+            ? current
+            : nextLiveAsrProviders[0]?.id ?? nextAsrProviders[0]?.id ?? null
+        );
         setLlmProviderId((current) => current ?? nextLlmProviders[0]?.id ?? null);
         setMeetingProjectId(
           canLinkMeetingsToProjects && requestedProjectId && nextProjects.some((project) => project.id === requestedProjectId)
@@ -392,22 +430,38 @@ export function MeetingsPage() {
 
   useEffect(() => {
     updateLiveAsrDraft({
-      providerId: asrProviderId,
-      providerLabel: activeAsrProviderLabel,
+      providerId: liveAsrProviderId,
+      providerLabel: activeLiveAsrProviderLabel,
+      finalProviderId: liveFinalAsrProviderId ?? liveAsrProviderId,
+      finalProviderLabel: activeLiveFinalAsrProviderLabel,
       language,
       title,
       usageAudioSeconds: policySnapshot?.usage.audio_seconds_last_24h ?? null,
       maxDurationSeconds: policySnapshot?.policy.max_audio_seconds_per_request ?? null
     });
   }, [
-    activeAsrProviderLabel,
-    asrProviderId,
+    activeLiveAsrProviderLabel,
+    activeLiveFinalAsrProviderLabel,
     language,
+    liveAsrProviderId,
+    liveFinalAsrProviderId,
     policySnapshot?.policy.max_audio_seconds_per_request,
     policySnapshot?.usage.audio_seconds_last_24h,
     title,
     updateLiveAsrDraft
   ]);
+
+  useEffect(() => {
+    if (!savedAudioProviderSupportsSpeakerDiarization && transcriptSpeakerDiarization) {
+      setTranscriptSpeakerDiarization(false);
+    }
+  }, [savedAudioProviderSupportsSpeakerDiarization, transcriptSpeakerDiarization]);
+
+  useEffect(() => {
+    if (!savedAudioProviderSupportsSpeakerDiarization && meetingSpeakerDiarization) {
+      setMeetingSpeakerDiarization(false);
+    }
+  }, [meetingSpeakerDiarization, savedAudioProviderSupportsSpeakerDiarization]);
 
   useEffect(() => {
     if (!lastSavedTranscript) {
@@ -460,7 +514,7 @@ export function MeetingsPage() {
           setNotice(
             nextTranscript.speaker_diarization_enabled
               ? 'Replay audio finished processing. Speaker-tagged transcript is ready.'
-              : 'Replay audio finished background processing.'
+              : 'Replay audio finished background speaker-tag processing.'
           );
         }
 
@@ -869,28 +923,74 @@ export function MeetingsPage() {
                   </select>
                 </label>
               </div>
-              {asrProviders.length > 1 ? (
-                <label className="field">
-                  <span>ASR</span>
-                  <select value={String(asrProviderId ?? '')} onChange={(event) => setAsrProviderId(Number(event.target.value) || null)}>
-                    {asrProviders.map((provider) => (
-                      <option key={provider.id} value={provider.id}>
-                        {provider.name} · {provider.model_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-
               {transcriptInputMode === 'live' ? (
                 <>
+                  <div className="form-grid cols-2">
+                    {liveAsrProviders.length > 1 ? (
+                      <label className="field">
+                        <span>Live ASR</span>
+                        <select value={String(liveAsrProviderId ?? '')} onChange={(event) => setLiveAsrProviderId(Number(event.target.value) || null)}>
+                          {liveAsrProviders.map((provider) => (
+                            <option key={provider.id} value={provider.id}>
+                              {provider.name} · {provider.model_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <div className="list-row-copy">
+                        {activeLiveAsrProvider
+                          ? `${activeLiveAsrProvider.name} · ${activeLiveAsrProvider.model_name}`
+                          : 'No low-latency ASR provider.'}
+                      </div>
+                    )}
+                    {asrProviders.length > 1 ? (
+                      <label className="field">
+                        <span>Final transcript provider</span>
+                        <select
+                          value={String(liveFinalAsrProviderId ?? '')}
+                          onChange={(event) => setLiveFinalAsrProviderId(Number(event.target.value) || null)}
+                        >
+                          {asrProviders.map((provider) => (
+                            <option key={provider.id} value={provider.id}>
+                              {provider.name} · {provider.model_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <div className="list-row-copy">
+                        {activeLiveFinalAsrProvider
+                          ? `${activeLiveFinalAsrProvider.name} · ${activeLiveFinalAsrProvider.model_name}`
+                          : 'No final transcript provider.'}
+                      </div>
+                    )}
+                  </div>
                   <LiveAsrPanel />
                   <div className="list-row-copy">
-                    Saved live takes try speaker diarization automatically after stop when replay audio uploads successfully.
+                    {liveFinalProviderSupportsSpeakerDiarization
+                      ? 'The green in-progress line stays on the live ASR model. When it turns white, that committed line comes from the final transcript provider. Saved replay audio can still add speaker tags after save.'
+                      : 'The green in-progress line stays on the live ASR model. When it turns white, that committed line comes from the final transcript provider.'}
                   </div>
                 </>
               ) : (
                 <form className="form-grid" onSubmit={handleTranscriptSubmit}>
+                  {asrProviders.length > 1 ? (
+                    <label className="field">
+                      <span>ASR</span>
+                      <select value={String(asrProviderId ?? '')} onChange={(event) => setAsrProviderId(Number(event.target.value) || null)}>
+                        {asrProviders.map((provider) => (
+                          <option key={provider.id} value={provider.id}>
+                            {provider.name} · {provider.model_name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <div className="list-row-copy">
+                      {activeAsrProvider ? `${activeAsrProvider.name} · ${activeAsrProvider.model_name}` : 'No ASR provider.'}
+                    </div>
+                  )}
                   <div className="capture-strip">
                     <span className="capture-pill">Used {formatDuration(policySnapshot?.usage.audio_seconds_last_24h ?? null)}</span>
                     <span className="capture-pill">Max {formatDuration(policySnapshot?.policy.max_audio_seconds_per_request ?? null)}</span>
@@ -903,12 +1003,15 @@ export function MeetingsPage() {
                       <input
                         type="checkbox"
                         checked={transcriptSpeakerDiarization}
+                        disabled={!savedAudioProviderSupportsSpeakerDiarization}
                         onChange={(event) => setTranscriptSpeakerDiarization(event.target.checked)}
                       />
                       Multi-speaker diarization
                     </label>
                     <div className="list-row-copy">
-                      Use this only when more than one person is talking. It keeps the default transcript path unchanged unless you opt in.
+                      {savedAudioProviderSupportsSpeakerDiarization
+                        ? 'Use this only when more than one person is talking. It keeps the default transcript path unchanged unless you opt in.'
+                        : 'This ASR provider can confirm transcript text, but speaker diarization needs a timestamp-capable local Breeze provider.'}
                     </div>
                   </div>
                   {transcriptSpeakerDiarization ? (
@@ -970,12 +1073,15 @@ export function MeetingsPage() {
                   <input
                     type="checkbox"
                     checked={meetingSpeakerDiarization}
+                    disabled={!savedAudioProviderSupportsSpeakerDiarization}
                     onChange={(event) => setMeetingSpeakerDiarization(event.target.checked)}
                   />
                   Multi-speaker diarization
                 </label>
                 <div className="list-row-copy">
-                  Use this only when more than one person is talking. It runs on the optional NeMo diarizer path and is slower than the default single-speaker flow.
+                  {savedAudioProviderSupportsSpeakerDiarization
+                    ? 'Use this only when more than one person is talking. It runs on the optional NeMo diarizer path and is slower than the default single-speaker flow.'
+                    : 'This ASR provider can transcribe the meeting, but speaker diarization needs a timestamp-capable local Breeze provider.'}
                 </div>
               </div>
               {meetingSpeakerDiarization ? (
@@ -1215,8 +1321,8 @@ export function MeetingsPage() {
                 <Notice
                   title={
                     selectedTranscript.post_processing_state === 'failed'
-                      ? 'Replay processing paused'
-                      : 'Replay processing in background'
+                      ? 'Speaker-tag processing paused'
+                      : 'Speaker-tag processing in background'
                   }
                   description={transcriptProcessingDescription(selectedTranscript)}
                   tone={selectedTranscript.post_processing_state === 'failed' ? 'warning' : 'info'}

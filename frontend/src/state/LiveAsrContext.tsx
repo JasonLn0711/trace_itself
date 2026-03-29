@@ -182,7 +182,7 @@ function liveLabelForState(state: LiveState) {
 
 function liveSaveNoticeForTranscript(transcript: AsrTranscript) {
   if (transcript.post_processing_state === 'queued' || transcript.post_processing_state === 'running') {
-    return 'Live transcript saved. Replay audio is refining the final transcript in the background.';
+    return 'Live transcript saved. Replay audio is refining speaker tags in the background.';
   }
   if (transcript.speaker_diarization_enabled) {
     return 'Live transcript saved with speaker tags.';

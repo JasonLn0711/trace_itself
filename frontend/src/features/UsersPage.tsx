@@ -128,8 +128,8 @@ function providerToEdit(provider: AIProvider): AIProviderFormState {
   };
 }
 
-function providerDefaultsForKind(kind: AIProviderKind) {
-  if (kind === 'llm') {
+function providerDefaults(kind: AIProviderKind, driver?: AIProviderDriver) {
+  if (kind === 'llm' || driver === 'gemini') {
     return {
       driver: 'gemini' as AIProviderDriver,
       model_name: 'gemini-3.1-flash-lite-preview',
@@ -147,8 +147,11 @@ function providerPurpose(provider: AIProvider) {
   if (provider.driver === 'gemini' && provider.kind === 'llm') {
     return 'Nutrition STT + meal multimodal analysis + meeting notes';
   }
+  if (provider.driver === 'gemini' && provider.kind === 'asr') {
+    return 'Saved-audio transcript confirmation through the Gemini API';
+  }
   if (provider.kind === 'asr') {
-    return 'Audio workspace transcription';
+    return 'Audio workspace transcription and live partial ASR';
   }
   return 'General text generation';
 }
@@ -828,7 +831,7 @@ export function UsersPage() {
                     value={createProviderForm.kind}
                     onChange={(event) => {
                       const kind = event.target.value as AIProviderKind;
-                      const defaults = providerDefaultsForKind(kind);
+                      const defaults = providerDefaults(kind);
                       setCreateProviderForm({
                         ...createProviderForm,
                         kind,
@@ -843,8 +846,27 @@ export function UsersPage() {
                   </select>
                 </Field>
                 <Field label="Driver">
-                  <select value={createProviderForm.driver} onChange={(event) => setCreateProviderForm({ ...createProviderForm, driver: event.target.value as AIProviderDriver })}>
-                    {createProviderForm.kind === 'asr' ? <option value="local_breeze">local_breeze</option> : <option value="gemini">gemini</option>}
+                  <select
+                    value={createProviderForm.driver}
+                    onChange={(event) => {
+                      const driver = event.target.value as AIProviderDriver;
+                      const defaults = providerDefaults(createProviderForm.kind, driver);
+                      setCreateProviderForm({
+                        ...createProviderForm,
+                        driver,
+                        model_name: defaults.model_name,
+                        base_url: defaults.base_url
+                      });
+                    }}
+                  >
+                    {createProviderForm.kind === 'asr' ? (
+                      <>
+                        <option value="local_breeze">local_breeze</option>
+                        <option value="gemini">gemini</option>
+                      </>
+                    ) : (
+                      <option value="gemini">gemini</option>
+                    )}
                   </select>
                 </Field>
               </div>
@@ -863,7 +885,12 @@ export function UsersPage() {
                 <input value={createProviderForm.base_url} onChange={(event) => setCreateProviderForm({ ...createProviderForm, base_url: event.target.value })} placeholder="Optional" />
               </Field>
               <Field label="API key">
-                <input type="password" value={createProviderForm.api_key} onChange={(event) => setCreateProviderForm({ ...createProviderForm, api_key: event.target.value })} placeholder={createProviderForm.kind === 'llm' ? 'Required for Gemini' : 'Optional'} />
+                <input
+                  type="password"
+                  value={createProviderForm.api_key}
+                  onChange={(event) => setCreateProviderForm({ ...createProviderForm, api_key: event.target.value })}
+                  placeholder={createProviderForm.driver === 'gemini' ? 'Required for Gemini' : 'Optional'}
+                />
               </Field>
               <Field label="Description">
                 <input value={createProviderForm.description} onChange={(event) => setCreateProviderForm({ ...createProviderForm, description: event.target.value })} placeholder="Optional" />
@@ -904,7 +931,7 @@ export function UsersPage() {
                               value={form.kind}
                               onChange={(event) => {
                                 const kind = event.target.value as AIProviderKind;
-                                const defaults = providerDefaultsForKind(kind);
+                                const defaults = providerDefaults(kind);
                                 setEditProviderForms({
                                   ...editProviderForms,
                                   [provider.id]: {
@@ -922,8 +949,30 @@ export function UsersPage() {
                             </select>
                           </Field>
                           <Field label="Driver">
-                            <select value={form.driver} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, driver: event.target.value as AIProviderDriver } })}>
-                              {form.kind === 'asr' ? <option value="local_breeze">local_breeze</option> : <option value="gemini">gemini</option>}
+                            <select
+                              value={form.driver}
+                              onChange={(event) => {
+                                const driver = event.target.value as AIProviderDriver;
+                                const defaults = providerDefaults(form.kind, driver);
+                                setEditProviderForms({
+                                  ...editProviderForms,
+                                  [provider.id]: {
+                                    ...form,
+                                    driver,
+                                    model_name: defaults.model_name,
+                                    base_url: defaults.base_url
+                                  }
+                                });
+                              }}
+                            >
+                              {form.kind === 'asr' ? (
+                                <>
+                                  <option value="local_breeze">local_breeze</option>
+                                  <option value="gemini">gemini</option>
+                                </>
+                              ) : (
+                                <option value="gemini">gemini</option>
+                              )}
                             </select>
                           </Field>
                         </div>

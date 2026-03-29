@@ -357,7 +357,10 @@ def persist_live_transcript_reprocessing(
                 audio_path,
                 language=language,
                 provider=provider,
-                enable_speaker_diarization=provider_asr_service.supports_speaker_diarization(provider),
+                enable_speaker_diarization=(
+                    settings.asr_meeting_diarization_enabled
+                    and provider_asr_service.supports_speaker_diarization(provider)
+                ),
                 max_speaker_count=None,
             )
         except (AsrRuntimeUnavailableError, AsrServiceError, DiarizationRuntimeUnavailableError, DiarizationServiceError) as exc:
@@ -377,14 +380,13 @@ def persist_live_transcript_reprocessing(
         if transcript is None:
             return
 
-        transcript.transcript_text = result.transcript_text
-        transcript.transcript_entries_json = serialize_meeting_transcript_entries(result.transcript_entries)
-        transcript.language = result.language
+        if result.speaker_diarization_enabled and result.transcript_entries:
+            transcript.transcript_entries_json = serialize_meeting_transcript_entries(result.transcript_entries)
+            transcript.speaker_diarization_enabled = True
+            transcript.speaker_count = result.speaker_count
+            transcript.speaker_diarization_model_name = result.speaker_diarization_model_name
+        transcript.language = result.language or transcript.language
         transcript.duration_seconds = result.duration_seconds or transcript.duration_seconds
-        transcript.model_name = result.asr_model_name
-        transcript.speaker_diarization_enabled = result.speaker_diarization_enabled
-        transcript.speaker_count = result.speaker_count
-        transcript.speaker_diarization_model_name = result.speaker_diarization_model_name
         set_post_processing_status(transcript, state=POST_PROCESSING_COMPLETED, error=None)
         db.commit()
 
@@ -464,11 +466,15 @@ def create_live_session(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Live partial ASR currently supports only local Breeze providers.",
         )
-    final_provider = resolve_ai_provider(
-        kind=AIProviderKind.ASR,
-        provider_id=payload.final_provider_id,
-        current_user=current_user,
-        db=db,
+    final_provider = (
+        resolve_ai_provider(
+            kind=AIProviderKind.ASR,
+            provider_id=payload.final_provider_id,
+            current_user=current_user,
+            db=db,
+        )
+        if payload.final_provider_id is not None
+        else provider
     )
     try:
         provider_asr_service.ensure_provider_ready(provider)
@@ -484,6 +490,7 @@ def create_live_session(
             model_name=provider.model_name,
             final_provider_id=final_provider.id,
             final_model_name=final_provider.model_name,
+            final_provider=final_provider,
             language_hint=normalize_language(payload.language),
             max_duration_seconds=policy.max_audio_seconds_per_request,
         )
@@ -575,13 +582,17 @@ async def persist_live_session(
     transcript_entries_json = serialize_live_entries(live_asr_service.serialize_entries(session.entries))
     transcript_language = session.detected_language or session.language_hint
     transcript_duration_seconds = captured_duration_seconds or None
-    transcript_model_name = session.model_name
+    transcript_model_name = session.final_model_name
     speaker_diarization_enabled = False
     speaker_count = None
     speaker_diarization_model_name = None
     post_processing_state = (
         POST_PROCESSING_QUEUED
-        if stored_audio is not None
+        if (
+            stored_audio is not None
+            and settings.asr_meeting_diarization_enabled
+            and provider_asr_service.supports_speaker_diarization(session.final_provider)
+        )
         else POST_PROCESSING_COMPLETED
     )
 
@@ -608,7 +619,7 @@ async def persist_live_session(
     record_usage_event(
         db,
         user_id=current_user.id,
-        provider_id=session.provider_id,
+        provider_id=session.final_provider_id,
         kind=UsageEventKind.ASR_AUDIO,
         source="asr_live_stream",
         duration_seconds=captured_duration_seconds,
@@ -617,6 +628,8 @@ async def persist_live_session(
     db.refresh(transcript)
     if (
         stored_audio is not None
+        and settings.asr_meeting_diarization_enabled
+        and provider_asr_service.supports_speaker_diarization(session.final_provider)
         and background_tasks is not None
     ):
         background_tasks.add_task(

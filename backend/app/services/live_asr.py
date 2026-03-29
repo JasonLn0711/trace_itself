@@ -8,7 +8,9 @@ import numpy as np
 from faster_whisper.vad import VadOptions, get_speech_timestamps
 
 from app.core.config import get_settings
+from app.models.ai_provider import AIProvider
 from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
+from app.services.provider_asr import service as provider_asr_service
 
 settings = get_settings()
 ORPHANED_PENDING_SESSION_SECONDS = 10
@@ -35,6 +37,7 @@ class LiveAsrSession:
     model_name: str
     final_provider_id: int
     final_model_name: str
+    final_provider: AIProvider
     language_hint: str | None
     max_duration_seconds: int
     created_at: float
@@ -69,6 +72,7 @@ class LiveAsrSessionManager:
         model_name: str,
         final_provider_id: int,
         final_model_name: str,
+        final_provider: AIProvider,
         language_hint: str | None,
         max_duration_seconds: int,
     ) -> LiveAsrSession:
@@ -87,6 +91,7 @@ class LiveAsrSessionManager:
             model_name=model_name,
             final_provider_id=final_provider_id,
             final_model_name=final_model_name,
+            final_provider=final_provider,
             language_hint=language_hint,
             max_duration_seconds=max_duration_seconds,
             created_at=now,
@@ -219,14 +224,15 @@ class LiveAsrSessionManager:
 
     async def _commit_current_utterance(self, session: LiveAsrSession) -> None:
         full_audio = self._concatenate_chunks(session.current_utterance_chunks)
+        prompt_tail = self._prompt_tail(session.committed_text)
         try:
             result = await asyncio.to_thread(
-                asr_service.transcribe_waveform,
+                provider_asr_service.transcribe_waveform,
+                session.final_provider,
                 full_audio,
                 language=session.detected_language or session.language_hint,
-                model_name=session.model_name,
                 beam_size=settings.asr_live_final_beam_size,
-                initial_prompt=self._prompt_tail(session.committed_text),
+                initial_prompt=prompt_tail,
                 condition_on_previous_text=False,
                 chunk_length=min(
                     max(8, int(round(full_audio.size / settings.asr_live_sample_rate))),
@@ -239,15 +245,43 @@ class LiveAsrSessionManager:
         except AsrServiceError:
             result = None
 
-        if result and result.text:
-            session.committed_text = self._append_text(session.committed_text, result.text)
-            session.detected_language = result.language or session.detected_language
+        if result is None and (
+            session.final_provider_id != session.provider_id or session.final_model_name != session.model_name
+        ):
+            try:
+                result = await asyncio.to_thread(
+                    asr_service.transcribe_waveform,
+                    full_audio,
+                    language=session.detected_language or session.language_hint,
+                    model_name=session.model_name,
+                    beam_size=settings.asr_live_final_beam_size,
+                    initial_prompt=prompt_tail,
+                    condition_on_previous_text=False,
+                    chunk_length=min(
+                        max(8, int(round(full_audio.size / settings.asr_live_sample_rate))),
+                        max(settings.asr_live_max_window_seconds, 30),
+                    ),
+                    vad_parameters=self._vad_parameters(),
+                )
+            except AsrRuntimeUnavailableError:
+                raise
+            except AsrServiceError:
+                result = None
+
+        raw_committed_text = result.text.strip() if result and result.text else ""
+        committed_text = self._extract_incremental_text(session.committed_text, raw_committed_text)
+        if not committed_text:
+            committed_text = self._extract_incremental_text(session.committed_text, session.partial_text.strip())
+        if committed_text:
+            session.committed_text = self._append_text(session.committed_text, committed_text)
+            if result and result.language:
+                session.detected_language = result.language or session.detected_language
             session.entries.insert(
                 0,
                 LiveTranscriptEntry(
                     id=uuid4().hex,
                     recorded_at=session.current_utterance_started_at or datetime.now(timezone.utc),
-                    text=result.text.strip(),
+                    text=committed_text,
                 ),
             )
 
@@ -368,6 +402,24 @@ class LiveAsrSessionManager:
             return addition.strip()
         return f"{existing.rstrip()}\n{addition.strip()}"
 
+    @classmethod
+    def _extract_incremental_text(cls, existing: str, candidate: str) -> str:
+        candidate = candidate.strip()
+        if not candidate:
+            return ""
+
+        normalized_existing = cls._normalize_text_for_overlap(existing)
+        normalized_candidate = cls._normalize_text_for_overlap(candidate)
+        if not normalized_existing or not normalized_candidate:
+            return candidate
+        if normalized_candidate == normalized_existing:
+            return ""
+
+        overlap = cls._longest_overlap_suffix_prefix(normalized_existing, normalized_candidate)
+        if not overlap or len(overlap) < cls._minimum_overlap_length(normalized_candidate):
+            return candidate
+        return cls._trim_prefix_by_normalized_text(candidate, overlap)
+
     @staticmethod
     def _preview_text(session: LiveAsrSession) -> str:
         if session.committed_text and session.partial_text:
@@ -380,6 +432,42 @@ class LiveAsrSessionManager:
         if not words:
             return None
         return " ".join(words[-settings.asr_live_prompt_tail_words :])
+
+    @staticmethod
+    def _normalize_text_for_overlap(value: str) -> str:
+        return " ".join(value.split())
+
+    @staticmethod
+    def _longest_overlap_suffix_prefix(existing: str, candidate: str) -> str:
+        max_overlap = min(len(existing), len(candidate))
+        for length in range(max_overlap, 0, -1):
+            if existing[-length:] == candidate[:length]:
+                return candidate[:length]
+        return ""
+
+    @staticmethod
+    def _minimum_overlap_length(candidate: str) -> int:
+        return max(6, len(candidate) // 3)
+
+    @classmethod
+    def _trim_prefix_by_normalized_text(cls, value: str, normalized_prefix: str) -> str:
+        if not normalized_prefix:
+            return value.strip()
+
+        collapsed: list[str] = []
+        pending_space = False
+        for index, char in enumerate(value):
+            if char.isspace():
+                if collapsed:
+                    pending_space = True
+                continue
+            if pending_space:
+                collapsed.append(" ")
+                pending_space = False
+            collapsed.append(char)
+            if "".join(collapsed) == normalized_prefix:
+                return value[index + 1 :].strip()
+        return value.strip()
 
     @staticmethod
     def _vad_parameters() -> dict[str, int | float]:
