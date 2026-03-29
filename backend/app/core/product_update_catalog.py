@@ -539,4 +539,19 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         changed_at=datetime.fromisoformat("2026-03-29T09:30:00+00:00"),
         is_pinned=True,
     ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-replay-upload-body-limit",
+        version_tag="v1.1.15",
+        title="Long live replay uploads no longer hit the old frontend body cap",
+        summary="The frontend proxy now accepts larger replay-audio uploads during live stop/save.",
+        details=(
+            "Long saved live takes were still at risk of transcript-only fallback because Next.js buffered proxied upload "
+            "bodies with a default 10 MB limit before forwarding them to FastAPI. The frontend now raises that proxy "
+            "body-size ceiling so longer replay attachments can reach the backend intact."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-29T10:15:00+00:00"),
+        is_pinned=True,
+    ),
 )

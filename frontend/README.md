@@ -65,5 +65,6 @@ Audio-workspace behavior to keep in mind:
 - live recognition uses the browser worklet's normalized mono `16 kHz` PCM stream, so transport batch size and saved replay bitrate are separate concerns
 - the browser currently targets about `32 KB` PCM uploads with a short max-wait guard so weaker connections are less likely to turn queue growth into oversized requests
 - saved live replay audio is recorded at about `64 kbps` to keep stop/save uploads smaller without materially changing the live ASR path itself
+- the Next.js `/api` proxy now allows larger request bodies by default so long live replay uploads are not clipped around the old `10 MB` limit before they reach FastAPI
 - the transcript UI now shows replay-processing status for saved live takes while background speaker-tag refinement is still running
 - true real-time live diarization is not part of the current stream path

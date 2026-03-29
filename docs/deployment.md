@@ -99,6 +99,7 @@ Optional ASR tuning:
 - `ASR_LIVE_MAX_CHUNK_KB=2048` for the backend hard ceiling on accepted live audio chunk size
 - `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB=32` for the browser-side upload granularity; this only changes transport batching and not ASR decoder context
 - `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS=1000` for the browser-side max wait before flushing a smaller transport batch
+- `NEXT_PROXY_CLIENT_MAX_BODY_SIZE=128mb` for the Next.js frontend proxy limit on larger replay-audio uploads during live stop/save
 - `ASR_LIVE_MAX_UTTERANCE_SECONDS=45` for the longest uninterrupted live utterance buffered before a forced commit
 - `ASR_LIVE_MAX_SESSIONS_PER_USER=2` for the maximum number of non-finalized live ASR sessions per account
 - `ASR_MAX_UPLOAD_MB=512` for long compressed ASR uploads
@@ -217,6 +218,7 @@ ASR notes:
 - The recorder now lives at the authenticated app-shell level instead of only inside the `Audio` page, and other pages expose a compact live dock so users can stop, save, or jump back to `Audio` without losing the session.
 - The open-session limit now counts only non-finalized sessions, and obviously orphaned pre-start sessions are reaped automatically so one visible recorder does not trip a false multi-session error.
 - Saved live replay audio is now recorded at about `64 kbps` instead of `128 kbps`, which keeps stop/save uploads smaller while leaving the live PCM ASR path unchanged.
+- The frontend proxy now raises Next.js request-body buffering to `128mb` by default so longer live replay attachments can reach FastAPI without being truncated around the old `10 MB` ceiling.
 - Stopping a long live take now returns the transcript row first, then finishes replay-audio transcription and diarization in a FastAPI background task so the stop/save request does not stay open for the full NeMo pass.
 - The transcript list and detail view now expose replay-processing status for saved live takes, so `Queued`, `Refining`, or `Replay failed` reflects whether the background saved-audio pass has finished.
 - Saved audio passed to the diarizer is normalized to mono `16 kHz` WAV with `ffmpeg` before NeMo runs, which keeps browser-recorded WebM uploads compatible with the Sortformer path.

@@ -12,6 +12,8 @@ Latest repo updates are listed here so reviewers can immediately see what change
 
 ### Updated 2026-03-29
 
+- `Longer Live Replay Uploads`
+  Raised the Next.js proxy body limit for `/api` uploads so longer saved live replay files no longer get truncated around the default `10 MB` frontend ceiling before they reach FastAPI.
 - `Faster Live Save + Background Replay Refinement`
   Stopping live ASR now saves the transcript row immediately, stores replay audio first, and moves long saved-audio transcription plus diarization work into a background task so long takes do not hold the stop/save request open.
 - `Expanded Transcript Diarization`
@@ -145,6 +147,8 @@ Recent live ASR work focused on three different failure modes: long recording sa
   The fragile part was not the PCM chunk streaming itself. The failure happened later, when the browser-uploaded recording was sent to the live-session `persist` endpoint. That proxy was reparsing multipart uploads with `request.formData()`, so longer recordings were buffered a second time inside Next.js before FastAPI ever received them.
 - `Upload-path fix`
   The proxy now forwards the original multipart request body as a stream, preserves the incoming `content-type` boundary and `content-length`, and uses `duplex: 'half'` so Node can pass the upload through without rebuilding the whole form in memory first.
+- `Frontend body-limit fix`
+  Next.js was still buffering proxied upload bodies with a default `10 MB` ceiling, which is why long saved live replays could end in `socket hang up` and force a transcript-only rescue. The frontend now raises that proxy body limit so larger replay uploads can reach FastAPI intact.
 - `Burst-handling fix`
   The backend now accepts live chunk requests up to `2048 KB`, while the browser sends much smaller transport batches by default. Normal live uploads now target about `32 KB` with a short max-wait guard, but the backend still keeps its own rolling decoder window and utterance buffer so recognition context does not shrink with transport size.
 - `Browser PCM conditioning`
