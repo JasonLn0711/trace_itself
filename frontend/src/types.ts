@@ -178,6 +178,7 @@ export interface LiveAsrSessionSnapshot {
   entries: LiveAsrTranscriptEntry[];
   partial_entry: LiveAsrTranscriptEntry | null;
   model_name: string;
+  final_model_name: string | null;
   final_ready: boolean;
 }
 
@@ -495,4 +496,207 @@ export interface UserPasswordResetInput {
 export interface ApiErrorPayload {
   detail?: unknown;
   message?: string;
+}
+
+export interface NutritionProfile {
+  username: string;
+  display_name: string | null;
+  age: number | null;
+  sex: string | null;
+  height_cm: number | null;
+  current_weight_kg: number | null;
+  target_weight_kg: number | null;
+  goal_type: string | null;
+  activity_level: string | null;
+  weekly_workouts: number | null;
+  workout_types: string[];
+  location_region: string | null;
+  dietary_preferences: string[];
+  allergies: string[];
+  disliked_foods: string[];
+  tracking_focus: string[];
+  updated_at: string;
+}
+
+export interface NutritionProfileInput {
+  display_name?: string | null;
+  age?: number | null;
+  sex?: string | null;
+  height_cm?: number | null;
+  current_weight_kg?: number | null;
+  target_weight_kg?: number | null;
+  goal_type?: string | null;
+  activity_level?: string | null;
+  weekly_workouts?: number | null;
+  workout_types?: string[];
+  location_region?: string | null;
+  dietary_preferences?: string[];
+  allergies?: string[];
+  disliked_foods?: string[];
+  tracking_focus?: string[];
+}
+
+export interface NutritionGoal {
+  id: number;
+  daily_calorie_target: number | null;
+  daily_protein_g: number | null;
+  daily_carbs_g: number | null;
+  daily_fat_g: number | null;
+  daily_sugar_g: number | null;
+  daily_sodium_mg: number | null;
+  daily_fiber_g: number | null;
+  updated_at: string;
+}
+
+export interface NutritionGoalInput {
+  daily_calorie_target?: number | null;
+  daily_protein_g?: number | null;
+  daily_carbs_g?: number | null;
+  daily_fat_g?: number | null;
+  daily_sugar_g?: number | null;
+  daily_sodium_mg?: number | null;
+  daily_fiber_g?: number | null;
+}
+
+export interface BodyLog {
+  id: number;
+  log_date: string;
+  weight_kg: number | null;
+  body_fat_pct: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BodyLogInput {
+  log_date: string;
+  weight_kg?: number | null;
+  body_fat_pct?: number | null;
+  notes?: string | null;
+}
+
+export interface MealItem {
+  id?: number;
+  food_name: string;
+  canonical_food_id?: number | null;
+  estimated_portion_label?: string | null;
+  estimated_quantity?: number | null;
+  estimated_unit?: string | null;
+  calories?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+  sugar_g?: number | null;
+  sodium_mg?: number | null;
+  fiber_g?: number | null;
+  confidence?: number | null;
+  source_type?: string | null;
+  uncertain?: boolean;
+  notes?: string | null;
+  created_at?: string;
+}
+
+export interface MealSummary {
+  id: number;
+  meal_type: string;
+  eaten_at: string;
+  status: string;
+  total_calories: number | null;
+  total_protein_g: number | null;
+  total_carbs_g: number | null;
+  total_fat_g: number | null;
+  total_sugar_g: number | null;
+  total_sodium_mg: number | null;
+  total_fiber_g: number | null;
+  ai_summary: string | null;
+  suggestion_text: string | null;
+  user_confirmed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Meal extends MealSummary {
+  eaten_at: string;
+  image_object_key: string | null;
+  audio_object_key: string | null;
+  transcript_text: string | null;
+  extra_text: string | null;
+  items: MealItem[];
+}
+
+export interface MealInput {
+  meal_type: string;
+  eaten_at: string;
+  image_object_key?: string | null;
+  audio_object_key?: string | null;
+  transcript_text?: string | null;
+  extra_text?: string | null;
+}
+
+export interface MealUpdateInput {
+  meal_type?: string;
+  eaten_at?: string;
+  image_object_key?: string | null;
+  audio_object_key?: string | null;
+  transcript_text?: string | null;
+  extra_text?: string | null;
+  items?: MealItem[];
+}
+
+export interface MealConfirmInput {
+  transcript_text?: string | null;
+  extra_text?: string | null;
+  items: MealItem[];
+}
+
+export interface NutritionToday {
+  date: string;
+  calorie_target: number | null;
+  total_calories: number;
+  remaining_calories: number | null;
+  total_protein_g: number;
+  total_carbs_g: number;
+  total_fat_g: number;
+  total_sugar_g: number;
+  total_sodium_mg: number;
+  total_fiber_g: number;
+  meals: MealSummary[];
+  high_risk_meals: string[];
+  encouragement: string;
+  suggestions: string[];
+}
+
+export interface NutritionTrendPoint {
+  date: string;
+  label: string;
+  calories: number;
+  protein_g: number;
+}
+
+export interface NutritionWeightPoint {
+  date: string;
+  weight_kg: number;
+}
+
+export interface NutritionTopFood {
+  food_name: string;
+  count: number;
+}
+
+export interface NutritionRiskWindow {
+  meal_type: string;
+  count: number;
+}
+
+export interface NutritionWindow {
+  window_start: string;
+  window_end: string;
+  days: number;
+  calorie_points: NutritionTrendPoint[];
+  weight_points: NutritionWeightPoint[];
+  protein_target_days: number;
+  average_calories: number;
+  average_protein_g: number;
+  top_foods: NutritionTopFood[];
+  risk_windows: NutritionRiskWindow[];
+  summary_text: string;
 }

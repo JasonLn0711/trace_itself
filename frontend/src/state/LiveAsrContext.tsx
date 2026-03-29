@@ -16,6 +16,8 @@ export type LiveState = 'idle' | 'connecting' | 'live' | 'stopping' | 'saving';
 export type LiveAsrDraft = {
   providerId: number | null;
   providerLabel: string;
+  finalProviderId: number | null;
+  finalProviderLabel: string;
   language: string;
   title: string;
   usageAudioSeconds: number | null;
@@ -61,6 +63,8 @@ const DEFAULT_LIVE_TRANSPORT_MAX_WAIT_MS = 1000;
 const INITIAL_DRAFT: LiveAsrDraft = {
   providerId: null,
   providerLabel: 'ASR',
+  finalProviderId: null,
+  finalProviderLabel: 'ASR',
   language: '',
   title: '',
   usageAudioSeconds: null,
@@ -178,7 +182,7 @@ function liveLabelForState(state: LiveState) {
 
 function liveSaveNoticeForTranscript(transcript: AsrTranscript) {
   if (transcript.post_processing_state === 'queued' || transcript.post_processing_state === 'running') {
-    return 'Live transcript saved. Replay audio is refining speaker tags in the background.';
+    return 'Live transcript saved. Replay audio is refining the final transcript in the background.';
   }
   if (transcript.speaker_diarization_enabled) {
     return 'Live transcript saved with speaker tags.';
@@ -236,6 +240,8 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       const next = { ...current, ...partial };
       return Object.is(current.providerId, next.providerId) &&
         current.providerLabel === next.providerLabel &&
+        Object.is(current.finalProviderId, next.finalProviderId) &&
+        current.finalProviderLabel === next.finalProviderLabel &&
         current.language === next.language &&
         current.title === next.title &&
         Object.is(current.usageAudioSeconds, next.usageAudioSeconds) &&
@@ -531,6 +537,7 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       setState('connecting');
       const nextSnapshot = await asrApi.createLiveSession({
         provider_id: draftRef.current.providerId,
+        final_provider_id: draftRef.current.finalProviderId ?? draftRef.current.providerId,
         language: draftRef.current.language
       });
       createdSessionId = nextSnapshot.session_id;

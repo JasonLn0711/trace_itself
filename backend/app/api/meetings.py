@@ -21,7 +21,7 @@ from app.models.meeting_record import MeetingRecord
 from app.models.project import Project
 from app.models.user import User
 from app.schemas.meeting import MeetingRecordRead, MeetingRecordSummaryRead
-from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
+from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError
 from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
 from app.services.diarization import (
     DiarizationRuntimeUnavailableError,
@@ -30,6 +30,7 @@ from app.services.diarization import (
 )
 from app.services.meeting_ai import MeetingAiError, generate_meeting_artifacts
 from app.services.meeting_transcription import MeetingTranscriptEntry, service as meeting_transcription_service
+from app.services.provider_asr import service as provider_asr_service
 from app.services.usage_policy import ensure_audio_duration_allowed, ensure_llm_budget_available, get_or_create_usage_policy, record_usage_event
 from app.core.enums import UsageEventKind
 
@@ -273,7 +274,12 @@ def create_meeting(
         db=db,
     )
     try:
-        asr_service.ensure_model_ready(asr_provider.model_name)
+        provider_asr_service.ensure_provider_ready(asr_provider)
+        if speaker_diarization and not provider_asr_service.supports_speaker_diarization(asr_provider):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Selected ASR provider does not support speaker diarization on saved audio.",
+            )
         if speaker_diarization:
             diarization_service.ensure_model_ready()
     except AsrRuntimeUnavailableError as exc:
@@ -302,7 +308,7 @@ def create_meeting(
         transcript = meeting_transcription_service.transcribe(
             stored_audio.storage_path,
             language=normalized_language,
-            model_name=asr_provider.model_name,
+            provider=asr_provider,
             enable_speaker_diarization=speaker_diarization,
             max_speaker_count=max_speaker_count,
         )

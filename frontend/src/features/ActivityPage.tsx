@@ -169,7 +169,7 @@ export function ActivityPage() {
             <button className="btn btn-primary" type="button" onClick={() => void loadEvents()}>
               {refreshing ? 'Refreshing...' : 'Refresh'}
             </button>
-            <Link className="btn btn-ghost" href="/users">Control</Link>
+            <Link className="btn btn-ghost" href="/control">Control</Link>
             <Link className="btn btn-ghost" href="/">Home</Link>
           </>
         }

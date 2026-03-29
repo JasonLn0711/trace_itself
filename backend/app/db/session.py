@@ -11,6 +11,7 @@ from app.db.bootstrap import (
     backfill_existing_data,
     ensure_default_access_groups,
     ensure_default_ai_providers,
+    ensure_default_food_catalog,
     ensure_initial_admin,
     ensure_usage_policy,
     finalize_schema_upgrades,
@@ -43,6 +44,7 @@ def init_db() -> None:
                 full_access_group = ensure_default_access_groups(db)
                 ensure_default_ai_providers(db)
                 ensure_usage_policy(db)
+                ensure_default_food_catalog(db)
                 backfill_existing_data(db, admin.id, full_access_group.id)
                 sync_product_updates_catalog(db, admin.id)
             with engine.begin() as connection:

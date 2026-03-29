@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     asr_meeting_diarization_min_overlap_ratio: float = 0.35
     meeting_upload_dir: str = "/data/meetings"
     meeting_max_upload_mb: int = 512
+    meal_upload_dir: str = "/data/meals"
+    meal_max_audio_upload_mb: int = 32
+    meal_max_image_upload_mb: int = 16
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.1-flash-lite-preview"
 
@@ -97,6 +100,14 @@ class Settings(BaseSettings):
     @property
     def meeting_max_upload_bytes(self) -> int:
         return self.meeting_max_upload_mb * 1024 * 1024
+
+    @property
+    def meal_max_audio_upload_bytes(self) -> int:
+        return self.meal_max_audio_upload_mb * 1024 * 1024
+
+    @property
+    def meal_max_image_upload_bytes(self) -> int:
+        return self.meal_max_image_upload_mb * 1024 * 1024
 
     @property
     def is_production_like(self) -> bool:

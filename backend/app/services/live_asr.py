@@ -33,6 +33,8 @@ class LiveAsrSession:
     user_id: int
     provider_id: int
     model_name: str
+    final_provider_id: int
+    final_model_name: str
     language_hint: str | None
     max_duration_seconds: int
     created_at: float
@@ -65,6 +67,8 @@ class LiveAsrSessionManager:
         user_id: int,
         provider_id: int,
         model_name: str,
+        final_provider_id: int,
+        final_model_name: str,
         language_hint: str | None,
         max_duration_seconds: int,
     ) -> LiveAsrSession:
@@ -81,6 +85,8 @@ class LiveAsrSessionManager:
             user_id=user_id,
             provider_id=provider_id,
             model_name=model_name,
+            final_provider_id=final_provider_id,
+            final_model_name=final_model_name,
             language_hint=language_hint,
             max_duration_seconds=max_duration_seconds,
             created_at=now,
@@ -407,6 +413,7 @@ class LiveAsrSessionManager:
             ],
             "partial_entry": partial_entry,
             "model_name": session.model_name,
+            "final_model_name": session.final_model_name,
             "final_ready": session.finalized,
         }
 

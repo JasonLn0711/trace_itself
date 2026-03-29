@@ -58,6 +58,7 @@ class AsrTranscriptRead(BaseModel):
 
 class LiveAsrSessionCreate(BaseModel):
     provider_id: int | None = None
+    final_provider_id: int | None = None
     language: str | None = None
 
 
@@ -79,6 +80,7 @@ class LiveAsrSessionRead(BaseModel):
     entries: list[LiveAsrTranscriptEntryRead]
     partial_entry: LiveAsrTranscriptEntryRead | None = None
     model_name: str
+    final_model_name: str | None = None
     final_ready: bool
 
 

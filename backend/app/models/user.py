@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, JSON, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import UserRole
@@ -19,6 +19,20 @@ class User(Base):
         default=UserRole.MEMBER,
         nullable=False,
     )
+    age: Mapped[int | None] = mapped_column(Integer)
+    sex: Mapped[str | None] = mapped_column(String(20))
+    height_cm: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    current_weight_kg: Mapped[float | None] = mapped_column(Numeric(6, 2))
+    target_weight_kg: Mapped[float | None] = mapped_column(Numeric(6, 2))
+    goal_type: Mapped[str | None] = mapped_column(String(30))
+    activity_level: Mapped[str | None] = mapped_column(String(30))
+    weekly_workouts: Mapped[int | None] = mapped_column(Integer)
+    workout_types: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    location_region: Mapped[str | None] = mapped_column(String(100))
+    dietary_preferences: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    allergies: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    disliked_foods: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    tracking_focus: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     access_group_id: Mapped[int | None] = mapped_column(ForeignKey("access_groups.id", ondelete="SET NULL"), index=True)
     max_concurrent_sessions: Mapped[int] = mapped_column(Integer, default=2, server_default="2", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -44,6 +58,9 @@ class User(Base):
     audit_events = relationship("AuditEvent", back_populates="user")
     product_updates = relationship("ProductUpdate", back_populates="author")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    nutrition_goal = relationship("UserGoal", back_populates="user", cascade="all, delete-orphan", uselist=False)
+    body_logs = relationship("BodyLog", back_populates="user", cascade="all, delete-orphan")
+    meals = relationship("Meal", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def access_group_name(self) -> str | None:

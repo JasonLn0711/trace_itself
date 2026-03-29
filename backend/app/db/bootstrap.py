@@ -2,10 +2,12 @@ from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.food_catalog_seed import FOOD_CATALOG_SEED
 from app.core.product_update_catalog import PRODUCT_UPDATE_CATALOG
 from app.core.enums import AIProviderDriver, AIProviderKind, UserRole
 from app.models.access_group import AccessGroup
 from app.models.ai_provider import AIProvider
+from app.models.food_catalog import FoodCatalog
 from app.models.product_update import ProductUpdate
 from app.models.user import User
 from app.models.usage_policy import UsagePolicy
@@ -41,6 +43,30 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS max_concurrent_sessions INTEGER"))
     connection.execute(text("ALTER TABLE users ALTER COLUMN max_concurrent_sessions SET DEFAULT 2"))
     connection.execute(text("UPDATE users SET max_concurrent_sessions = 2 WHERE max_concurrent_sessions IS NULL OR max_concurrent_sessions < 1"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS sex VARCHAR(20)"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS height_cm NUMERIC(5,2)"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_weight_kg NUMERIC(6,2)"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS target_weight_kg NUMERIC(6,2)"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS goal_type VARCHAR(30)"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS activity_level VARCHAR(30)"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS weekly_workouts INTEGER"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS workout_types JSONB"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS location_region VARCHAR(100)"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS dietary_preferences JSONB"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS allergies JSONB"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS disliked_foods JSONB"))
+    connection.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS tracking_focus JSONB"))
+    connection.execute(text("ALTER TABLE users ALTER COLUMN workout_types SET DEFAULT '[]'::jsonb"))
+    connection.execute(text("ALTER TABLE users ALTER COLUMN dietary_preferences SET DEFAULT '[]'::jsonb"))
+    connection.execute(text("ALTER TABLE users ALTER COLUMN allergies SET DEFAULT '[]'::jsonb"))
+    connection.execute(text("ALTER TABLE users ALTER COLUMN disliked_foods SET DEFAULT '[]'::jsonb"))
+    connection.execute(text("ALTER TABLE users ALTER COLUMN tracking_focus SET DEFAULT '[]'::jsonb"))
+    connection.execute(text("UPDATE users SET workout_types = '[]'::jsonb WHERE workout_types IS NULL"))
+    connection.execute(text("UPDATE users SET dietary_preferences = '[]'::jsonb WHERE dietary_preferences IS NULL"))
+    connection.execute(text("UPDATE users SET allergies = '[]'::jsonb WHERE allergies IS NULL"))
+    connection.execute(text("UPDATE users SET disliked_foods = '[]'::jsonb WHERE disliked_foods IS NULL"))
+    connection.execute(text("UPDATE users SET tracking_focus = '[]'::jsonb WHERE tracking_focus IS NULL"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_storage_path VARCHAR(255)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS audio_mime_type VARCHAR(120)"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS capture_mode VARCHAR(32)"))
@@ -429,6 +455,7 @@ def ensure_default_access_groups(db: Session) -> AccessGroup:
 
 def ensure_default_ai_providers(db: Session) -> None:
     created = False
+    shared_gemini_name = "Gemini 3.1 Flash-Lite"
 
     local_asr = db.scalar(select(AIProvider).where(AIProvider.name == "Local Breeze ASR"))
     if local_asr is None:
@@ -463,23 +490,49 @@ def ensure_default_ai_providers(db: Session) -> None:
             created = True
 
     if settings.gemini_api_key:
-        gemini = db.scalar(select(AIProvider).where(AIProvider.name == "Gemini Meeting Notes"))
+        gemini = db.scalar(select(AIProvider).where(AIProvider.name == shared_gemini_name))
+        if gemini is None:
+            gemini = db.scalar(select(AIProvider).where(AIProvider.name == "Gemini Meeting Notes"))
         if gemini is None:
             api_key = settings.gemini_api_key.strip()
             db.add(
                 AIProvider(
-                    name="Gemini Meeting Notes",
+                    name=shared_gemini_name,
                     kind=AIProviderKind.LLM,
                     driver=AIProviderDriver.GEMINI,
                     model_name=settings.gemini_model,
                     base_url="https://generativelanguage.googleapis.com/v1beta",
                     api_key_encrypted=encrypt_secret(api_key),
                     api_key_hint=make_secret_hint(api_key),
-                    description="Gemini provider for meeting summaries and action items.",
+                    description="Gemini provider for nutrition STT, multimodal meal analysis, and meeting notes.",
                     is_active=True,
                 )
             )
             created = True
+        else:
+            updated = False
+            if gemini.name != shared_gemini_name:
+                gemini.name = shared_gemini_name
+                updated = True
+            if gemini.model_name != settings.gemini_model:
+                gemini.model_name = settings.gemini_model
+                updated = True
+            if gemini.driver != AIProviderDriver.GEMINI:
+                gemini.driver = AIProviderDriver.GEMINI
+                updated = True
+            if gemini.kind != AIProviderKind.LLM:
+                gemini.kind = AIProviderKind.LLM
+                updated = True
+            if gemini.base_url != "https://generativelanguage.googleapis.com/v1beta":
+                gemini.base_url = "https://generativelanguage.googleapis.com/v1beta"
+                updated = True
+            expected_description = "Gemini provider for nutrition STT, multimodal meal analysis, and meeting notes."
+            if gemini.description != expected_description:
+                gemini.description = expected_description
+                updated = True
+            if updated:
+                db.add(gemini)
+                created = True
 
     if created:
         db.commit()
@@ -499,6 +552,28 @@ def ensure_usage_policy(db: Session) -> UsagePolicy:
     db.commit()
     db.refresh(policy)
     return policy
+
+
+def ensure_default_food_catalog(db: Session) -> None:
+    items = list(db.scalars(select(FoodCatalog).order_by(FoodCatalog.id.asc())).all())
+    existing_by_key = {(item.food_name, item.locale): item for item in items}
+    dirty = False
+
+    for seed in FOOD_CATALOG_SEED:
+        key = (seed["food_name"], seed["locale"])
+        item = existing_by_key.get(key)
+        if item is None:
+            db.add(FoodCatalog(**seed))
+            dirty = True
+            continue
+
+        for field, value in seed.items():
+            if getattr(item, field) != value:
+                setattr(item, field, value)
+                dirty = True
+
+    if dirty:
+        db.commit()
 
 
 def sync_product_updates_catalog(db: Session, admin_id: int) -> None:

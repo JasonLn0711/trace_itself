@@ -84,12 +84,12 @@ const emptyAccessGroupForm = (): AccessGroupFormState => ({
 });
 
 const emptyAIProviderForm = (): AIProviderFormState => ({
-  name: '',
-  kind: 'asr',
-  driver: 'local_breeze',
-  model_name: '',
-  base_url: '',
-  description: '',
+  name: 'Gemini 3.1 Flash-Lite',
+  kind: 'llm',
+  driver: 'gemini',
+  model_name: 'gemini-3.1-flash-lite-preview',
+  base_url: 'https://generativelanguage.googleapis.com/v1beta',
+  description: 'Shared Gemini provider for nutrition STT, multimodal meal analysis, and meeting notes.',
   is_active: true,
   api_key: ''
 });
@@ -128,8 +128,29 @@ function providerToEdit(provider: AIProvider): AIProviderFormState {
   };
 }
 
-function normalizeProviderDriver(kind: AIProviderKind): AIProviderDriver {
-  return kind === 'asr' ? 'local_breeze' : 'gemini';
+function providerDefaultsForKind(kind: AIProviderKind) {
+  if (kind === 'llm') {
+    return {
+      driver: 'gemini' as AIProviderDriver,
+      model_name: 'gemini-3.1-flash-lite-preview',
+      base_url: 'https://generativelanguage.googleapis.com/v1beta'
+    };
+  }
+  return {
+    driver: 'local_breeze' as AIProviderDriver,
+    model_name: 'SoybeanMilk/faster-whisper-Breeze-ASR-25',
+    base_url: ''
+  };
+}
+
+function providerPurpose(provider: AIProvider) {
+  if (provider.driver === 'gemini' && provider.kind === 'llm') {
+    return 'Nutrition STT + meal multimodal analysis + meeting notes';
+  }
+  if (provider.kind === 'asr') {
+    return 'Audio workspace transcription';
+  }
+  return 'General text generation';
 }
 
 function capabilitySummary(group: AccessGroup) {
@@ -796,7 +817,7 @@ export function UsersPage() {
       {tab === 'providers' ? (
         <div className="grid two">
           <Card className="section-card">
-            <SectionHeader title="New provider" />
+            <SectionHeader title="New provider" description="Gemini is the shared API for nutrition STT, meal analysis, and meeting notes. Keep local Breeze only if you still want the private live/audio workspace." />
             <form className="form-grid" onSubmit={handleCreateProvider}>
               <Field label="Name">
                 <input value={createProviderForm.name} onChange={(event) => setCreateProviderForm({ ...createProviderForm, name: event.target.value })} required />
@@ -807,7 +828,14 @@ export function UsersPage() {
                     value={createProviderForm.kind}
                     onChange={(event) => {
                       const kind = event.target.value as AIProviderKind;
-                      setCreateProviderForm({ ...createProviderForm, kind, driver: normalizeProviderDriver(kind) });
+                      const defaults = providerDefaultsForKind(kind);
+                      setCreateProviderForm({
+                        ...createProviderForm,
+                        kind,
+                        driver: defaults.driver,
+                        model_name: defaults.model_name,
+                        base_url: defaults.base_url
+                      });
                     }}
                   >
                     <option value="asr">asr</option>
@@ -866,6 +894,7 @@ export function UsersPage() {
                         <div className="list-row-copy line-clamp-1">
                           {provider.model_name} · {provider.api_key_hint || (provider.has_api_key ? 'key set' : 'no key')}
                         </div>
+                        <div className="list-row-copy line-clamp-1">{providerPurpose(provider)}</div>
                         <Field label="Name">
                           <input value={form.name} onChange={(event) => setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, name: event.target.value } })} />
                         </Field>
@@ -875,7 +904,17 @@ export function UsersPage() {
                               value={form.kind}
                               onChange={(event) => {
                                 const kind = event.target.value as AIProviderKind;
-                                setEditProviderForms({ ...editProviderForms, [provider.id]: { ...form, kind, driver: normalizeProviderDriver(kind) } });
+                                const defaults = providerDefaultsForKind(kind);
+                                setEditProviderForms({
+                                  ...editProviderForms,
+                                  [provider.id]: {
+                                    ...form,
+                                    kind,
+                                    driver: defaults.driver,
+                                    model_name: defaults.model_name,
+                                    base_url: defaults.base_url
+                                  }
+                                });
                               }}
                             >
                               <option value="asr">asr</option>

@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 from app.core.enums import AIProviderKind, AppFeature
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.models.body_log import BodyLog
 from app.models.daily_log import DailyLog
 from app.models.asr_transcript import AsrTranscript
 from app.models.ai_provider import AIProvider
+from app.models.meal import Meal
 from app.models.milestone import Milestone
 from app.models.meeting_record import MeetingRecord
 from app.models.project import Project
@@ -164,6 +166,17 @@ def get_daily_log_or_404(
     return daily_log
 
 
+def get_body_log_or_404(
+    body_log_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BodyLog:
+    body_log = db.scalar(select(BodyLog).where(BodyLog.id == body_log_id, BodyLog.user_id == current_user.id))
+    if not body_log:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Body log not found.")
+    return body_log
+
+
 def get_asr_transcript_or_404(
     transcript_id: int,
     current_user: User = Depends(get_current_user),
@@ -173,6 +186,17 @@ def get_asr_transcript_or_404(
     if not transcript:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transcript not found.")
     return transcript
+
+
+def get_meal_or_404(
+    meal_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Meal:
+    meal = db.scalar(select(Meal).where(Meal.id == meal_id, Meal.user_id == current_user.id))
+    if not meal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found.")
+    return meal
 
 
 def get_meeting_record_or_404(

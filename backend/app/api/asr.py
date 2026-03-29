@@ -12,14 +12,16 @@ from app.api.deps import get_asr_transcript_or_404, get_current_user, require_as
 from app.core.enums import AIProviderKind
 from app.core.config import get_settings
 from app.db.session import SessionLocal, get_db
+from app.models.ai_provider import AIProvider
 from app.models.asr_transcript import AsrTranscript
 from app.models.user import User
 from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary, LiveAsrSessionCreate, LiveAsrSessionRead
-from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError, service as asr_service
+from app.services.asr import AsrRuntimeUnavailableError, AsrServiceError
 from app.services.audio_storage import delete_audio_file, probe_audio_duration_seconds, save_upload_file
 from app.services.diarization import DiarizationRuntimeUnavailableError, DiarizationServiceError, service as diarization_service
 from app.services.live_asr import LiveAsrSessionError, service as live_asr_service
 from app.services.meeting_transcription import service as meeting_transcription_service
+from app.services.provider_asr import service as provider_asr_service
 from app.services.usage_policy import ensure_audio_duration_allowed, get_or_create_usage_policy, record_usage_event
 from app.core.enums import UsageEventKind
 
@@ -321,12 +323,21 @@ def persist_live_transcript_reprocessing(
     transcript_id: int,
     storage_relative_path: str,
     language: str | None,
-    model_name: str,
+    provider_id: int,
 ) -> None:
     audio_path = Path(settings.asr_upload_dir) / storage_relative_path
     with SessionLocal() as db:
         transcript = db.get(AsrTranscript, transcript_id)
         if transcript is None:
+            return
+        provider = db.get(AIProvider, provider_id)
+        if provider is None or not provider.is_active:
+            set_post_processing_status(
+                transcript,
+                state=POST_PROCESSING_FAILED,
+                error="Final transcript provider is no longer available.",
+            )
+            db.commit()
             return
         if not audio_path.exists():
             set_post_processing_status(
@@ -341,11 +352,12 @@ def persist_live_transcript_reprocessing(
         db.commit()
 
         try:
+            provider_asr_service.ensure_provider_ready(provider)
             result = meeting_transcription_service.transcribe(
                 audio_path,
                 language=language,
-                model_name=model_name,
-                enable_speaker_diarization=True,
+                provider=provider,
+                enable_speaker_diarization=provider_asr_service.supports_speaker_diarization(provider),
                 max_speaker_count=None,
             )
         except (AsrRuntimeUnavailableError, AsrServiceError, DiarizationRuntimeUnavailableError, DiarizationServiceError) as exc:
@@ -447,8 +459,21 @@ def create_live_session(
         current_user=current_user,
         db=db,
     )
+    if not provider_asr_service.supports_live_streaming(provider):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Live partial ASR currently supports only local Breeze providers.",
+        )
+    final_provider = resolve_ai_provider(
+        kind=AIProviderKind.ASR,
+        provider_id=payload.final_provider_id,
+        current_user=current_user,
+        db=db,
+    )
     try:
-        asr_service.ensure_model_ready(provider.model_name)
+        provider_asr_service.ensure_provider_ready(provider)
+        if final_provider.id != provider.id:
+            provider_asr_service.ensure_provider_ready(final_provider)
     except AsrRuntimeUnavailableError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     policy = get_or_create_usage_policy(db)
@@ -457,6 +482,8 @@ def create_live_session(
             user_id=current_user.id,
             provider_id=provider.id,
             model_name=provider.model_name,
+            final_provider_id=final_provider.id,
+            final_model_name=final_provider.model_name,
             language_hint=normalize_language(payload.language),
             max_duration_seconds=policy.max_audio_seconds_per_request,
         )
@@ -554,7 +581,7 @@ async def persist_live_session(
     speaker_diarization_model_name = None
     post_processing_state = (
         POST_PROCESSING_QUEUED
-        if stored_audio is not None and settings.asr_meeting_diarization_enabled
+        if stored_audio is not None
         else POST_PROCESSING_COMPLETED
     )
 
@@ -590,7 +617,6 @@ async def persist_live_session(
     db.refresh(transcript)
     if (
         stored_audio is not None
-        and settings.asr_meeting_diarization_enabled
         and background_tasks is not None
     ):
         background_tasks.add_task(
@@ -598,7 +624,7 @@ async def persist_live_session(
             transcript_id=transcript.id,
             storage_relative_path=stored_audio.relative_storage_path,
             language=transcript_language,
-            model_name=session.model_name,
+            provider_id=session.final_provider_id,
         )
     live_asr_service.mark_persisted(session_id, current_user.id)
     return to_read(transcript)
@@ -630,7 +656,12 @@ async def transcribe_audio(
         db=db,
     )
     try:
-        asr_service.ensure_model_ready(provider.model_name)
+        provider_asr_service.ensure_provider_ready(provider)
+        if speaker_diarization and not provider_asr_service.supports_speaker_diarization(provider):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Selected ASR provider does not support speaker diarization on saved audio.",
+            )
         if speaker_diarization:
             diarization_service.ensure_model_ready()
     except AsrRuntimeUnavailableError as exc:
@@ -657,7 +688,7 @@ async def transcribe_audio(
         result = meeting_transcription_service.transcribe(
             stored_audio.storage_path,
             language=normalized_language,
-            model_name=provider.model_name,
+            provider=provider,
             enable_speaker_diarization=speaker_diarization,
             max_speaker_count=max_speaker_count,
         )

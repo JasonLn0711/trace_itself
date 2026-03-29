@@ -3,8 +3,10 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.core.config import get_settings
-from app.services.asr import AsrSegment, AsrTranscriptionResult, service as asr_service
+from app.models.ai_provider import AIProvider
+from app.services.asr import AsrSegment, AsrTranscriptionResult
 from app.services.diarization import SpeakerTurn, service as diarization_service
+from app.services.provider_asr import service as provider_asr_service
 
 settings = get_settings()
 
@@ -48,17 +50,17 @@ class MeetingTranscriptionService:
         file_path: Path,
         *,
         language: str | None,
-        model_name: str,
+        provider: AIProvider,
         enable_speaker_diarization: bool,
         max_speaker_count: int | None,
     ) -> MeetingTranscriptionResult:
-        transcription = asr_service.transcribe_file(
+        transcription = provider_asr_service.transcribe_file(
+            provider,
             file_path,
             language=language,
-            model_name=model_name,
             word_timestamps=False,
         )
-        if not enable_speaker_diarization:
+        if not enable_speaker_diarization or not provider_asr_service.supports_speaker_diarization(provider):
             return MeetingTranscriptionResult(
                 transcript_text=transcription.text,
                 language=transcription.language,
@@ -72,6 +74,17 @@ class MeetingTranscriptionService:
 
         turns = diarization_service.diarize_file(file_path, max_speakers=max_speaker_count)
         entries = build_meeting_entries(transcription, turns)
+        if not entries:
+            return MeetingTranscriptionResult(
+                transcript_text=transcription.text,
+                language=transcription.language,
+                duration_seconds=transcription.duration_seconds,
+                asr_model_name=transcription.model_name,
+                transcript_entries=[],
+                speaker_diarization_enabled=False,
+                speaker_count=None,
+                speaker_diarization_model_name=None,
+            )
         detected_speakers = sorted(
             {entry.speaker_label for entry in entries if entry.speaker_label}
             or {normalize_speaker_label(turn.speaker_label) for turn in turns if turn.speaker_label}

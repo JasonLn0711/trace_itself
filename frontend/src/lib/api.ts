@@ -6,6 +6,8 @@ import type {
   AuditEvent,
   AsrTranscript,
   AsrTranscriptSummary,
+  BodyLog,
+  BodyLogInput,
   LiveAsrSessionSnapshot,
   DailyLog,
   DashboardActivityFeed,
@@ -15,9 +17,20 @@ import type {
   DashboardTimeline,
   DashboardWeeklyReview,
   DashboardSummary,
+  Meal,
+  MealSummary,
+  MealConfirmInput,
+  MealInput,
+  MealUpdateInput,
   MeetingRecord,
   MeetingRecordSummary,
   Milestone,
+  NutritionGoal,
+  NutritionGoalInput,
+  NutritionProfile,
+  NutritionProfileInput,
+  NutritionToday,
+  NutritionWindow,
   ProductUpdate,
   Project,
   Task,
@@ -297,12 +310,13 @@ export const asrApi = {
       method: 'POST'
     });
   },
-  createLiveSession(input?: { language?: string; provider_id?: number | null }) {
+  createLiveSession(input?: { language?: string; provider_id?: number | null; final_provider_id?: number | null }) {
     return request<LiveAsrSessionSnapshot>('/asr/live-sessions', {
       method: 'POST',
       body: {
         language: input?.language?.trim() || null,
-        provider_id: input?.provider_id ?? null
+        provider_id: input?.provider_id ?? null,
+        final_provider_id: input?.final_provider_id ?? null
       }
     });
   },
@@ -638,5 +652,125 @@ export const dailyLogsApi = {
     return request<void>(`/daily-logs/${id}`, {
       method: 'DELETE'
     });
+  }
+};
+
+export const profileApi = {
+  get() {
+    return request<NutritionProfile>('/profile');
+  },
+  update(body: NutritionProfileInput) {
+    return request<NutritionProfile>('/profile', {
+      method: 'PUT',
+      body
+    });
+  },
+  getGoals() {
+    return request<NutritionGoal>('/profile/goals');
+  },
+  updateGoals(body: NutritionGoalInput) {
+    return request<NutritionGoal>('/profile/goals', {
+      method: 'PUT',
+      body
+    });
+  }
+};
+
+export const bodyLogsApi = {
+  list(query?: { limit?: number }) {
+    return request<BodyLog[]>(withQuery('/body-logs', query));
+  },
+  create(body: BodyLogInput) {
+    return request<BodyLog>('/body-logs', {
+      method: 'POST',
+      body
+    });
+  },
+  update(id: number, body: Partial<BodyLogInput>) {
+    return request<BodyLog>(`/body-logs/${id}`, {
+      method: 'PUT',
+      body
+    });
+  },
+  remove(id: number) {
+    return request<void>(`/body-logs/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
+export const mealsApi = {
+  list(query?: { date?: string }) {
+    return request<MealSummary[]>(withQuery('/meals', query));
+  },
+  get(id: number) {
+    return request<Meal>(`/meals/${id}`);
+  },
+  create(body: MealInput) {
+    return request<Meal>('/meals', {
+      method: 'POST',
+      body
+    });
+  },
+  ingest(input: {
+    meal_type: string;
+    eaten_at: string;
+    transcript_text?: string | null;
+    extra_text?: string | null;
+    image_file?: File | null;
+    audio_file?: File | null;
+  }) {
+    const formData = new FormData();
+    formData.append('meal_type', input.meal_type);
+    formData.append('eaten_at', input.eaten_at);
+    if (input.transcript_text) {
+      formData.append('transcript_text', input.transcript_text);
+    }
+    if (input.extra_text) {
+      formData.append('extra_text', input.extra_text);
+    }
+    if (input.image_file) {
+      formData.append('image_file', input.image_file);
+    }
+    if (input.audio_file) {
+      formData.append('audio_file', input.audio_file);
+    }
+    return requestForm<Meal>('/meals/ingest', formData, {
+      method: 'POST'
+    });
+  },
+  update(id: number, body: MealUpdateInput) {
+    return request<Meal>(`/meals/${id}`, {
+      method: 'PUT',
+      body
+    });
+  },
+  analyze(id: number) {
+    return request<Meal>(`/meals/${id}/analyze`, {
+      method: 'POST'
+    });
+  },
+  confirm(id: number, body: MealConfirmInput) {
+    return request<Meal>(`/meals/${id}/confirm`, {
+      method: 'POST',
+      body
+    });
+  },
+  remove(id: number) {
+    return request<void>(`/meals/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
+export const nutritionApi = {
+  today() {
+    return request<NutritionToday>('/dashboard/today');
+  },
+  weekly() {
+    return request<NutritionWindow>('/dashboard/weekly');
+  },
+  monthly() {
+    return request<NutritionWindow>('/dashboard/monthly');
   }
 };

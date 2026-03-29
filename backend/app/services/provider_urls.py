@@ -20,7 +20,7 @@ def normalize_provider_base_url(
     if not cleaned:
         return None
 
-    if kind == AIProviderKind.ASR or driver == AIProviderDriver.LOCAL_BREEZE:
+    if driver == AIProviderDriver.LOCAL_BREEZE:
         raise ProviderUrlValidationError("Local Breeze providers do not accept a custom base URL.")
 
     parsed = urlparse(cleaned)

@@ -54,7 +54,8 @@ export function LiveAsrPanel() {
         <span className="capture-pill">Used {formatDuration(draft.usageAudioSeconds)}</span>
         {draft.maxDurationSeconds ? <span className="capture-pill">Max {formatDuration(draft.maxDurationSeconds)}</span> : null}
         <span className={`capture-pill ${state === 'live' ? 'live' : snapshot?.final_ready ? 'ready' : ''}`}>{liveLabel}</span>
-        <span className="capture-pill">{draft.providerLabel}</span>
+        <span className="capture-pill">Live {draft.providerLabel}</span>
+        <span className="capture-pill">Final {draft.finalProviderLabel}</span>
         <span className="capture-pill">{durationCaption}</span>
         {snapshot?.language ? <Badge tone="neutral">{snapshot.language}</Badge> : null}
         {(state === 'live' || state === 'connecting') ? <span className="capture-pill ready">Browse other pages safely</span> : null}

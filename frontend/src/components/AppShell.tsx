@@ -105,9 +105,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     sessionTimeoutPaused ? 'info' : idleCountdownMs <= 60_000 ? 'danger' : idleCountdownMs <= 120_000 ? 'warning' : 'neutral';
   const visibleNavItems: NavItem[] = [
     ...(canUseFeature(user, 'project_tracer') ? [{ to: '/', label: 'Home' }] : []),
+    { to: '/dashboard', label: 'Nutrition' },
+    { to: '/meals/new', label: 'Log Meal' },
+    { to: '/body-log', label: 'Body Log' },
+    { to: '/profile/setup', label: 'Profile' },
     ...(canUseAudioWorkspace(user) ? [{ to: '/meetings', label: 'Audio' }] : []),
     ...(canUseFeature(user, 'project_tracer') ? [{ to: '/projects', label: 'Projects' }, { to: '/tasks', label: 'Tasks' }] : []),
-    ...(user?.role === 'admin' ? [{ to: '/users', label: 'Control' }] : []),
+    ...(user?.role === 'admin' ? [{ to: '/control', label: 'Control' }] : []),
     ...(user?.role === 'admin' ? [{ to: '/activity', label: 'Activity' }] : []),
     { to: '/updates', label: 'Updates' },
     ...(canUseFeature(user, 'project_tracer') ? [{ to: '/daily-logs', label: 'Daily Logs' }] : []),

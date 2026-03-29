@@ -32,7 +32,7 @@ export function canAccessPath(user: User | null | undefined, path: string) {
   if (path === '/' || path.startsWith('/projects') || path.startsWith('/tasks') || path.startsWith('/daily-logs')) {
     return canUseFeature(user, 'project_tracer');
   }
-  if (path.startsWith('/users') || path.startsWith('/activity')) {
+  if (path.startsWith('/users') || path.startsWith('/control') || path.startsWith('/activity')) {
     return isAdmin(user);
   }
   if (path.startsWith('/asr')) {

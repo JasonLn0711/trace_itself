@@ -23,8 +23,11 @@ def get_ai_provider_or_404(provider_id: int, db: Session) -> AIProvider:
 
 
 def validate_provider(kind: AIProviderKind, driver: AIProviderDriver) -> None:
-    if kind == AIProviderKind.ASR and driver != AIProviderDriver.LOCAL_BREEZE:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ASR currently supports only local Breeze providers.")
+    if kind == AIProviderKind.ASR and driver not in {AIProviderDriver.LOCAL_BREEZE, AIProviderDriver.GEMINI}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ASR currently supports local Breeze and Gemini providers.",
+        )
     if kind == AIProviderKind.LLM and driver != AIProviderDriver.GEMINI:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="LLM currently supports only Gemini providers.")
 
