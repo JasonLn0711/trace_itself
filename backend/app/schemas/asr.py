@@ -18,6 +18,7 @@ class AsrTranscriptSummary(BaseModel):
     live_entry_count: int
     speaker_diarization_enabled: bool
     speaker_count: int | None
+    post_processing_state: str
     excerpt: str
     created_at: datetime
     updated_at: datetime
@@ -49,6 +50,8 @@ class AsrTranscriptRead(BaseModel):
     speaker_diarization_enabled: bool
     speaker_count: int | None
     speaker_diarization_model_name: str | None
+    post_processing_state: str
+    post_processing_error: str | None
     created_at: datetime
     updated_at: datetime
 

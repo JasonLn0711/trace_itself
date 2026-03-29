@@ -3,7 +3,7 @@ import json
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_asr_transcript_or_404, get_current_user, require_asr_access, resolve_ai_provider
 from app.core.enums import AIProviderKind
 from app.core.config import get_settings
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
 from app.models.asr_transcript import AsrTranscript
 from app.models.user import User
 from app.schemas.asr import AsrTranscriptRead, AsrTranscriptSummary, LiveAsrSessionCreate, LiveAsrSessionRead
@@ -26,6 +26,17 @@ from app.core.enums import UsageEventKind
 router = APIRouter(prefix="/asr", tags=["asr"], dependencies=[Depends(require_asr_access)])
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+POST_PROCESSING_COMPLETED = "completed"
+POST_PROCESSING_QUEUED = "queued"
+POST_PROCESSING_RUNNING = "running"
+POST_PROCESSING_FAILED = "failed"
+VALID_POST_PROCESSING_STATES = {
+    POST_PROCESSING_COMPLETED,
+    POST_PROCESSING_QUEUED,
+    POST_PROCESSING_RUNNING,
+    POST_PROCESSING_FAILED,
+}
 
 
 async def read_capped_request_body(request: Request, *, max_bytes: int) -> bytes:
@@ -75,6 +86,7 @@ def to_summary(transcript: AsrTranscript) -> AsrTranscriptSummary:
         live_entry_count=len(parsed_entries),
         speaker_diarization_enabled=bool(transcript.speaker_diarization_enabled),
         speaker_count=transcript.speaker_count,
+        post_processing_state=normalize_post_processing_state(transcript.post_processing_state),
         excerpt=build_excerpt(transcript.transcript_text),
         created_at=transcript.created_at,
         updated_at=transcript.updated_at,
@@ -97,6 +109,8 @@ def to_read(transcript: AsrTranscript) -> AsrTranscriptRead:
         speaker_diarization_enabled=bool(transcript.speaker_diarization_enabled),
         speaker_count=transcript.speaker_count,
         speaker_diarization_model_name=transcript.speaker_diarization_model_name,
+        post_processing_state=normalize_post_processing_state(transcript.post_processing_state),
+        post_processing_error=normalize_post_processing_error(transcript.post_processing_error),
         created_at=transcript.created_at,
         updated_at=transcript.updated_at,
     )
@@ -122,6 +136,18 @@ def normalize_capture_mode(raw_capture_mode: str | None) -> str:
     if normalized in {"live", "file"}:
         return normalized
     return "file"
+
+
+def normalize_post_processing_state(raw_state: str | None) -> str:
+    normalized = (raw_state or "").strip().lower()
+    if normalized in VALID_POST_PROCESSING_STATES:
+        return normalized
+    return POST_PROCESSING_COMPLETED
+
+
+def normalize_post_processing_error(raw_error: str | None) -> str | None:
+    normalized = (raw_error or "").strip()
+    return normalized or None
 
 
 def build_download_filename(stem: str | None, suffix: str) -> str:
@@ -280,6 +306,77 @@ def build_transcript_text_download(transcript: AsrTranscript) -> str:
     return "\n".join(lines).strip() or transcript.transcript_text
 
 
+def set_post_processing_status(
+    transcript: AsrTranscript,
+    *,
+    state: str,
+    error: str | None = None,
+) -> None:
+    transcript.post_processing_state = normalize_post_processing_state(state)
+    transcript.post_processing_error = normalize_post_processing_error(error)
+
+
+def persist_live_transcript_reprocessing(
+    *,
+    transcript_id: int,
+    storage_relative_path: str,
+    language: str | None,
+    model_name: str,
+) -> None:
+    audio_path = Path(settings.asr_upload_dir) / storage_relative_path
+    with SessionLocal() as db:
+        transcript = db.get(AsrTranscript, transcript_id)
+        if transcript is None:
+            return
+        if not audio_path.exists():
+            set_post_processing_status(
+                transcript,
+                state=POST_PROCESSING_FAILED,
+                error="Replay audio file is no longer available for background processing.",
+            )
+            db.commit()
+            return
+
+        set_post_processing_status(transcript, state=POST_PROCESSING_RUNNING, error=None)
+        db.commit()
+
+        try:
+            result = meeting_transcription_service.transcribe(
+                audio_path,
+                language=language,
+                model_name=model_name,
+                enable_speaker_diarization=True,
+                max_speaker_count=None,
+            )
+        except (AsrRuntimeUnavailableError, AsrServiceError, DiarizationRuntimeUnavailableError, DiarizationServiceError) as exc:
+            logger.exception("Saved live ASR replay processing failed for transcript %s.", transcript_id)
+            transcript = db.get(AsrTranscript, transcript_id)
+            if transcript is None:
+                return
+            set_post_processing_status(
+                transcript,
+                state=POST_PROCESSING_FAILED,
+                error=str(exc),
+            )
+            db.commit()
+            return
+
+        transcript = db.get(AsrTranscript, transcript_id)
+        if transcript is None:
+            return
+
+        transcript.transcript_text = result.transcript_text
+        transcript.transcript_entries_json = serialize_meeting_transcript_entries(result.transcript_entries)
+        transcript.language = result.language
+        transcript.duration_seconds = result.duration_seconds or transcript.duration_seconds
+        transcript.model_name = result.asr_model_name
+        transcript.speaker_diarization_enabled = result.speaker_diarization_enabled
+        transcript.speaker_count = result.speaker_count
+        transcript.speaker_diarization_model_name = result.speaker_diarization_model_name
+        set_post_processing_status(transcript, state=POST_PROCESSING_COMPLETED, error=None)
+        db.commit()
+
+
 def serialize_meeting_transcript_entries(entries) -> str | None:
     return serialize_transcript_entries(
         [
@@ -403,6 +500,7 @@ async def finalize_live_session(
 @router.post("/live-sessions/{session_id}/persist", response_model=AsrTranscriptRead, status_code=status.HTTP_201_CREATED)
 async def persist_live_session(
     session_id: str,
+    background_tasks: BackgroundTasks,
     file: UploadFile | None = File(default=None),
     title: str | None = Form(default=None),
     current_user: User = Depends(get_current_user),
@@ -454,26 +552,11 @@ async def persist_live_session(
     speaker_diarization_enabled = False
     speaker_count = None
     speaker_diarization_model_name = None
-
-    if stored_audio is not None and settings.asr_meeting_diarization_enabled:
-        try:
-            diarized_transcript = meeting_transcription_service.transcribe(
-                stored_audio.storage_path,
-                language=transcript_language,
-                model_name=session.model_name,
-                enable_speaker_diarization=True,
-                max_speaker_count=None,
-            )
-            transcript_text = diarized_transcript.transcript_text
-            transcript_entries_json = serialize_meeting_transcript_entries(diarized_transcript.transcript_entries)
-            transcript_language = diarized_transcript.language
-            transcript_duration_seconds = diarized_transcript.duration_seconds or transcript_duration_seconds
-            transcript_model_name = diarized_transcript.asr_model_name
-            speaker_diarization_enabled = diarized_transcript.speaker_diarization_enabled
-            speaker_count = diarized_transcript.speaker_count
-            speaker_diarization_model_name = diarized_transcript.speaker_diarization_model_name
-        except (AsrRuntimeUnavailableError, AsrServiceError, DiarizationRuntimeUnavailableError, DiarizationServiceError):
-            logger.exception("Saved live ASR diarization failed; falling back to the transcript captured during streaming.")
+    post_processing_state = (
+        POST_PROCESSING_QUEUED
+        if stored_audio is not None and settings.asr_meeting_diarization_enabled
+        else POST_PROCESSING_COMPLETED
+    )
 
     transcript = AsrTranscript(
         user_id=current_user.id,
@@ -491,6 +574,8 @@ async def persist_live_session(
         speaker_diarization_enabled=speaker_diarization_enabled,
         speaker_count=speaker_count,
         speaker_diarization_model_name=speaker_diarization_model_name,
+        post_processing_state=post_processing_state,
+        post_processing_error=None,
     )
     db.add(transcript)
     record_usage_event(
@@ -503,6 +588,18 @@ async def persist_live_session(
     )
     db.commit()
     db.refresh(transcript)
+    if (
+        stored_audio is not None
+        and settings.asr_meeting_diarization_enabled
+        and background_tasks is not None
+    ):
+        background_tasks.add_task(
+            persist_live_transcript_reprocessing,
+            transcript_id=transcript.id,
+            storage_relative_path=stored_audio.relative_storage_path,
+            language=transcript_language,
+            model_name=session.model_name,
+        )
     live_asr_service.mark_persisted(session_id, current_user.id)
     return to_read(transcript)
 

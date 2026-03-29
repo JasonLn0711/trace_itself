@@ -116,6 +116,7 @@ Optional ASR tuning:
 
 When tuning live ASR, keep these layers separate:
 
+- browser PCM conditioning: mono mic capture, high-pass cleanup, light compression, adaptive gain, noise gating, and `16 kHz` resampling happen in the browser before PCM is queued for upload
 - transport/upload granularity: `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB`, `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS`
 - rolling decoder context: `ASR_LIVE_MAX_WINDOW_SECONDS`
 - utterance commit policy: `ASR_LIVE_COMMIT_SILENCE_MS`, `ASR_LIVE_MAX_UTTERANCE_SECONDS`
@@ -209,16 +210,21 @@ ASR notes:
 - After the model is cached, later transcriptions are much faster.
 - If CUDA is configured but unavailable, the backend stays up and the ASR endpoints return `503` with a clear fix message.
 - Live ASR now rejects oversized chunks, limits open sessions per user, and force-commits long uninterrupted utterances to keep memory bounded.
-- The live ASR page streams mic audio in small normalized chunks, keeps recording alive while users browse other in-app pages, and still stores a compact Opus/WebM recording when the take is saved.
+- The live ASR page streams browser-conditioned mic audio in small normalized chunks, keeps recording alive while users browse other in-app pages, and still stores a compact Opus/WebM replay file when the take is saved.
+- Before PCM leaves the browser, the mic path is forced to mono, passed through a high-pass filter and light compressor, then normalized, noise-gated, and resampled to `16 kHz`. This helps smoother live transcription on ordinary microphones without tying recognition quality to replay-file bitrate.
 - Transport batching is now separate from recognition context: the browser can upload around `32 KB` at a time while the backend still keeps its own rolling decoder window and utterance-commit logic.
+- The browser-side flush timer keeps small PCM uploads moving even on unstable connections, while the backend still allows much larger temporary bursts before rejecting a request.
 - The recorder now lives at the authenticated app-shell level instead of only inside the `Audio` page, and other pages expose a compact live dock so users can stop, save, or jump back to `Audio` without losing the session.
 - The open-session limit now counts only non-finalized sessions, and obviously orphaned pre-start sessions are reaped automatically so one visible recorder does not trip a false multi-session error.
+- Saved live replay audio is now recorded at about `64 kbps` instead of `128 kbps`, which keeps stop/save uploads smaller while leaving the live PCM ASR path unchanged.
+- Stopping a long live take now returns the transcript row first, then finishes replay-audio transcription and diarization in a FastAPI background task so the stop/save request does not stay open for the full NeMo pass.
+- The transcript list and detail view now expose replay-processing status for saved live takes, so `Queued`, `Refining`, or `Replay failed` reflects whether the background saved-audio pass has finished.
 - Saved audio passed to the diarizer is normalized to mono `16 kHz` WAV with `ffmpeg` before NeMo runs, which keeps browser-recorded WebM uploads compatible with the Sortformer path.
 - Saved audio files live in the Docker volume `app_data`, so they persist across container restarts.
 - Live ASR sessions are held in backend memory, so after deploying a session-lifecycle fix it is reasonable to restart the backend once and clear any stale sessions from the old runtime.
 - Cross-page persistence only applies to in-app navigation. A full page refresh or closing the tab still interrupts browser microphone capture, so this should be described to users as navigation-safe rather than reload-safe.
 - Meeting note generation requires `GEMINI_API_KEY`; without it, the `Meetings` page cannot complete note generation.
-- Multi-speaker diarization is opt-in from the `Transcript` file-upload form and the `Notes` form. Saved live takes also attempt diarization by default after stop/save, but true real-time live diarization is not part of the streaming path yet.
+- Multi-speaker diarization is opt-in from the `Transcript` file-upload form and the `Notes` form. Saved live takes also attempt diarization by default after stop/save, but the saved-live path now does that work asynchronously after the transcript is already visible. True real-time live diarization is not part of the streaming path yet.
 - If a live save falls back to transcript-only persistence because replay audio could not be attached, the transcript is still kept, but there is no audio file left for the post-save diarization pass.
 - Provider API secrets are stored encrypted in Postgres, and production deployments must now use a dedicated `CREDENTIALS_SECRET_KEY`.
 - The default policy is 3 LLM text runs per user per rolling 24 hours and 5 hours max audio per file.

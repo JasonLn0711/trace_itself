@@ -4,6 +4,7 @@ export type ProductUpdateType = 'build' | 'fix' | 'update' | 'security';
 export type AIProviderKind = 'asr' | 'llm';
 export type AIProviderDriver = 'local_breeze' | 'gemini';
 export type AuditEventType = 'login_success' | 'login_failed' | 'logout' | 'page_view';
+export type AsrTranscriptPostProcessingState = 'completed' | 'queued' | 'running' | 'failed';
 
 export type UserRole = 'admin' | 'member';
 
@@ -123,6 +124,7 @@ export interface AsrTranscriptSummary {
   live_entry_count: number;
   speaker_diarization_enabled: boolean;
   speaker_count: number | null;
+  post_processing_state: AsrTranscriptPostProcessingState;
   excerpt: string;
   created_at: string;
   updated_at: string;
@@ -152,6 +154,8 @@ export interface AsrTranscript {
   speaker_diarization_enabled: boolean;
   speaker_count: number | null;
   speaker_diarization_model_name: string | null;
+  post_processing_state: AsrTranscriptPostProcessingState;
+  post_processing_error: string | null;
   created_at: string;
   updated_at: string;
 }

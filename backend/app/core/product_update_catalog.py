@@ -501,12 +501,42 @@ PRODUCT_UPDATE_CATALOG: tuple[ProductUpdateCatalogEntry, ...] = (
         summary="The backend accepts larger live audio bursts, while the browser now flushes them in smaller batches.",
         details=(
             "The live ASR chunk ceiling was raised from 256 KB to 2048 KB for better burst tolerance, but the browser "
-            "now aims to ship queued PCM in smaller 512 KB batches so longer sessions stay resilient without turning "
+            "now aims to ship queued PCM in smaller 32 KB batches so longer sessions stay resilient without turning "
             "temporary network stalls into oversized requests."
         ),
         area="asr",
         change_type=ProductUpdateType.FIX,
         changed_at=datetime.fromisoformat("2026-03-28T03:30:00+00:00"),
+        is_pinned=True,
+    ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-asr-pcm-conditioning-and-compact-replay",
+        version_tag="v1.1.13",
+        title="Live ASR now conditions browser PCM and saves smaller replay files",
+        summary="The browser smooths mic PCM before upload and now stores saved live replay audio at a lower bitrate.",
+        details=(
+            "The live browser path now clearly separates worklet-conditioned `16 kHz` PCM for streaming from the saved "
+            "replay attachment used during stop/save. That keeps live recognition stable while recording, but reduces "
+            "the replay attachment to about 64 kbps so stop/save uploads stay smaller."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.UPDATE,
+        changed_at=datetime.fromisoformat("2026-03-29T08:00:00+00:00"),
+        is_pinned=True,
+    ),
+    ProductUpdateCatalogEntry(
+        entry_key="live-save-background-replay-processing",
+        version_tag="v1.1.14",
+        title="Live saves now return fast while replay refinement finishes in background",
+        summary="Stopping live audio now saves the transcript immediately and lets long replay processing finish afterward.",
+        details=(
+            "The stop/save path now stores replay audio first, creates the saved transcript row right away, "
+            "and moves full-file replay transcription plus diarization into a background task. The Audio workspace "
+            "shows queued or refining status until the saved-audio speaker-tag pass is done."
+        ),
+        area="asr",
+        change_type=ProductUpdateType.FIX,
+        changed_at=datetime.fromisoformat("2026-03-29T09:30:00+00:00"),
         is_pinned=True,
     ),
 )

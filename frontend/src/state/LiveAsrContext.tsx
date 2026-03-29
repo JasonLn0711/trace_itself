@@ -176,6 +176,19 @@ function liveLabelForState(state: LiveState) {
   return 'Idle';
 }
 
+function liveSaveNoticeForTranscript(transcript: AsrTranscript) {
+  if (transcript.post_processing_state === 'queued' || transcript.post_processing_state === 'running') {
+    return 'Live transcript saved. Replay audio is refining speaker tags in the background.';
+  }
+  if (transcript.speaker_diarization_enabled) {
+    return 'Live transcript saved with speaker tags.';
+  }
+  if (transcript.audio_mime_type) {
+    return 'Live transcript saved.';
+  }
+  return 'Live transcript saved without replay audio.';
+}
+
 export function LiveAsrProvider({ children }: { children: ReactNode }) {
   const { resetIdleTimeout, setSessionHold } = useAuth();
   const [draft, setDraft] = useState<LiveAsrDraft>(INITIAL_DRAFT);
@@ -362,13 +375,7 @@ export function LiveAsrProvider({ children }: { children: ReactNode }) {
       setPendingSave(false);
       clearLiveState();
       setLastSavedTranscript(transcript);
-      setNotice(
-        transcript.speaker_diarization_enabled
-          ? 'Live transcript saved with speaker tags.'
-          : transcript.audio_mime_type
-            ? 'Live transcript saved.'
-            : 'Live transcript saved without replay audio.'
-      );
+      setNotice(liveSaveNoticeForTranscript(transcript));
     } catch (nextError) {
       if (pending.file) {
         const rescued = await persistTranscriptOnly(

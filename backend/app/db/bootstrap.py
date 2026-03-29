@@ -48,6 +48,8 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS speaker_diarization_enabled BOOLEAN"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS speaker_count INTEGER"))
     connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS speaker_diarization_model_name VARCHAR(160)"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS post_processing_state VARCHAR(32)"))
+    connection.execute(text("ALTER TABLE asr_transcripts ADD COLUMN IF NOT EXISTS post_processing_error TEXT"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS project_id INTEGER"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS transcript_entries_json TEXT"))
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS speaker_diarization_enabled BOOLEAN"))
@@ -55,9 +57,15 @@ def apply_schema_upgrades(connection) -> None:
     connection.execute(text("ALTER TABLE meeting_records ADD COLUMN IF NOT EXISTS speaker_diarization_model_name VARCHAR(160)"))
     connection.execute(text("UPDATE asr_transcripts SET capture_mode = 'file' WHERE capture_mode IS NULL"))
     connection.execute(text("ALTER TABLE asr_transcripts ALTER COLUMN speaker_diarization_enabled SET DEFAULT FALSE"))
+    connection.execute(text("ALTER TABLE asr_transcripts ALTER COLUMN post_processing_state SET DEFAULT 'completed'"))
     connection.execute(
         text(
             "UPDATE asr_transcripts SET speaker_diarization_enabled = FALSE WHERE speaker_diarization_enabled IS NULL"
+        )
+    )
+    connection.execute(
+        text(
+            "UPDATE asr_transcripts SET post_processing_state = 'completed' WHERE post_processing_state IS NULL OR post_processing_state = ''"
         )
     )
     connection.execute(text("ALTER TABLE meeting_records ALTER COLUMN speaker_diarization_enabled SET DEFAULT FALSE"))
@@ -101,6 +109,8 @@ def apply_schema_upgrades(connection) -> None:
                 speaker_diarization_enabled BOOLEAN NOT NULL DEFAULT FALSE,
                 speaker_count INTEGER NULL,
                 speaker_diarization_model_name VARCHAR(160) NULL,
+                post_processing_state VARCHAR(32) NOT NULL DEFAULT 'completed',
+                post_processing_error TEXT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             )

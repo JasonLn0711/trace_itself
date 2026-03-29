@@ -12,8 +12,14 @@ Latest repo updates are listed here so reviewers can immediately see what change
 
 ### Updated 2026-03-29
 
+- `Faster Live Save + Background Replay Refinement`
+  Stopping live ASR now saves the transcript row immediately, stores replay audio first, and moves long saved-audio transcription plus diarization work into a background task so long takes do not hold the stop/save request open.
 - `Expanded Transcript Diarization`
   Added optional multi-speaker diarization to transcript file uploads, kept live streaming speaker-blind during capture, and now runs diarization on saved live takes by default when replay audio uploads successfully.
+- `Diarization Tuning`
+  Reduced diarization sensitivity by moving speaker assignment to segment-level transcript spans, smoothing isolated speaker flips, defaulting new diarized flows to a lower speaker cap, and keeping visible labels reindexed as clean `Speaker 1..N`.
+- `Smoother Live PCM + Safer Transport`
+  Clarified the browser-side PCM conditioning path for live ASR, kept live uploads on normalized `16 kHz` mono PCM with smaller transport batches for unstable connections, and reduced saved replay recordings to `64 kbps` so stop/save uploads are smaller without changing the live transcript path.
 
 ### Updated 2026-03-27
 
@@ -117,7 +123,7 @@ Speaker diarization now covers three audio paths with different defaults:
 - `Transcript opt-in`
   The `Transcript` file-upload form exposes `Multi-speaker diarization` for uploaded audio where more than one person is talking.
 - `Saved live takes`
-  Live ASR itself stays speaker-blind for low-latency streaming, but once a live take is stopped and saved, the backend now tries to run diarization on the saved replay audio by default and shows speaker-labeled transcript lines when that succeeds.
+  Live ASR itself stays speaker-blind for low-latency streaming, but once a live take is stopped and saved, the app now stores the transcript immediately, uploads replay audio first, and then tries saved-audio diarization in the background by default. The transcript view shows `Queued`, `Refining`, or `Replay failed` while that replay pass is still running.
 - `Not true real-time live diarization`
   Speaker labels are not assigned while the microphone stream is still running. That remains a later step so the current live capture path stays low-latency and stable.
 - `Meeting notes`
@@ -141,8 +147,12 @@ Recent live ASR work focused on three different failure modes: long recording sa
   The proxy now forwards the original multipart request body as a stream, preserves the incoming `content-type` boundary and `content-length`, and uses `duplex: 'half'` so Node can pass the upload through without rebuilding the whole form in memory first.
 - `Burst-handling fix`
   The backend now accepts live chunk requests up to `2048 KB`, while the browser sends much smaller transport batches by default. Normal live uploads now target about `32 KB` with a short max-wait guard, but the backend still keeps its own rolling decoder window and utterance buffer so recognition context does not shrink with transport size.
+- `Browser PCM conditioning`
+  Before PCM leaves the browser, the live microphone path is forced to mono, passed through a high-pass filter and light compressor, then normalized and noise-gated inside the audio worklet before being resampled to `16 kHz` PCM. This keeps the live stream smoother for ASR on ordinary laptop microphones without tying transcript quality to the saved replay file bitrate.
 - `Why the transport split matters`
   The browser-side upload granularity is now a transport concern instead of a recognition concern. In other words, a `32 KB` upload is not treated like a final mini-transcript. The backend still aggregates those uploads into larger utterance state, refreshes partials from its own rolling preview window, and only commits final text on silence or utterance-length boundaries.
+- `Safer internet behavior`
+  Smaller default PCM batches plus a short flush timer make temporary network stalls less likely to turn into oversized uploads, while the backend still keeps a much larger hard ceiling so brief browser-side bursts do not immediately fail the session.
 - `Cross-page live-session fix`
   The live recorder no longer lives only inside the `Audio` page component. Its session state now sits at the authenticated app-shell level, so users can browse other pages in the app while the microphone stream keeps running and return through a compact live dock.
 - `Why this is cool`
@@ -155,6 +165,10 @@ Recent live ASR work focused on three different failure modes: long recording sa
   Live ASR sessions are kept in backend memory, so after deploying session-lifecycle fixes it is worth restarting the backend once to clear any stale in-memory sessions that were created before the patch.
 - `Saved-live diarization scope`
   The saved-live diarization pass only runs when the stop/save flow successfully uploads replay audio. If the save falls back to transcript-only persistence, the transcript is still preserved, but there is no audio file left to diarize afterward.
+- `Fast stop/save path`
+  The long replay-audio reprocessing step no longer blocks the initial stop/save response. The app now saves the streamed transcript immediately, stores replay audio quickly, and lets full-file replay refinement plus diarization finish in a background task that updates the same transcript row later.
+- `Smaller saved replay files`
+  The browser-side `MediaRecorder` bitrate for saved live replay audio is now `64000` instead of `128000`. That mainly affects the replay file that is attached during stop/save; it does not materially change the real-time ASR path because live recognition still runs on the worklet-generated PCM stream.
 
 ## Security Hardening
 
@@ -179,6 +193,8 @@ New security-related environment settings:
 
 Live ASR tuning is intentionally split across three layers:
 
+- `Browser PCM conditioning`
+  The worklet path applies mono capture, high-pass cleanup, light compression, adaptive gain, noise gating, and `16 kHz` resampling before the browser queues PCM for upload.
 - `Transport`
   `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_TARGET_KB` and `NEXT_PUBLIC_ASR_LIVE_TRANSPORT_MAX_WAIT_MS` control how often the browser uploads PCM to the backend.
 - `Decoder context`

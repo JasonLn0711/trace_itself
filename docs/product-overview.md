@@ -87,9 +87,11 @@ The audio side extends the system beyond manual tracking:
 
 In practice, a live session now behaves like a shared workspace tool rather than a page-local widget: users can start in `Audio`, move through the rest of the app, and keep a compact dock visible until they stop or save the take.
 
-The live pipeline is also layered deliberately: the browser can upload tiny transport batches for stability, while the backend still preserves a larger rolling decode window and utterance-level transcript commits.
+The live pipeline is also layered deliberately: the browser conditions the mic signal before upload, can ship tiny transport batches for stability, and still lets the backend preserve a larger rolling decode window and utterance-level transcript commits. That keeps live ASR responsive over weaker connections without shrinking recognition context to the size of each upload.
 
-Speaker tagging follows the same staged approach. File transcripts can opt into diarization, meeting notes can opt into diarization, and saved live takes can be diarized after stop when replay audio is available. True real-time live diarization is still intentionally deferred so the current streaming path stays stable.
+Saved live replay audio is also treated as a separate concern. The browser keeps the replay attachment compact at about `64 kbps`, while the actual live transcript path still runs from the worklet-generated `16 kHz` mono PCM stream.
+
+Speaker tagging follows the same staged approach. File transcripts can opt into diarization, meeting notes can opt into diarization, and saved live takes can be diarized after stop when replay audio is available. The stop/save path now returns the transcript first and lets replay refinement finish in the background, so longer recordings do not keep the user waiting on a full-file NeMo pass before the transcript appears. True real-time live diarization is still intentionally deferred so the current streaming path stays stable.
 
 That makes the repo broader than a simple task manager while still keeping execution as the primary theme.
 

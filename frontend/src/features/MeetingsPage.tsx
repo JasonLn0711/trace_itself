@@ -27,6 +27,7 @@ import type {
   AIProvider,
   AsrTranscript,
   AsrTranscriptEntry,
+  AsrTranscriptPostProcessingState,
   AsrTranscriptSummary,
   MeetingRecord,
   MeetingRecordSummary,
@@ -48,6 +49,7 @@ const LANGUAGE_OPTIONS = [
 ] as const;
 
 const SPEAKER_COUNT_OPTIONS = [2, 3, 4, 5, 6, 8] as const;
+const TRANSCRIPT_POST_PROCESSING_POLL_MS = 2500;
 
 function excerpt(value: string, max = 160) {
   const compact = value.replace(/\s+/g, ' ').trim();
@@ -96,6 +98,59 @@ function parsePositiveIntegerParam(value: string | null) {
 
 function transcriptSourceLabel(value: 'live' | 'file' | string | null | undefined) {
   return (value || '').toLowerCase() === 'live' ? 'Live' : 'File';
+}
+
+function isTranscriptPostProcessingPending(state: AsrTranscriptPostProcessingState | string | null | undefined) {
+  return state === 'queued' || state === 'running';
+}
+
+function transcriptPostProcessingTone(state: AsrTranscriptPostProcessingState | string | null | undefined) {
+  if (state === 'failed') {
+    return 'danger' as const;
+  }
+  if (state === 'queued' || state === 'running') {
+    return 'warning' as const;
+  }
+  return 'success' as const;
+}
+
+function transcriptPostProcessingLabel(state: AsrTranscriptPostProcessingState | string | null | undefined) {
+  if (state === 'queued') {
+    return 'Queued';
+  }
+  if (state === 'running') {
+    return 'Refining';
+  }
+  if (state === 'failed') {
+    return 'Replay failed';
+  }
+  return 'Ready';
+}
+
+function liveSaveNoticeForTranscript(transcript: AsrTranscript) {
+  if (isTranscriptPostProcessingPending(transcript.post_processing_state)) {
+    return 'Live transcript saved. Replay audio is refining speaker tags in the background.';
+  }
+  if (transcript.speaker_diarization_enabled) {
+    return 'Live transcript saved with speaker tags.';
+  }
+  if (transcript.audio_mime_type) {
+    return 'Live transcript saved.';
+  }
+  return 'Live transcript saved without replay audio.';
+}
+
+function transcriptProcessingDescription(transcript: AsrTranscript) {
+  if (transcript.post_processing_state === 'queued') {
+    return 'Replay audio is saved. Speaker-tag refinement will start in the background shortly.';
+  }
+  if (transcript.post_processing_state === 'running') {
+    return 'Replay audio is being reprocessed in the background so this transcript can pick up cleaner speaker tags.';
+  }
+  if (transcript.post_processing_state === 'failed') {
+    return transcript.post_processing_error || 'Replay processing did not finish. The original live transcript is still available below.';
+  }
+  return '';
 }
 
 function formatAudioTimestamp(seconds: number | null | undefined) {
@@ -375,6 +430,66 @@ export function MeetingsPage() {
     };
   }, [clearLastSavedTranscript, lastSavedTranscript]);
 
+  useEffect(() => {
+    if (!selectedTranscriptId || !selectedTranscript || !isTranscriptPostProcessingPending(selectedTranscript.post_processing_state)) {
+      return;
+    }
+
+    const pendingTranscriptId = selectedTranscriptId;
+    const pendingState = selectedTranscript.post_processing_state;
+    let cancelled = false;
+    let timerId: number | null = null;
+
+    async function pollPendingTranscript() {
+      try {
+        const [nextTranscript, nextSummaries] = await Promise.all([
+          asrApi.get(pendingTranscriptId),
+          asrApi.list({ limit: 100 })
+        ]);
+        if (cancelled) {
+          return;
+        }
+
+        setSelectedTranscript(nextTranscript);
+        setTranscriptEntries(nextSummaries);
+
+        if (
+          pendingState !== nextTranscript.post_processing_state &&
+          nextTranscript.post_processing_state === 'completed'
+        ) {
+          setNotice(
+            nextTranscript.speaker_diarization_enabled
+              ? 'Replay audio finished processing. Speaker-tagged transcript is ready.'
+              : 'Replay audio finished background processing.'
+          );
+        }
+
+        if (isTranscriptPostProcessingPending(nextTranscript.post_processing_state)) {
+          timerId = window.setTimeout(() => {
+            void pollPendingTranscript();
+          }, TRANSCRIPT_POST_PROCESSING_POLL_MS);
+        }
+      } catch {
+        if (!cancelled) {
+          timerId = window.setTimeout(() => {
+            void pollPendingTranscript();
+          }, TRANSCRIPT_POST_PROCESSING_POLL_MS);
+        }
+      }
+    }
+
+    timerId = window.setTimeout(() => {
+      void pollPendingTranscript();
+    }, TRANSCRIPT_POST_PROCESSING_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (timerId !== null) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [selectedTranscript, selectedTranscriptId]);
+
   const canRunMeetingNotes =
     notesEnabled &&
     llmProviders.length > 0 &&
@@ -595,13 +710,7 @@ export function MeetingsPage() {
       ]);
       setPolicySnapshot(nextPolicy);
       setTranscriptEntries(items);
-      setNotice(
-        created.speaker_diarization_enabled
-          ? 'Live transcript saved with speaker tags.'
-          : created.audio_mime_type
-            ? 'Live transcript saved.'
-            : 'Live transcript saved without replay audio.'
-      );
+      setNotice(liveSaveNoticeForTranscript(created));
     } catch (err) {
       setError(extractApiErrorMessage(err));
     }
@@ -947,6 +1056,11 @@ export function MeetingsPage() {
                           <Badge tone={entry.capture_mode === 'live' ? 'success' : 'neutral'}>
                             {transcriptSourceLabel(entry.capture_mode)}
                           </Badge>
+                          {entry.capture_mode === 'live' && entry.post_processing_state !== 'completed' ? (
+                            <Badge tone={transcriptPostProcessingTone(entry.post_processing_state)}>
+                              {transcriptPostProcessingLabel(entry.post_processing_state)}
+                            </Badge>
+                          ) : null}
                           <Badge tone="neutral">{languageLabel(entry.language)}</Badge>
                           <Badge tone="neutral">{formatDuration(entry.duration_seconds)}</Badge>
                           {entry.speaker_diarization_enabled ? (
@@ -1058,6 +1172,11 @@ export function MeetingsPage() {
                 <Badge tone={selectedTranscript.capture_mode === 'live' ? 'success' : 'neutral'}>
                   {transcriptSourceLabel(selectedTranscript.capture_mode)}
                 </Badge>
+                {selectedTranscript.capture_mode === 'live' && selectedTranscript.post_processing_state !== 'completed' ? (
+                  <Badge tone={transcriptPostProcessingTone(selectedTranscript.post_processing_state)}>
+                    {transcriptPostProcessingLabel(selectedTranscript.post_processing_state)}
+                  </Badge>
+                ) : null}
                 <Badge tone="neutral">{languageLabel(selectedTranscript.language)}</Badge>
                 <Badge tone="neutral">{formatDuration(selectedTranscript.duration_seconds)}</Badge>
                 <Badge tone={selectedTranscript.audio_mime_type ? 'neutral' : 'warning'}>
@@ -1092,6 +1211,17 @@ export function MeetingsPage() {
                   tone="warning"
                 />
               )}
+              {selectedTranscript.capture_mode === 'live' && selectedTranscript.post_processing_state !== 'completed' ? (
+                <Notice
+                  title={
+                    selectedTranscript.post_processing_state === 'failed'
+                      ? 'Replay processing paused'
+                      : 'Replay processing in background'
+                  }
+                  description={transcriptProcessingDescription(selectedTranscript)}
+                  tone={selectedTranscript.post_processing_state === 'failed' ? 'warning' : 'info'}
+                />
+              ) : null}
               {selectedTranscript.transcript_entries.length ? (
                 selectedTranscript.speaker_diarization_enabled && hasSpeakerAttributedTranscriptEntries(selectedTranscript.transcript_entries) ? (
                   renderAsrTranscriptEntries(selectedTranscript.transcript_entries)
